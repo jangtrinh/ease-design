@@ -1,0 +1,35 @@
+{
+  "name": "ease-design",
+  "version": "0.0.0",
+  "description": "Multi-runtime design-cli — describe what you want, get pro-taste UI.",
+  "type": "module",
+  "bin": {
+    "ui": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "knowledge",
+    "schemas",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.1",
+    "eslint": "^10.4.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4",
+    "vitest": "^4.1.7"
+  }
+}
