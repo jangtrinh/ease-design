@@ -92,4 +92,27 @@ describe("parseArgs", () => {
     expect(r.flags["json"]).toBe(true);
     expect(r.flags["help"]).toBe(true);
   });
+
+  it("bare - after a string flag is treated as its value (stdin sentinel)", () => {
+    // `--markup -` must store "-" as the flag value, not drop it or
+    // misclassify it as an unknown short option.
+    const r = parseArgs(["registry", "register", "Button/Primary", "--markup", "-"]);
+    expect(r.command).toBe("registry");
+    expect(r.subcommand).toBe("register");
+    expect(r.positionals).toEqual(["Button/Primary"]);
+    expect(r.flags["markup"]).toBe("-");
+  });
+
+  it("bare - as a standalone positional is treated as a value, not an unknown flag", () => {
+    // When `-` appears as the second non-flag token it is placed in the subcommand
+    // slot (second positional carved out by the parser), not silently stored as a
+    // spurious flag entry. Commands with hasSubcommands:false re-route it back to
+    // positionals[0] in cli.ts — but the key invariant here is that no flag is set.
+    const r = parseArgs(["autofix", "-"]);
+    expect(r.command).toBe("autofix");
+    expect(r.subcommand).toBe("-");
+    expect(r.positionals).toEqual([]);
+    // Must NOT appear as a spurious flag (the old behaviour was flags[""] = true)
+    expect(r.flags[""]).toBeUndefined();
+  });
 });

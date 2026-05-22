@@ -48,6 +48,8 @@ export interface ParsedArgs {
 function isValueToken(token: string): boolean {
   if (token.startsWith("--")) return false;
   if (token === "-h" || token === "-v") return false;
+  // Bare `-` conventionally means "read from stdin" and is always a value.
+  if (token === "-") return true;
   // A `-` followed by a digit is a negative number, not a flag.
   if (token.startsWith("-") && token.length > 1 && /^-[0-9]/.test(token)) return true;
   // Any other `-x` short flag is not a value.
@@ -110,6 +112,13 @@ export function parseArgs(args: string[]): ParsedArgs {
           flags[withoutDashes] = true;
         }
       }
+      i++;
+      continue;
+    }
+
+    // Bare `-` (stdin sentinel) is a positional value, not a short flag.
+    if (token === "-") {
+      positionals.push(token);
       i++;
       continue;
     }

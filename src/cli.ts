@@ -15,6 +15,9 @@ import type { CommandResult } from "./core/output.js";
 
 import { colorCommand } from "./commands/color.js";
 import { tokensCommand } from "./commands/tokens.js";
+import { autofixCommand } from "./commands/autofix.js";
+import { validateLayoutCommand } from "./commands/validate-layout.js";
+import { registryCommand } from "./commands/registry.js";
 
 const VERSION = "0.0.1";
 
@@ -32,6 +35,9 @@ const COMMANDS: Record<string, Command> = {};
 
 COMMANDS[colorCommand.name] = colorCommand;
 COMMANDS[tokensCommand.name] = tokensCommand;
+COMMANDS[autofixCommand.name] = autofixCommand;
+COMMANDS[validateLayoutCommand.name] = validateLayoutCommand;
+COMMANDS[registryCommand.name] = registryCommand;
 
 // ─── Root help ────────────────────────────────────────────────────────────────
 
@@ -102,6 +108,14 @@ export function run(args: string[]): number {
       `ui: unknown command '${parsed.command}'\nRun 'ui --help' for usage.\n`,
     );
     return 1;
+  }
+
+  // For commands with no real subcommands the parser slots the file/positional
+  // argument into parsed.subcommand (second non-flag token). Shift it back into
+  // positionals[0] so command handlers read parsed.positionals[0] unconditionally.
+  if (!cmd.hasSubcommands && parsed.subcommand !== undefined) {
+    parsed.positionals.unshift(parsed.subcommand);
+    parsed.subcommand = undefined;
   }
 
   // Wrap dispatch so any unexpected throw becomes a clean exit 2 instead of

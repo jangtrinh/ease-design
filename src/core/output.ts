@@ -67,10 +67,21 @@ export function errJson(
   return { exitCode: 1, stdout: JSON.stringify(envelope, null, 2) + "\n" };
 }
 
-/** Build a success CommandResult — JSON envelope mode. */
+/** Build a success CommandResult — JSON envelope mode. Exit code is always 0. */
 export function okJson(command: string, data: unknown): CommandResult {
   const envelope: JsonEnvelope = { ok: true, command, data };
   return { exitCode: 0, stdout: JSON.stringify(envelope, null, 2) + "\n" };
+}
+
+/**
+ * Build a success CommandResult with a caller-supplied exit code — JSON mode.
+ * Use when the command ran successfully (`ok: true`) but the exit code conveys
+ * a pass/fail signal independent of whether the command itself errored.
+ * Example: validate-layout exits 1 when it finds errors, but `ok` stays true.
+ */
+export function okJsonWithExit(command: string, data: unknown, exitCode: number): CommandResult {
+  const envelope: JsonEnvelope = { ok: true, command, data };
+  return { exitCode, stdout: JSON.stringify(envelope, null, 2) + "\n" };
 }
 
 /** Build an internal-error CommandResult (exit 2). */

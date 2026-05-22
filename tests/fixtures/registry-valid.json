@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "components": [
+    {
+      "name": "Button/Primary",
+      "category": "action",
+      "markup": "<button class=\"btn btn-primary\" type=\"button\">Click me</button>",
+      "tokensUsed": ["color.primary", "space.4"],
+      "variants": ["primary", "secondary"],
+      "states": ["default", "hover", "disabled"],
+      "description": "Primary call-to-action button"
+    },
+    {
+      "name": "Card/Pricing",
+      "category": "layout",
+      "markup": "<div class=\"card\"><h2>Pro</h2><p>$9/mo</p></div>",
+      "tokensUsed": ["color.surface", "space.6"],
+      "description": "Pricing tier card"
+    }
+  ]
+}
