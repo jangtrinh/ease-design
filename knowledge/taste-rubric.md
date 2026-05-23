@@ -302,6 +302,27 @@ After every generation, score all applicable axes. The default **pass threshold 
   page) or, rarely, note an axis as not-applicable (e.g. Iconography for a UI with no
   icons). It should not be lowered silently to let weak output through.
 
+### Pass thresholds
+
+Every axis must score **≥ 7 / 10** for the generation to pass the gate. The
+critique workflow re-prompts the lowest-scoring axis when any axis falls below
+7, and stops after at most three critique → refine rounds.
+
+**Why 7, not 6 or 8.** The per-axis rubric describes 7–8 as *"coherent, intentional,
+honoring the persona's target"* and 9–10 as *"the axis carries the design."* A 6
+is *"functional but generic — could be any product"*. A floor of 6 lets generic,
+template-ish output ship — exactly the failure mode the gate exists to catch. A
+floor of 8 demands per-axis excellence on every generation, which inflates the
+refine loop, slows iteration, and punishes axes the persona deliberately keeps
+restrained (e.g. low Motion for a data tool, low Depth for a flat design language).
+Seven is the lowest score at which the rubric language stops calling the result
+generic, so it is the right gate height for *most personas, most modes* — strict
+enough to reject template output, lenient enough not to over-fit on a single axis.
+Briefs that want flagship-level output raise the threshold per axis (typically
+Typography and Layout to 8); briefs targeting cockpit-style data tools sometimes
+mark Motion not-applicable. The floor itself does not move below 7 — it only
+moves up.
+
 The gate's purpose is not perfectionism — it is to catch the failure mode where a model
 produces a plausible-looking but generic, system-ignoring result and ships it.
 

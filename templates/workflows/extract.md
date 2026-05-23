@@ -300,29 +300,84 @@ ui registry list --json
 - `registry list` confirms every component you intended to register made
   it in, with the canonical names you assigned.
 
-### 10. Hand off to the quality gate
+### 10. Run the DS-validity gate
 
-Pass the extracted DS to `templates/workflows/critique.md`. The critique
-gate scores the 6 taste axes plus the 7th Consistency axis. Extraction has
-no generated HTML to score the visual axes against directly — instead, the
-gate runs `ui ds context` and inspects:
+Extraction produces a Design System on disk, **not** rendered HTML. The
+6+1-axis taste gate in `templates/workflows/critique.md` scores rendered
+markup against a persona's craft targets — it has no input to grade here.
+Extraction therefore does **not** hand off to `critique.md`. Instead, the
+closure step is a DS-validity gate: a fixed set of checks that prove the
+extracted artifact is internally consistent, accessibility-clean, and
+mutable through the canonical mutation surface.
 
-- **Layout / Spacing** — does the spacing scale form a real grid (integer
-  multiples of a base unit), or is it noise?
-- **Typography** — is the font-size scale monotonic, with sensible ratios
-  between steps, and at most 2 font families?
-- **Color** — do all semantic foreground/background pairs pass WCAG 4.5:1
-  (text) and 3:1 (large text)? `ui color contrast` is the oracle.
-- **Depth / Surface** — is the shadow scale ordered (sm < md < lg < xl by
-  ambient + spread), or arbitrary?
-- **Consistency** — does the component count look right for the source (no
-  silent drops), and does every registered component declare at least one
-  token from `--tokens` (i.e. the registry actually links back to the token
-  store)?
+State explicitly to the user: *"extraction has no rendered HTML, so the
+6+1-axis taste gate does not apply; this DS-validity gate is the closure
+step."*
 
-Iconography and Motion are not usually observable in static extraction —
-the gate records them as N/A unless icon font / SVG hints and CSS
-transitions/animations are present in the source.
+Run all four checks. Every one must pass — surface any failure to the
+user with the suggested remediation and stop the workflow.
+
+1. **Manifest + tokens + registry load cleanly.**
+
+   ```sh
+   ui ds context --strict --format json
+   ```
+
+   Must exit `0`. A non-zero exit — especially `DS_TAMPERED` — means
+   the manifest hash does not match the tokens + registry on disk; the
+   extraction left the DS internally inconsistent and must be re-run.
+   Surface the exit code to the user and stop.
+
+2. **Registry sanity.**
+
+   ```sh
+   ui registry list --json
+   ```
+
+   Inspect the JSON envelope. The component count should be plausible
+   for the source (no silent drops between step 8 and now). Every
+   record must use a canonical `Category/Variant` name and declare at
+   least one entry under `tokens` — a registry record with zero linked
+   tokens means the component was registered without proving it
+   consumes the token store, which fragments the system.
+
+3. **Color-contrast spot check on semantic palette pairs.** For every
+   semantic foreground/background pair in the extracted tokens
+   (typically `color-text-body` over `color-surface`,
+   `color-text-muted` over `color-surface`, primary action text over
+   `color-primary`, danger text over `color-danger`), resolve each
+   alias to its primitive and run:
+
+   ```sh
+   ui color contrast <foreground-hex> <background-hex>
+   ```
+
+   Body text pairs must clear **WCAG 4.5 : 1**; large-text and
+   non-text UI pairs must clear **3 : 1**. Any pair below threshold
+   gets reported to the user with the suggested remediation — pick a
+   different primitive stop for the failing semantic role and re-run
+   `ui ds change-token` on that path (covered in check 4).
+
+4. **Token-graph round-trip via the sanctioned mutation surface.**
+   Confirm a known semantic alias can be repointed and resolves
+   correctly:
+
+   ```sh
+   ui ds change-token color.primary --value "{blue.600}"
+   ui ds context --strict --format json
+   ui ds change-token color.primary --value "{<original-primitive>}"
+   ```
+
+   The intermediate `ds context` must succeed (manifest re-seals
+   cleanly, dependency graph stays acyclic). The final
+   `change-token` restores the original alias so the round-trip is
+   non-destructive. A failure here means the token graph the
+   extractor produced cannot survive a normal rebrand operation —
+   the DS is sealed but brittle.
+
+When all four checks pass, the extracted DS is the project's source of
+truth for every subsequent `/ui:generate`. Generated HTML *will* run
+through `critique.md` per its own contract; the DS itself does not.
 
 ---
 
@@ -337,8 +392,8 @@ transitions/animations are present in the source.
     the init plus every `change-token` applied during step 7.
 - A summary printed to the host model surface: counts (tokens extracted,
   components registered), the synthesized persona slug + family, any
-  contrast or scale issues surfaced by the quality gate, and the path
-  `ui ds context` will read from on subsequent calls.
+  contrast or scale issues surfaced by the DS-validity gate (step 10),
+  and the path `ui ds context` will read from on subsequent calls.
 - **No new HTML.** Extraction is a system-building workflow, not a
   generation workflow. Run `/ui:generate` next to produce HTML that lives
   inside the extracted system.
@@ -347,12 +402,22 @@ transitions/animations are present in the source.
 
 ## Quality gate
 
-Run `templates/workflows/critique.md` against the populated `design/`
-directory. The gate scores the same 6 + 1 axes as every other workflow,
-but the inputs it inspects are the manifest, tokens, and registry rather
-than rendered HTML — see step 10 for the axis-by-axis mapping. The
-workflow is complete only when the gate passes. On persistent failure
-(e.g. contrast can't be made to pass without changing the chosen palette),
-surface the failing axis + the suggested remediation to the user; the
-remediation is usually "pick a different stop for the failing semantic
-role and re-run `ui ds change-token` on that path".
+Extraction does **not** defer to `templates/workflows/critique.md` — the
+taste gate scores rendered HTML against persona targets, and extraction
+has none. The closure step is the **DS-validity gate** defined in step
+10: `ui ds context --strict --format json` exits clean, `ui registry
+list --json` shows plausible counts and canonical names with linked
+tokens, `ui color contrast` clears WCAG on every semantic
+foreground/background pair, and a `change-token` round-trip leaves the
+manifest re-sealed. The workflow is complete only when all four checks
+pass. On persistent failure — usually a contrast pair that can't clear
+threshold without changing the palette — surface the failing check and
+the remediation to the user; the remediation is typically "pick a
+different primitive stop for the failing semantic role and re-run
+`ui ds change-token` on that path".
+
+Generated HTML produced by subsequent `/ui:generate` runs against the
+extracted DS *will* be scored by `critique.md`, including its 7th
+Consistency axis (which is exactly what the registry + tokens populated
+here exist to enforce). That is the right time for the taste gate, not
+now.
