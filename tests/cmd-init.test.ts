@@ -1,12 +1,8 @@
 import { describe, expect, it, afterEach } from "vitest";
-import { fileURLToPath } from "node:url";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { mkdirSync, existsSync, rmSync, readFileSync } from "node:fs";
+import { mkdirSync, existsSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { run } from "../src/cli.js";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-void HERE; // used only via fix() if needed
 
 function captureRun(args: string[]): { code: number; out: string; err: string } {
   let out = "";
@@ -55,19 +51,23 @@ describe("ui init --runtime claude", () => {
     expect(existsSync(join(cwd, ".claude", "ease-design.json"))).toBe(true);
   });
 
-  it("manifest has correct schema: version:1, status:stub, runtime:claude, roadmapPointer non-empty", () => {
+  it("manifest has correct schema: version:1, status:ready, runtime:claude, roadmapPointer non-empty", () => {
     const cwd = makeTmpDir();
     captureRun(["init", "--runtime", "claude", "--cwd", cwd]);
     const manifest = JSON.parse(
       readFileSync(join(cwd, ".claude", "ease-design.json"), "utf8"),
-    ) as { version: number; status: string; runtime: string; roadmapPointer: string; generatedAt: string };
+    ) as { version: number; status: string; runtime: string; roadmapPointer: string; generatedAt: string; adapters: string[]; templateHashes: Record<string, string> };
     expect(manifest.version).toBe(1);
-    expect(manifest.status).toBe("stub");
+    expect(manifest.status).toBe("ready");
     expect(manifest.runtime).toBe("claude");
     expect(manifest.roadmapPointer.length).toBeGreaterThan(0);
     // generatedAt must be a valid ISO-8601 string
     expect(() => new Date(manifest.generatedAt)).not.toThrow();
     expect(new Date(manifest.generatedAt).toISOString()).toBe(manifest.generatedAt);
+    // adapter tree fields
+    expect(Array.isArray(manifest.adapters)).toBe(true);
+    expect(manifest.adapters.length).toBeGreaterThan(0);
+    expect(typeof manifest.templateHashes).toBe("object");
   });
 });
 
@@ -169,5 +169,138 @@ describe("ui init argument validation", () => {
     const { code, out } = captureRun(["init", "--help"]);
     expect(code).toBe(0);
     expect(out.toLowerCase()).toContain("init");
+  });
+});
+
+// ── Adapter tree integration tests ────────────────────────────────────────────
+
+describe("ui init --runtime claude adapter tree", () => {
+  it("JSON envelope data.adapters[0].paths has 15 entries", () => {
+    const cwd = makeTmpDir();
+    const { code, out } = captureRun(["init", "--runtime", "claude", "--cwd", cwd, "--json"]);
+    expect(code).toBe(0);
+    const json = JSON.parse(out) as {
+      data: { adapters: { runtime: string; paths: string[] }[] };
+    };
+    expect(json.data.adapters).toHaveLength(1);
+    expect(json.data.adapters[0]?.paths.length).toBe(15);
+  });
+
+  it("JSON envelope data.adapters[0].paths includes the generate slash-command path", () => {
+    const cwd = makeTmpDir();
+    const { out } = captureRun(["init", "--runtime", "claude", "--cwd", cwd, "--json"]);
+    const json = JSON.parse(out) as {
+      data: { adapters: { runtime: string; paths: string[] }[] };
+    };
+    const paths = json.data.adapters[0]?.paths ?? [];
+    expect(paths.some((p) => p.endsWith(".claude/commands/ui/generate.md") || p.includes("commands/ui/generate.md"))).toBe(true);
+  });
+
+  it("on-disk manifest has status 'ready' with adapters and templateHashes", () => {
+    const cwd = makeTmpDir();
+    captureRun(["init", "--runtime", "claude", "--cwd", cwd]);
+    const manifest = JSON.parse(
+      readFileSync(join(cwd, ".claude", "ease-design.json"), "utf8"),
+    ) as { status: string; adapters: string[]; templateHashes: Record<string, string> };
+    expect(manifest.status).toBe("ready");
+    expect(Array.isArray(manifest.adapters)).toBe(true);
+    expect(manifest.adapters.length).toBeGreaterThan(0);
+    expect(Object.keys(manifest.templateHashes).length).toBeGreaterThan(0);
+  });
+
+  it("adapter files exist on disk after init", () => {
+    const cwd = makeTmpDir();
+    captureRun(["init", "--runtime", "claude", "--cwd", cwd]);
+    expect(existsSync(join(cwd, ".claude", "commands", "ui", "generate.md"))).toBe(true);
+    expect(existsSync(join(cwd, ".claude", "skills", "ease-design-pick-persona", "SKILL.md"))).toBe(true);
+  });
+
+  it("--force rewrites adapter files byte-identically", () => {
+    const cwd = makeTmpDir();
+    captureRun(["init", "--runtime", "claude", "--cwd", cwd]);
+    const originalBytes = readFileSync(join(cwd, ".claude", "commands", "ui", "generate.md"));
+    // Corrupt the file
+    writeFileSync(join(cwd, ".claude", "commands", "ui", "generate.md"), "corrupted", "utf8");
+    const { code } = captureRun(["init", "--runtime", "claude", "--cwd", cwd, "--force"]);
+    expect(code).toBe(0);
+    const restoredBytes = readFileSync(join(cwd, ".claude", "commands", "ui", "generate.md"));
+    expect(restoredBytes.toString("utf8")).toBe(originalBytes.toString("utf8"));
+  });
+});
+
+describe("ui init adapter pre-flight collision", () => {
+  it("pre-existing adapter file without --force → exit 1, MANIFEST_EXISTS naming the adapter path", () => {
+    const cwd = makeTmpDir();
+    // Pre-create the generate adapter file
+    mkdirSync(join(cwd, ".claude", "commands", "ui"), { recursive: true });
+    writeFileSync(join(cwd, ".claude", "commands", "ui", "generate.md"), "pre-existing", "utf8");
+    const { code, out } = captureRun(["init", "--runtime", "claude", "--cwd", cwd, "--json"]);
+    expect(code).toBe(1);
+    const json = JSON.parse(out) as { error: { code: string; message: string } };
+    expect(json.error.code).toBe("MANIFEST_EXISTS");
+    expect(json.error.message).toContain("generate.md");
+  });
+});
+
+describe("ui init --runtime codex AGENTS.md integration", () => {
+  it("writes AGENTS.md with sentinel block when file does not exist", () => {
+    const cwd = makeTmpDir();
+    captureRun(["init", "--runtime", "codex", "--cwd", cwd]);
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(true);
+    const content = readFileSync(join(cwd, "AGENTS.md"), "utf8");
+    expect(content).toContain("<!-- BEGIN ease-design -->");
+    expect(content).toContain("<!-- END ease-design -->");
+  });
+
+  it("pre-existing AGENTS.md with sentinel block and no --force → MANIFEST_EXISTS", () => {
+    const cwd = makeTmpDir();
+    captureRun(["init", "--runtime", "codex", "--cwd", cwd]);
+    const { code, out } = captureRun(["init", "--runtime", "codex", "--cwd", cwd, "--json"]);
+    expect(code).toBe(1);
+    const json = JSON.parse(out) as { error: { code: string } };
+    expect(json.error.code).toBe("MANIFEST_EXISTS");
+  });
+
+  it("pre-existing AGENTS.md without sentinel block → appends; second run without --force errors", () => {
+    const cwd = makeTmpDir();
+    // Write AGENTS.md without the sentinel block
+    writeFileSync(join(cwd, "AGENTS.md"), "# My Project\n\nUser content.\n", "utf8");
+    const { code: code1 } = captureRun(["init", "--runtime", "codex", "--cwd", cwd]);
+    expect(code1).toBe(0);
+    const content = readFileSync(join(cwd, "AGENTS.md"), "utf8");
+    expect(content).toContain("User content.");
+    expect(content).toContain("<!-- BEGIN ease-design -->");
+    // Second run: block now exists → MANIFEST_EXISTS without --force
+    const { code: code2, out } = captureRun(["init", "--runtime", "codex", "--cwd", cwd, "--json"]);
+    expect(code2).toBe(1);
+    const json = JSON.parse(out) as { error: { code: string } };
+    expect(json.error.code).toBe("MANIFEST_EXISTS");
+  });
+});
+
+describe("ui init --all cross-runtime rollback", () => {
+  it("failure on runtime N rolls back adapter files written for runtimes 0..N-1", () => {
+    const cwd = makeTmpDir();
+
+    // Block antigravity workflows dir by placing a plain file where mkdirSync
+    // would need to create a directory — this causes adapter write to fail for
+    // the antigravity runtime (the second in the RUNTIMES order after claude).
+    // We create the parent dir first, then drop a regular file named "workflows"
+    // so mkdirSync(.agent/workflows/) throws ENOTDIR.
+    mkdirSync(join(cwd, ".agent"), { recursive: true });
+    writeFileSync(join(cwd, ".agent", "workflows"), "blocker", "utf8");
+
+    const { code, out } = captureRun(["init", "--all", "--cwd", cwd, "--json"]);
+
+    // Must fail
+    expect(code).toBe(1);
+    const json = JSON.parse(out) as { error: { code: string } };
+    expect(json.error.code).toBe("WRITE_ERROR");
+
+    // Claude adapter files that were written for the first runtime must be
+    // rolled back — none of the .claude/commands/ui/ files should remain.
+    expect(existsSync(join(cwd, ".claude", "commands", "ui", "generate.md"))).toBe(false);
+    // Claude manifest must also be rolled back.
+    expect(existsSync(join(cwd, ".claude", "ease-design.json"))).toBe(false);
   });
 });
