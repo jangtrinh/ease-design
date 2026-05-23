@@ -23,6 +23,7 @@ import { stripFencesCommand } from "./commands/strip-fences.js";
 import { parseJsonStreamCommand } from "./commands/parse-json-stream.js";
 import { exportCommand } from "./commands/export.js";
 import { initCommand } from "./commands/init.js";
+import { dsCommand } from "./commands/ds.js";
 
 const VERSION = "0.0.1";
 
@@ -48,6 +49,7 @@ COMMANDS[stripFencesCommand.name] = stripFencesCommand;
 COMMANDS[parseJsonStreamCommand.name] = parseJsonStreamCommand;
 COMMANDS[exportCommand.name] = exportCommand;
 COMMANDS[initCommand.name] = initCommand;
+COMMANDS[dsCommand.name] = dsCommand;
 
 // ─── Root help ────────────────────────────────────────────────────────────────
 

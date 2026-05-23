@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ease-design.dev/schemas/ds.manifest.schema.json",
+  "title": "ease-design DS manifest",
+  "type": "object",
+  "required": ["name", "version", "createdAt", "persona", "intent",
+               "compiledHash", "registryHash", "generation", "changelog"],
+  "additionalProperties": false,
+  "properties": {
+    "name":         { "type": "string", "minLength": 1, "maxLength": 64 },
+    "version":      { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "createdAt":    { "type": "string", "format": "date-time" },
+    "persona": {
+      "type": "object",
+      "required": ["slug", "family"],
+      "additionalProperties": false,
+      "properties": {
+        "slug":         { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "family":       { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "antiPatterns": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "intent":       { "type": "string", "maxLength": 512 },
+    "compiledHash": { "type": "string", "pattern": "^sha256-[A-Za-z0-9_-]+$" },
+    "registryHash": { "type": "string", "pattern": "^sha256-[A-Za-z0-9_-]+$" },
+    "generation":   { "type": "integer", "minimum": 1 },
+    "changelog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ts", "kind", "by"],
+        "additionalProperties": false,
+        "properties": {
+          "ts":     { "type": "string", "format": "date-time" },
+          "kind":   { "type": "string", "enum": ["init", "change-token", "register"] },
+          "by":     { "type": "string", "maxLength": 64 },
+          "path":   { "type": "string" },
+          "from":   { "type": "string" },
+          "to":     { "type": "string" },
+          "reason": { "type": "string", "maxLength": 256 },
+          "note":   { "type": "string", "maxLength": 256 }
+        }
+      }
+    }
+  }
+}

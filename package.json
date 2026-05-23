@@ -20,7 +20,8 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",
-    "test": "vitest run"
+    "test": "vitest run",
+    "personas:verify": "node scripts/derive-personas-json.mjs"
   },
   "license": "MIT",
   "devDependencies": {

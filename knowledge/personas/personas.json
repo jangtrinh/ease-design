@@ -1,0 +1,1251 @@
+[
+  {
+    "slug": "liquid-glass",
+    "family": "material-surface",
+    "uiTypes": [
+      "landing",
+      "app",
+      "dashboard",
+      "portfolio"
+    ],
+    "density": "comfortable",
+    "colorMode": "both",
+    "trending": true,
+    "keywords": [
+      "glass",
+      "translucent",
+      "blur",
+      "apple",
+      "liquid",
+      "refraction",
+      "modern",
+      "premium"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "SF Pro Display, Inter, sans-serif",
+      "fontFamilyBody": "SF Pro Text, Inter, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#3B82F6",
+      "neutralHex": "#71717A",
+      "successHex": "#16A34A",
+      "warningHex": "#F59E0B",
+      "dangerHex": "#DC2626",
+      "infoHex": "#0EA5E9",
+      "bgLightHex": "#FFFFFF",
+      "bgDarkHex": "#18181B"
+    },
+    "radius": {
+      "sm": "6px",
+      "md": "12px",
+      "lg": "20px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "soft",
+    "antiPatterns": [
+      "opaque backgrounds",
+      "hard shadows",
+      "sharp corners",
+      "flat surfaces",
+      "heavy borders"
+    ]
+  },
+  {
+    "slug": "prismatic-glass",
+    "family": "material-surface",
+    "uiTypes": [
+      "landing",
+      "app",
+      "portfolio"
+    ],
+    "density": "comfortable",
+    "colorMode": "light",
+    "trending": false,
+    "keywords": [
+      "glass",
+      "rainbow",
+      "prism",
+      "light",
+      "prismatic",
+      "spectrum",
+      "refraction"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Inter, Outfit, sans-serif",
+      "fontFamilyBody": "Inter, Outfit, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#8B5CF6",
+      "neutralHex": "#6B7280",
+      "successHex": "#10B981",
+      "warningHex": "#F59E0B",
+      "dangerHex": "#EF4444",
+      "infoHex": "#3B82F6",
+      "bgLightHex": "#FAFAFA",
+      "bgDarkHex": "#1E1B4B"
+    },
+    "radius": {
+      "sm": "8px",
+      "md": "16px",
+      "lg": "24px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "soft",
+    "antiPatterns": [
+      "dark backgrounds",
+      "heavy bold aesthetics",
+      "matte textures",
+      "industrial elements",
+      "monospace fonts"
+    ]
+  },
+  {
+    "slug": "haptic-claymorphism",
+    "family": "material-surface",
+    "uiTypes": [
+      "landing",
+      "app",
+      "social"
+    ],
+    "density": "comfortable",
+    "colorMode": "light",
+    "trending": false,
+    "keywords": [
+      "clay",
+      "soft",
+      "tactile",
+      "rounded",
+      "pastel",
+      "friendly",
+      "playful"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Nunito, Quicksand, sans-serif",
+      "fontFamilyBody": "Nunito, Quicksand, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#EC4899",
+      "neutralHex": "#9CA3AF",
+      "successHex": "#34D399",
+      "warningHex": "#FBBF24",
+      "dangerHex": "#F87171",
+      "infoHex": "#60A5FA",
+      "bgLightHex": "#FDF2F8",
+      "bgDarkHex": "#1F1927"
+    },
+    "radius": {
+      "sm": "12px",
+      "md": "20px",
+      "lg": "32px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "medium",
+    "antiPatterns": [
+      "sharp corners",
+      "thin borders",
+      "monospace fonts",
+      "neon colors",
+      "angular shapes"
+    ]
+  },
+  {
+    "slug": "velvet-noir",
+    "family": "material-surface",
+    "uiTypes": [
+      "landing",
+      "app",
+      "ecommerce",
+      "portfolio"
+    ],
+    "density": "comfortable",
+    "colorMode": "dark",
+    "trending": false,
+    "keywords": [
+      "dark",
+      "luxury",
+      "velvet",
+      "warm",
+      "gold",
+      "premium",
+      "elegant"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Playfair Display, Georgia, serif",
+      "fontFamilyBody": "Inter, Satoshi, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#C9A55C",
+      "neutralHex": "#8B8B8B",
+      "successHex": "#4CAF50",
+      "warningHex": "#FF9800",
+      "dangerHex": "#F44336",
+      "infoHex": "#2196F3",
+      "bgLightHex": "#F5F0E8",
+      "bgDarkHex": "#1A1614"
+    },
+    "radius": {
+      "sm": "12px",
+      "md": "16px",
+      "lg": "20px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "strong",
+    "antiPatterns": [
+      "cold blue-black backgrounds",
+      "neon accents",
+      "stark white elements",
+      "flat harsh contrasts",
+      "casual playful tone"
+    ]
+  },
+  {
+    "slug": "semi-flat-depth",
+    "family": "material-surface",
+    "uiTypes": [
+      "dashboard",
+      "admin",
+      "app",
+      "landing",
+      "documentation"
+    ],
+    "density": "comfortable",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "clean",
+      "professional",
+      "material",
+      "elevation",
+      "structured",
+      "system",
+      "functional"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Roboto, Inter, sans-serif",
+      "fontFamilyBody": "Roboto, Inter, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 500
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#1976D2",
+      "neutralHex": "#757575",
+      "successHex": "#388E3C",
+      "warningHex": "#F57C00",
+      "dangerHex": "#D32F2F",
+      "infoHex": "#0288D1",
+      "bgLightHex": "#FAFAFA",
+      "bgDarkHex": "#121212"
+    },
+    "radius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 8
+    },
+    "shadowIntensity": "medium",
+    "antiPatterns": [
+      "heavy textures",
+      "gradient backgrounds",
+      "decorative borders",
+      "extreme whitespace",
+      "experimental layouts"
+    ]
+  },
+  {
+    "slug": "modern-skeuomorphism",
+    "family": "material-surface",
+    "uiTypes": [
+      "app",
+      "dashboard"
+    ],
+    "density": "comfortable",
+    "colorMode": "light",
+    "trending": false,
+    "keywords": [
+      "tactile",
+      "physical",
+      "material",
+      "warm",
+      "realistic",
+      "depth",
+      "premium"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "SF Pro Display, system-ui, sans-serif",
+      "fontFamilyBody": "SF Pro Text, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#2563EB",
+      "neutralHex": "#6B7280",
+      "successHex": "#16A34A",
+      "warningHex": "#D97706",
+      "dangerHex": "#DC2626",
+      "infoHex": "#0284C7",
+      "bgLightHex": "#F3F4F6",
+      "bgDarkHex": "#1F2937"
+    },
+    "radius": {
+      "sm": "8px",
+      "md": "12px",
+      "lg": "16px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "strong",
+    "antiPatterns": [
+      "flat design",
+      "neon colors",
+      "extreme minimalism",
+      "wireframe style",
+      "pure white backgrounds"
+    ]
+  },
+  {
+    "slug": "dopamine-maximalism",
+    "family": "material-surface",
+    "uiTypes": [
+      "landing",
+      "app",
+      "social",
+      "ecommerce"
+    ],
+    "density": "comfortable",
+    "colorMode": "light",
+    "trending": true,
+    "keywords": [
+      "bold",
+      "colorful",
+      "fun",
+      "dopamine",
+      "vibrant",
+      "playful",
+      "energetic",
+      "squishy"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Nunito, Fredoka, sans-serif",
+      "fontFamilyBody": "Nunito, sans-serif",
+      "fontWeightBody": 500,
+      "fontWeightHeading": 800
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#7C3AED",
+      "neutralHex": "#6B7280",
+      "successHex": "#10B981",
+      "warningHex": "#F59E0B",
+      "dangerHex": "#EF4444",
+      "infoHex": "#06B6D4",
+      "bgLightHex": "#FFFBEB",
+      "bgDarkHex": "#1C1917"
+    },
+    "radius": {
+      "sm": "16px",
+      "md": "24px",
+      "lg": "40px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "medium",
+    "antiPatterns": [
+      "muted colors",
+      "minimal design",
+      "corporate look",
+      "thin fonts",
+      "subtle styling"
+    ]
+  },
+  {
+    "slug": "spatial-bento-geometry",
+    "family": "functional-saas",
+    "uiTypes": [
+      "landing",
+      "dashboard",
+      "admin",
+      "app"
+    ],
+    "density": "compact",
+    "colorMode": "light",
+    "trending": false,
+    "keywords": [
+      "bento",
+      "grid",
+      "modular",
+      "spatial",
+      "dense",
+      "compartment",
+      "dashboard"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Inter, system-ui, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#0F172A",
+      "neutralHex": "#64748B",
+      "successHex": "#16A34A",
+      "warningHex": "#EA580C",
+      "dangerHex": "#DC2626",
+      "infoHex": "#0284C7",
+      "bgLightHex": "#F8FAFC",
+      "bgDarkHex": "#0F172A"
+    },
+    "radius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "soft",
+    "antiPatterns": [
+      "full-bleed hero sections",
+      "serif fonts",
+      "organic shapes",
+      "extreme whitespace"
+    ]
+  },
+  {
+    "slug": "saas-aurora-minimal",
+    "family": "functional-saas",
+    "uiTypes": [
+      "landing",
+      "dashboard",
+      "app",
+      "admin"
+    ],
+    "density": "comfortable",
+    "colorMode": "light",
+    "trending": false,
+    "keywords": [
+      "saas",
+      "clean",
+      "aurora",
+      "professional",
+      "modern",
+      "gradient",
+      "minimal"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Inter, system-ui, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#6366F1",
+      "neutralHex": "#6B7280",
+      "successHex": "#10B981",
+      "warningHex": "#F59E0B",
+      "dangerHex": "#EF4444",
+      "infoHex": "#3B82F6",
+      "bgLightHex": "#FFFFFF",
+      "bgDarkHex": "#0F0F23"
+    },
+    "radius": {
+      "sm": "6px",
+      "md": "10px",
+      "lg": "16px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "soft",
+    "antiPatterns": [
+      "heavy textures",
+      "maximalist decoration",
+      "extreme artistic expression",
+      "unpredictable layouts"
+    ]
+  },
+  {
+    "slug": "data-dense-observatory",
+    "family": "functional-saas",
+    "uiTypes": [
+      "dashboard",
+      "admin",
+      "app"
+    ],
+    "density": "compact",
+    "colorMode": "dark",
+    "trending": false,
+    "keywords": [
+      "data",
+      "dense",
+      "charts",
+      "metrics",
+      "numbers",
+      "dashboard",
+      "observatory"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "JetBrains Mono, Fira Code, monospace",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 500
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#22D3EE",
+      "neutralHex": "#6B7280",
+      "successHex": "#4ADE80",
+      "warningHex": "#FACC15",
+      "dangerHex": "#F87171",
+      "infoHex": "#60A5FA",
+      "bgLightHex": "#F1F5F9",
+      "bgDarkHex": "#0A0F1E"
+    },
+    "radius": {
+      "sm": "2px",
+      "md": "4px",
+      "lg": "8px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "none",
+    "antiPatterns": [
+      "decorative images",
+      "large whitespace",
+      "playful aesthetics",
+      "rounded pill buttons",
+      "serif fonts"
+    ]
+  },
+  {
+    "slug": "industrial-blueprint",
+    "family": "editorial-minimal",
+    "uiTypes": [
+      "dashboard",
+      "admin",
+      "documentation",
+      "app"
+    ],
+    "density": "compact",
+    "colorMode": "dark",
+    "trending": false,
+    "keywords": [
+      "blueprint",
+      "technical",
+      "precision",
+      "engineering",
+      "grid",
+      "mono",
+      "data"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "IBM Plex Mono, Courier New, monospace",
+      "fontFamilyBody": "IBM Plex Sans, Inter, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#1D9BF0",
+      "neutralHex": "#8899A6",
+      "successHex": "#00BA7C",
+      "warningHex": "#FFB800",
+      "dangerHex": "#F4212E",
+      "infoHex": "#1D9BF0",
+      "bgLightHex": "#F7F9FA",
+      "bgDarkHex": "#15202B"
+    },
+    "radius": {
+      "sm": "0px",
+      "md": "2px",
+      "lg": "4px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "none",
+    "antiPatterns": [
+      "decorative elements",
+      "organic shapes",
+      "playful fonts",
+      "bright saturated colors",
+      "large whitespace"
+    ]
+  },
+  {
+    "slug": "quiet-luxury-editorial",
+    "family": "editorial-minimal",
+    "uiTypes": [
+      "landing",
+      "portfolio",
+      "ecommerce"
+    ],
+    "density": "spacious",
+    "colorMode": "light",
+    "trending": false,
+    "keywords": [
+      "luxury",
+      "editorial",
+      "serif",
+      "whitespace",
+      "quiet",
+      "refined",
+      "minimal"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Cormorant Garamond, Georgia, serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 300,
+      "fontWeightHeading": 400
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#1C1C1C",
+      "neutralHex": "#9E9E9E",
+      "successHex": "#2E7D32",
+      "warningHex": "#E65100",
+      "dangerHex": "#C62828",
+      "infoHex": "#1565C0",
+      "bgLightHex": "#FAFAF8",
+      "bgDarkHex": "#111111"
+    },
+    "radius": {
+      "sm": "0px",
+      "md": "2px",
+      "lg": "4px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 8
+    },
+    "shadowIntensity": "none",
+    "antiPatterns": [
+      "bright accent colors",
+      "rounded pill buttons",
+      "playful fonts",
+      "dense layouts",
+      "decorative icons"
+    ]
+  },
+  {
+    "slug": "abyssal-void-tech",
+    "family": "immersive-cinematic",
+    "uiTypes": [
+      "landing",
+      "dashboard",
+      "app"
+    ],
+    "density": "comfortable",
+    "colorMode": "dark",
+    "trending": false,
+    "keywords": [
+      "dark",
+      "void",
+      "glow",
+      "neon",
+      "bioluminescent",
+      "futuristic",
+      "space"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Orbitron, Space Grotesk, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#00FFC2",
+      "neutralHex": "#4B5563",
+      "successHex": "#00FF88",
+      "warningHex": "#FFD700",
+      "dangerHex": "#FF2D6D",
+      "infoHex": "#00BFFF",
+      "bgLightHex": "#F0FFF4",
+      "bgDarkHex": "#000000"
+    },
+    "radius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "16px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "strong",
+    "antiPatterns": [
+      "white backgrounds",
+      "warm colors",
+      "heavy shadows",
+      "playful cute aesthetics",
+      "serif fonts"
+    ]
+  },
+  {
+    "slug": "particle-atmosphere",
+    "family": "immersive-cinematic",
+    "uiTypes": [
+      "landing",
+      "dashboard",
+      "app"
+    ],
+    "density": "comfortable",
+    "colorMode": "dark",
+    "trending": true,
+    "keywords": [
+      "particle",
+      "dark",
+      "glow",
+      "futuristic",
+      "ai",
+      "developer",
+      "space",
+      "atmosphere"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Space Grotesk, Inter, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#818CF8",
+      "neutralHex": "#6B7280",
+      "successHex": "#34D399",
+      "warningHex": "#FBBF24",
+      "dangerHex": "#F87171",
+      "infoHex": "#38BDF8",
+      "bgLightHex": "#F0F4FF",
+      "bgDarkHex": "#030712"
+    },
+    "radius": {
+      "sm": "6px",
+      "md": "12px",
+      "lg": "20px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "medium",
+    "antiPatterns": [
+      "light backgrounds",
+      "pastel colors",
+      "heavy borders",
+      "traditional corporate look",
+      "flat design"
+    ]
+  },
+  {
+    "slug": "motion-led-storytelling",
+    "family": "immersive-cinematic",
+    "uiTypes": [
+      "landing",
+      "portfolio"
+    ],
+    "density": "spacious",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "cinematic",
+      "story",
+      "scroll",
+      "animation",
+      "dramatic",
+      "immersive",
+      "narrative"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Clash Display, Bebas Neue, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#E11D48",
+      "neutralHex": "#71717A",
+      "successHex": "#16A34A",
+      "warningHex": "#D97706",
+      "dangerHex": "#DC2626",
+      "infoHex": "#0EA5E9",
+      "bgLightHex": "#FFFFFF",
+      "bgDarkHex": "#09090B"
+    },
+    "radius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "16px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 8
+    },
+    "shadowIntensity": "strong",
+    "antiPatterns": [
+      "dense data layouts",
+      "multi-column grids",
+      "static content",
+      "corporate templates",
+      "standard navigation"
+    ]
+  },
+  {
+    "slug": "kinetic-swiss-punk",
+    "family": "graphic-modernist",
+    "uiTypes": [
+      "landing",
+      "portfolio"
+    ],
+    "density": "comfortable",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "swiss",
+      "typography",
+      "grid",
+      "punk",
+      "bold",
+      "primary",
+      "modernist"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Neue Haas Grotesk, Helvetica, sans-serif",
+      "fontFamilyBody": "Neue Haas Grotesk, Helvetica, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 900
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#FF0000",
+      "neutralHex": "#000000",
+      "successHex": "#008000",
+      "warningHex": "#FFFF00",
+      "dangerHex": "#FF0000",
+      "infoHex": "#0000FF",
+      "bgLightHex": "#FFFFFF",
+      "bgDarkHex": "#000000"
+    },
+    "radius": {
+      "sm": "0px",
+      "md": "0px",
+      "lg": "0px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 8
+    },
+    "shadowIntensity": "none",
+    "antiPatterns": [
+      "decorative elements",
+      "rounded corners",
+      "soft subtle colors",
+      "gradients",
+      "icon decorations"
+    ]
+  },
+  {
+    "slug": "kinetic-type-studio",
+    "family": "graphic-modernist",
+    "uiTypes": [
+      "landing",
+      "portfolio"
+    ],
+    "density": "spacious",
+    "colorMode": "both",
+    "trending": true,
+    "keywords": [
+      "typography",
+      "type",
+      "bold",
+      "minimal",
+      "editorial",
+      "poster",
+      "display",
+      "variable"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Fraunces, Playfair Display, serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#111111",
+      "neutralHex": "#737373",
+      "successHex": "#166534",
+      "warningHex": "#92400E",
+      "dangerHex": "#991B1B",
+      "infoHex": "#1E40AF",
+      "bgLightHex": "#FAFAFA",
+      "bgDarkHex": "#0A0A0A"
+    },
+    "radius": {
+      "sm": "0px",
+      "md": "2px",
+      "lg": "4px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 8
+    },
+    "shadowIntensity": "none",
+    "antiPatterns": [
+      "image-heavy layouts",
+      "small typography",
+      "decorative UI",
+      "rounded containers",
+      "complex navigation"
+    ]
+  },
+  {
+    "slug": "neo-frutiger-aero",
+    "family": "retro-digital",
+    "uiTypes": [
+      "landing",
+      "app"
+    ],
+    "density": "comfortable",
+    "colorMode": "light",
+    "trending": false,
+    "keywords": [
+      "aero",
+      "glossy",
+      "aqua",
+      "nostalgic",
+      "vista",
+      "retro",
+      "optimistic"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Segoe UI, Tahoma, sans-serif",
+      "fontFamilyBody": "Segoe UI, Tahoma, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 600
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#0078D4",
+      "neutralHex": "#605E5C",
+      "successHex": "#107C10",
+      "warningHex": "#FFB900",
+      "dangerHex": "#A80000",
+      "infoHex": "#0078D4",
+      "bgLightHex": "#F3F2F1",
+      "bgDarkHex": "#201F1E"
+    },
+    "radius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "medium",
+    "antiPatterns": [
+      "flat design",
+      "dark themes",
+      "industrial aesthetics",
+      "monochrome palettes",
+      "harsh contrasts"
+    ]
+  },
+  {
+    "slug": "iridescent-chrome",
+    "family": "retro-digital",
+    "uiTypes": [
+      "landing",
+      "portfolio",
+      "ecommerce"
+    ],
+    "density": "comfortable",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "iridescent",
+      "holographic",
+      "chrome",
+      "metallic",
+      "reflective",
+      "y2k",
+      "glossy"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Archivo Black, Impact, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 900
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#C0C0C0",
+      "neutralHex": "#808080",
+      "successHex": "#50C878",
+      "warningHex": "#FFD700",
+      "dangerHex": "#FF4444",
+      "infoHex": "#00BFFF",
+      "bgLightHex": "#F5F5F5",
+      "bgDarkHex": "#1A1A1A"
+    },
+    "radius": {
+      "sm": "2px",
+      "md": "4px",
+      "lg": "8px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "strong",
+    "antiPatterns": [
+      "products needing very high corporate trust",
+      "highlight overload creating visual noise",
+      "matte finishes",
+      "warm earthy tones"
+    ]
+  },
+  {
+    "slug": "modular-system-layout",
+    "family": "product-marketing",
+    "uiTypes": [
+      "landing",
+      "documentation",
+      "app",
+      "ecommerce"
+    ],
+    "density": "comfortable",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "modular",
+      "system",
+      "feature",
+      "grid",
+      "product",
+      "organized",
+      "scalable"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Inter, system-ui, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#2563EB",
+      "neutralHex": "#64748B",
+      "successHex": "#16A34A",
+      "warningHex": "#D97706",
+      "dangerHex": "#DC2626",
+      "infoHex": "#0284C7",
+      "bgLightHex": "#FFFFFF",
+      "bgDarkHex": "#0F172A"
+    },
+    "radius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "soft",
+    "antiPatterns": [
+      "organic shapes",
+      "asymmetric layouts",
+      "extreme whitespace",
+      "hand-drawn elements"
+    ]
+  },
+  {
+    "slug": "inclusive-clarity",
+    "family": "product-marketing",
+    "uiTypes": [
+      "dashboard",
+      "admin",
+      "app",
+      "documentation",
+      "landing"
+    ],
+    "density": "spacious",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "accessible",
+      "readable",
+      "clear",
+      "contrast",
+      "inclusive",
+      "calm",
+      "reliable"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Atkinson Hyperlegible, Inter, sans-serif",
+      "fontFamilyBody": "Atkinson Hyperlegible, Inter, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#1D4ED8",
+      "neutralHex": "#4B5563",
+      "successHex": "#15803D",
+      "warningHex": "#B45309",
+      "dangerHex": "#B91C1C",
+      "infoHex": "#0369A1",
+      "bgLightHex": "#FFFFFF",
+      "bgDarkHex": "#111827"
+    },
+    "radius": {
+      "sm": "4px",
+      "md": "6px",
+      "lg": "8px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 8
+    },
+    "shadowIntensity": "soft",
+    "antiPatterns": [
+      "decorative animations",
+      "thin fonts",
+      "low contrast colors",
+      "small text",
+      "hover-only states"
+    ]
+  },
+  {
+    "slug": "organic-mesh-gradients",
+    "family": "product-marketing",
+    "uiTypes": [
+      "landing",
+      "app",
+      "portfolio"
+    ],
+    "density": "spacious",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "gradient",
+      "organic",
+      "mesh",
+      "flowing",
+      "startup",
+      "modern",
+      "colorful",
+      "fresh"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Plus Jakarta Sans, Inter, sans-serif",
+      "fontFamilyBody": "Plus Jakarta Sans, Inter, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#7C3AED",
+      "neutralHex": "#6B7280",
+      "successHex": "#059669",
+      "warningHex": "#D97706",
+      "dangerHex": "#DC2626",
+      "infoHex": "#0891B2",
+      "bgLightHex": "#FAFAFF",
+      "bgDarkHex": "#0C0A1E"
+    },
+    "radius": {
+      "sm": "8px",
+      "md": "16px",
+      "lg": "28px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 4
+    },
+    "shadowIntensity": "soft",
+    "antiPatterns": [
+      "rigid grids",
+      "sharp corners",
+      "monochrome",
+      "dense layouts",
+      "corporate feel"
+    ]
+  },
+  {
+    "slug": "floating-composition",
+    "family": "product-marketing",
+    "uiTypes": [
+      "landing",
+      "portfolio"
+    ],
+    "density": "spacious",
+    "colorMode": "both",
+    "trending": false,
+    "keywords": [
+      "floating",
+      "launch",
+      "startup",
+      "mockup",
+      "device",
+      "innovation",
+      "space",
+      "modern"
+    ],
+    "typography": {
+      "fontFamilyDisplay": "Sora, Inter, sans-serif",
+      "fontFamilyBody": "Inter, system-ui, sans-serif",
+      "fontWeightBody": 400,
+      "fontWeightHeading": 700
+    },
+    "colorPhilosophy": {
+      "primaryHex": "#6366F1",
+      "neutralHex": "#6B7280",
+      "successHex": "#10B981",
+      "warningHex": "#F59E0B",
+      "dangerHex": "#EF4444",
+      "infoHex": "#3B82F6",
+      "bgLightHex": "#FFFFFF",
+      "bgDarkHex": "#0B0F1A"
+    },
+    "radius": {
+      "sm": "8px",
+      "md": "16px",
+      "lg": "24px",
+      "full": "9999px"
+    },
+    "spacing": {
+      "base": 8
+    },
+    "shadowIntensity": "medium",
+    "antiPatterns": [
+      "dense grids",
+      "flat layouts",
+      "heavy borders",
+      "crowded sections",
+      "corporate rigidity"
+    ]
+  }
+]
