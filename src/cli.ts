@@ -24,6 +24,7 @@ import { parseJsonStreamCommand } from "./commands/parse-json-stream.js";
 import { exportCommand } from "./commands/export.js";
 import { initCommand } from "./commands/init.js";
 import { dsCommand } from "./commands/ds.js";
+import { designmdCommand } from "./commands/designmd.js";
 
 const VERSION = "0.0.1";
 
@@ -50,6 +51,7 @@ COMMANDS[parseJsonStreamCommand.name] = parseJsonStreamCommand;
 COMMANDS[exportCommand.name] = exportCommand;
 COMMANDS[initCommand.name] = initCommand;
 COMMANDS[dsCommand.name] = dsCommand;
+COMMANDS[designmdCommand.name] = designmdCommand;
 
 // ─── Root help ────────────────────────────────────────────────────────────────
 

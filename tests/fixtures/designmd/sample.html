@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sample brand</title>
+  <link rel="stylesheet" href="/styles/main.css">
+  <link rel="preload" href="/fonts/inter.woff2" as="font" crossorigin="">
+  <script>console.log("hydration");</script>
+  <style>
+    :root { --color-brand: #f97316; --color-bg: #fffee7; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    h1 { font-family: 'Nunito', sans-serif; color: #1f2937; }
+  </style>
+</head>
+<body>
+  <header style="opacity:0;transform:translateY(24px);transition:opacity .65s ease">
+    <h1>Sample brand</h1>
+  </header>
+  <main>
+    <p style="color: #f97316; opacity: 0.8">Tangerine accent.</p>
+    <a href="/about">About</a>
+    <img src="/hero.png" srcset="/hero.png 1x, /hero@2x.png 2x">
+  </main>
+  <script src="/runtime.js"></script>
+</body>
+</html>

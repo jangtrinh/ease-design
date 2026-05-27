@@ -45,8 +45,19 @@ ui init --runtime claude     # wire ease-design into the current project
 
 In an agent CLI, the workflows surface as `/ui:generate`, `/ui:iterate`,
 `/ui:extract`, `/ui:from-ref`, `/ui:from-url`, `/ui:figma`, `/ui:redesign`,
-`/ui:refine`, `/ui:slides` (Claude Code namespace). `/ui:from-url <url>`
-emits a portable `DESIGN.md` (Google-Labs alpha spec) at project root.
+`/ui:refine`, `/ui:slides` (Claude Code namespace).
+
+`/ui:from-url <url>` extracts the live design system into `./<slug>/`
+— a self-contained folder with `DESIGN.md` (Google-Labs alpha spec),
+`DESIGN.preview.html` (open in a browser), the raw `source.html` +
+`source.css` audit trail, `tokens.json` (frequency-ranked source
+tokens with provenance), `run-summary.md`, and an `audit.md` report
+whose exit code gates workflow success (5 audit families: format,
+source-fidelity, ref-integrity, accessibility, discipline).
+
+Flags: `--name <slug>` overrides the URL-derived folder name;
+`--out-dir <path>` relocates the folder; `--force` overwrites an
+existing folder without confirming.
 
 ## The non-designer happy path
 

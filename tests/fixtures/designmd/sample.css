@@ -1,0 +1,22 @@
+:root {
+  --color-brand: #f97316;
+  --color-bg: #fffee7;
+  --color-fg: #1f2937;
+}
+
+.btn-primary {
+  background: #f97316;
+  color: #ffffff;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+}
+
+.card {
+  background: #fffee7;
+  color: #1f2937;
+  font-family: 'Nunito', sans-serif;
+}
+
+.muted { color: #6b7280; }
+.danger { color: #fb2c36; }
+.success { color: #10b981; }

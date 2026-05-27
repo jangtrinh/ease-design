@@ -14,13 +14,42 @@ workflow that produces `design/*.json` (those use `token-model` instead).
 ## What to read
 
 - `knowledge/designmd-format.md` — the authoritative format contract: YAML
-  schema, token value shapes, the 8 required sections and their order. This
-  skill is the *recipe*; that file is the *contract*. If they disagree, the
-  contract wins.
+  schema, token value shapes, the 8 required sections and their order, **and
+  the Token-precision sidebar** that defines raw CSS as source-of-truth and
+  WebFetch summaries as inference-only. This skill is the *recipe*; that
+  file is the *contract*. If they disagree, the contract wins.
+- `<slug>/tokens.json` — produced by `ui designmd extract-tokens` from raw
+  HTML + CSS. The canonical source-of-truth for hex values, font families,
+  and custom-property declarations. Always re-read this before emitting any
+  token value; never paraphrase from a WebFetch prose summary.
+
+## Source-of-truth precedence
+
+Before emitting any token, walk this precedence:
+
+1. **Hex values** — pulled from `tokens.json` `colors[]` first. Pick the
+   highest-frequency hex per semantic role. If you have to override (because
+   vision identified a brand colour that lives inside an `<img>` or unresolved
+   `var()`), record the override as an inline YAML comment
+   (`# screenshot override: <reason>`). Never write a hex that isn't in
+   `tokens.json` or `tokens.json.customProperties[].hex`.
+2. **Font families** — pulled from `tokens.json` `fonts[]` verbatim. No
+   inference, no "Inter, likely". If `fonts[]` is empty, fall back to the
+   system font stack and document it.
+3. **Component refs** — map to the highest-frequency hex per semantic role
+   so the system reflects the source's actual visual weight, not the
+   reviewer's preference.
+
+The downstream `ui designmd audit` runs the same comparison: emitted hex
+absent from `tokens.json` is a FAIL (invented value), emitted font family
+absent from `tokens.json` is a FAIL (wrong font). The audit is the
+deterministic enforcement of this precedence; this skill keeps the host
+model aligned in advance so the audit doesn't have to FAIL.
 
 ## What to produce
 
-A single file at `./DESIGN.md` (project root), containing:
+A single file at `./<slug>/DESIGN.md` (per-project folder; see
+`from-url.md` step 8 for the slug derivation), containing:
 
 1. A YAML front-matter block delimited by `---` on its own line.
 2. The 8 Markdown sections, in order, each with a `##` heading.

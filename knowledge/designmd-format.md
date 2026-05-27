@@ -194,7 +194,52 @@ and `ui registry register`. It is the source of truth for `/ui:generate`,
 | Composite tokens | Inline objects (typography) + flat refs | Two-tier primitive/semantic alias graph |
 | Manifest hash | None | Sealed `ds.manifest.json` with hash + changelog |
 
-The two can coexist in the same project. `/ui:from-url` writes
-`./DESIGN.md` and leaves `design/*.json` alone. Future bridge work
-(`v1.y`) may add a `ui designmd export --target dtcg` to convert one
-into the other; this snapshot does not.
+The two can coexist in the same project. `/ui:from-url` writes a
+per-project folder `./<slug>/DESIGN.md` and leaves `design/*.json`
+alone. Future bridge work (`v1.y`) may add a `ui designmd export
+--target dtcg` to convert one into the other; this snapshot does not.
+
+---
+
+## Token precision — what counts as source-of-truth
+
+When the `/ui:from-url` workflow harvests tokens for a DESIGN.md, the
+**raw HTML and the linked CSS bytes are canonical**. Anything else is
+inference and must defer to those bytes.
+
+The hierarchy, top to bottom:
+
+1. **Extraction grade** — values pulled by `ui designmd extract-tokens`
+   from raw HTML + linked CSS. Hex values with frequency counts. Font
+   families with provenance. Custom-property declarations with
+   resolved hex. This is the source the audit gate enforces.
+2. **Vision grade** — values pulled from a viewport screenshot via the
+   host model's native vision. Used to *correct* extraction-grade
+   tokens when a brand colour lives in an image, SVG, or unresolved
+   CSS variable. Recorded as inline YAML comments
+   (`# screenshot override: <reason>`). Subject to the audit; if a
+   vision-derived value isn't in the source CSS at all, the audit's
+   source-fidelity row FAILs and the workflow must reconcile.
+3. **Summary grade** — values inferred from an LLM-summarised view of
+   the page (e.g. a WebFetch prose summary that says "warm amber"
+   when the CSS actually used `#f97316` orange). **Never canonical
+   for hex values, font names, or dimension values.** Useful only
+   for persona prose, component naming, and Overview rationale —
+   things vision and extraction cannot decide.
+
+The audit gate enforces this hierarchy. The `source-fidelity` family
+FAILs any emitted hex with `count = 0` in `tokens.json` (an invented
+value, regardless of how plausible) and any emitted `fontFamily`
+first-name absent from `tokens.json` `fonts[]`.
+
+When the host CLI cannot reach the linked CSS (CORS, auth wall,
+edge-cache miss), the audit emits a WARN row "token confidence is
+summary-grade only" instead of FAIL. The user is told explicitly
+which fetch tier resolved the run, so any accepted summary-grade
+output is a deliberate choice.
+
+The reason this matters: WebFetch sanitises HTML through an LLM that
+rewrites colour mentions as natural-language descriptions ("warm
+amber", "tangerine accent"). Those descriptions are real signal for
+persona prose but they are not bit-exact for token emission. Always
+re-ground hex/font values in the bytes before emitting.
