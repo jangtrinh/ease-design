@@ -1,0 +1,33 @@
+{
+  "name": "figma-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin CLI + Figma plugin relay — the optional, non-deterministic 'hands' for ease-design's Figma authoring track. Drives a Figma Free plugin (Plugin API) over a local WebSocket broker; never the paid official write MCP.",
+  "bin": {
+    "figma-agent": "cli/dist/figma-agent.js"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs all",
+    "build:cli": "node scripts/build.mjs cli",
+    "build:plugin-main": "node scripts/build.mjs plugin-main",
+    "build:plugin-ui": "node scripts/build.mjs plugin-ui",
+    "typecheck": "tsc -p cli --noEmit && tsc -p plugin --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.130.0",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  },
+  "optionalDependencies": {
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.61.1",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.3.0"
+  }
+}

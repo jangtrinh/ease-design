@@ -1,0 +1,145 @@
+// RECTANGLE / IMAGE / SVG node creation.
+// Ported from EaseUI figma-plugin/code.ts:462-597 (createRectangleNode,
+// createImageNode, createSvgNode, createImageNodeWithFetch). Adapted for
+// documentAccess:"dynamic-page": fillStyleId → setFillStyleIdAsync.
+
+import type { FigmaExportNode } from '../../../shared/figma-payload-types';
+import { rgbToFigma, figmaColorToHex, mapExportEffects, pushImportWarning } from './executor-styles';
+import { applyTokenRefs } from './executor-variables';
+
+const PLACEHOLDER_FILL: SolidPaint = { type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 }, opacity: 1 };
+
+export async function createRectangleNode(
+  exportNode: FigmaExportNode,
+  colorStyles: Map<string, PaintStyle>,
+  tokenVars?: Map<string, Variable>,
+): Promise<RectangleNode> {
+  const rect = figma.createRectangle();
+  rect.name = exportNode.name;
+
+  if (exportNode.width) rect.resize(exportNode.width, exportNode.height || exportNode.width);
+
+  // Fills — reuse a generated paint style when the color matches a token
+  if (exportNode.fills && exportNode.fills.length > 0) {
+    const fill = exportNode.fills[0];
+    if (fill.color) {
+      const hex = figmaColorToHex(fill.color);
+      const paintStyle = colorStyles.get(hex);
+      if (paintStyle) {
+        await rect.setFillStyleIdAsync(paintStyle.id);
+      } else {
+        rect.fills = [{
+          type: 'SOLID',
+          color: rgbToFigma(fill.color),
+          opacity: fill.color.a,
+        }];
+      }
+    }
+  }
+
+  // Corner radius (uniform or per-corner)
+  if (exportNode.cornerRadius !== undefined) {
+    rect.cornerRadius = exportNode.cornerRadius;
+  } else if (exportNode.cornerRadii) {
+    rect.topLeftRadius = exportNode.cornerRadii.tl;
+    rect.topRightRadius = exportNode.cornerRadii.tr;
+    rect.bottomRightRadius = exportNode.cornerRadii.br;
+    rect.bottomLeftRadius = exportNode.cornerRadii.bl;
+  }
+
+  // Effects (multi-type: DROP_SHADOW, INNER_SHADOW, LAYER_BLUR, BACKGROUND_BLUR)
+  if (exportNode.effects) {
+    rect.effects = mapExportEffects(exportNode.effects);
+  }
+
+  // Strokes
+  if (exportNode.strokes && exportNode.strokes.length > 0) {
+    rect.strokes = exportNode.strokes.filter((s) => s.color).map((s) => ({
+      type: 'SOLID' as const,
+      color: rgbToFigma(s.color!),
+      opacity: s.color!.a,
+    }));
+    rect.strokeWeight = exportNode.strokeWeight || 1;
+  }
+
+  // Opacity — skip 0 values (CSS animation artifacts)
+  if (exportNode.opacity !== undefined && exportNode.opacity > 0) {
+    rect.opacity = exportNode.opacity;
+  }
+
+  // Token bindings (carried follow-up): fill/stroke/radius refs on decorations
+  if (exportNode.tokenRefs && tokenVars && tokenVars.size > 0) {
+    applyTokenRefs(rect, exportNode.tokenRefs, tokenVars);
+  }
+
+  return rect;
+}
+
+/** Fallback: images represented as rectangles with a placeholder fill. */
+export function createImageNode(exportNode: FigmaExportNode): RectangleNode {
+  const rect = figma.createRectangle();
+  rect.name = exportNode.name;
+  rect.resize(exportNode.width || 200, exportNode.height || 200);
+  rect.fills = [PLACEHOLDER_FILL];
+  rect.cornerRadius = exportNode.cornerRadius || 0;
+  return rect;
+}
+
+/** Create a vector node from SVG markup using figma.createNodeFromSvg(). */
+export function createSvgNode(exportNode: FigmaExportNode): SceneNode {
+  try {
+    const frame = figma.createNodeFromSvg(exportNode.svgContent!);
+    frame.name = exportNode.name;
+    const w = exportNode.width || 24;
+    const h = exportNode.height || 24;
+    frame.resize(w, h);
+    return frame;
+  } catch (err) {
+    pushImportWarning(`svg import failed for "${exportNode.name}": ${String(err)}`);
+    // Fallback to colored rectangle
+    return createImageNode(exportNode);
+  }
+}
+
+/** Download an image from URL and apply it as an image fill. */
+export async function createImageNodeWithFetch(exportNode: FigmaExportNode): Promise<RectangleNode> {
+  const rect = figma.createRectangle();
+  rect.name = exportNode.name;
+  rect.resize(exportNode.width || 200, exportNode.height || 200);
+  rect.cornerRadius = exportNode.cornerRadius || 0;
+
+  const url = exportNode.imageUrl || '';
+  if (!url || url.startsWith('data:') || url.startsWith('blob:')) {
+    // data: URLs are handled by figma.createImage below only for http(s);
+    // blob:/empty can't be fetched from the main thread — placeholder.
+    if (url.startsWith('data:')) {
+      try {
+        const image = figma.createImage(decodeDataUrl(url));
+        rect.fills = [{ type: 'IMAGE', imageHash: image.hash, scaleMode: 'FILL' }];
+        return rect;
+      } catch { /* fall through to placeholder */ }
+    }
+    rect.fills = [PLACEHOLDER_FILL];
+    return rect;
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const buffer = await response.arrayBuffer();
+    const image = figma.createImage(new Uint8Array(buffer));
+    rect.fills = [{ type: 'IMAGE', imageHash: image.hash, scaleMode: 'FILL' }];
+  } catch (err) {
+    pushImportWarning(`image fetch failed for "${exportNode.name}" (${url}): ${String(err)}`);
+    rect.fills = [PLACEHOLDER_FILL];
+  }
+
+  return rect;
+}
+
+/** Decode a base64 data: URL into bytes (figma.base64Decode handles the b64 part). */
+function decodeDataUrl(url: string): Uint8Array {
+  const comma = url.indexOf(',');
+  const b64 = url.slice(comma + 1);
+  return figma.base64Decode(b64);
+}

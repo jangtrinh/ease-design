@@ -29,6 +29,9 @@
     "schemas",
     "templates"
   ],
+  "workspaces": [
+    "figma-agent"
+  ],
   "engines": {
     "node": ">=20"
   },

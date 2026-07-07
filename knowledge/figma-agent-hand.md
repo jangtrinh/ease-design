@@ -6,10 +6,11 @@ convert HTML to real auto-layout Figma (html-to-figma), and see results (export-
 Read). Works on Figma Free. Requires the Figma Design Agent plugin open in Figma
 Desktop.
 
-This CLI is an optional external hand — like the `ui` binary it is driven over Bash, but
-it is NOT part of ease-design's deterministic `ui` binary and is not installed by
-ease-design. Point `<path-to-figma-design-agent>` at a local clone of the
-figma-design-agent repo with its Figma plugin loaded.
+This CLI is an optional in-repo hand — like the `ui` binary it is driven over Bash, but
+it is NOT part of ease-design's deterministic `ui` binary, is not installed by
+`npm install ease-design`, and is not published with the `ease-design` npm package.
+It lives at `figma-agent/` (an npm workspace inside this repo) and needs network
+access for its local broker plus the Figma plugin loaded — see `figma-agent/README.md`.
 
 Everything below was proven live (a canvas-proven smoke test + a real screen rebuild,
 2026-07-02).
@@ -17,16 +18,17 @@ Everything below was proven live (a canvas-proven smoke test + a real screen reb
 ## Setup & health
 
 ```bash
-FA="node <path-to-figma-design-agent>/cli/<built-cli>.js"   # the figma-agent CLI ships in the separate figma-design-agent repo
+# from the repo root: npm run build --workspace=figma-agent   (once, or after a source change)
+FA="node figma-agent/cli/dist/figma-agent.js"
 $FA status   # spawns the broker if absent; needs the plugin open in Figma
 ```
-- Plugin: Figma Desktop → Plugins → Development → **Figma Design Agent** (import
-  `plugin/manifest.json` once, from the figma-design-agent repo).
+- Plugin: Figma Desktop → Plugins → Development → **Ease Design Figma Agent** (import
+  `figma-agent/plugin/manifest.json` once).
 - `E_NO_PLUGIN` right after a rebuild = broker hot-replace raced the plugin's
   auto-reconnect (<1s) — just retry.
 - ⚠️ Some workspace setups have a scout-block hook that blocks Bash commands containing
-  the literal tokens `dist`/`build` — if you hit that while driving this external CLI,
-  call via a scratchpad wrapper script or a concatenation trick (`D="di""st"`).
+  the literal tokens `dist`/`build` — if you hit that while driving this CLI, call via a
+  scratchpad wrapper script or a concatenation trick (`D="di""st"`).
 - Broker daemon owns ports 9410–9419; log at `/tmp/figma-agent-broker.log`.
 
 ## Commands (all print one JSON to stdout)

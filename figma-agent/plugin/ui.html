@@ -1,0 +1,1521 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  body{font:12px/1.5 -apple-system,sans-serif;margin:8px;color:#333}
+  #status{padding:6px 8px;border-radius:6px;background:#eee}
+  #status.ok{background:#d9f2df}
+  #status.err{background:#fde2e2}
+</style>
+<div id="status">figma-agent: starting…</div>
+<div id="detail"></div>
+<script>"use strict";
+(() => {
+  // shared/protocol.ts
+  var PROTOCOL_VERSION = 1;
+  var PORT_RANGE_START = 9410;
+  var PORT_RANGE_END = 9419;
+  var CHUNK_LIMIT = 512 * 1024;
+  var BROKER_IDLE_SHUTDOWN_MS = 30 * 6e4;
+
+  // plugin/src/ui/converter/color-utils.ts
+  var NAMED_COLORS = {
+    white: "#ffffff",
+    black: "#000000",
+    red: "#ff0000",
+    green: "#008000",
+    blue: "#0000ff",
+    yellow: "#ffff00",
+    orange: "#ffa500",
+    purple: "#800080",
+    gray: "#808080",
+    grey: "#808080",
+    transparent: "transparent"
+  };
+  function parseCssColor(color) {
+    if (!color || color === "transparent" || color === "initial" || color === "inherit") return null;
+    const c = color.trim().toLowerCase();
+    if (NAMED_COLORS[c] && c !== "transparent") {
+      return parseCssColor(NAMED_COLORS[c]);
+    }
+    const hexMatch = c.match(/^#([a-f0-9]{3,8})$/);
+    if (hexMatch) {
+      let hex = hexMatch[1];
+      if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+      if (hex.length === 4) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+      const a = hex.length === 8 ? parseInt(hex.substring(6, 8), 16) / 255 : 1;
+      return { r, g, b, a };
+    }
+    const rgbMatch = c.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/);
+    if (rgbMatch) {
+      return {
+        r: parseFloat(rgbMatch[1]) / 255,
+        g: parseFloat(rgbMatch[2]) / 255,
+        b: parseFloat(rgbMatch[3]) / 255,
+        a: rgbMatch[4] !== void 0 ? parseFloat(rgbMatch[4]) : 1
+      };
+    }
+    return null;
+  }
+  function rgbaToHex(c) {
+    const r = Math.round(c.r * 255);
+    const g = Math.round(c.g * 255);
+    const b = Math.round(c.b * 255);
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  }
+
+  // plugin/src/ui/converter/parse-css.ts
+  function parseCssGradient(cssGradient) {
+    try {
+      const isRadial = cssGradient.includes("radial-gradient");
+      const isConic = cssGradient.includes("conic-gradient");
+      const inner = cssGradient.substring(
+        cssGradient.indexOf("(") + 1,
+        cssGradient.lastIndexOf(")")
+      );
+      const parts = inner.split(/,(?![^(]*\))/);
+      if (parts.length < 2) return null;
+      if (isRadial) {
+        let colorStartIndex2 = 0;
+        const first2 = parts[0].trim().toLowerCase();
+        if (first2.includes("circle") || first2.includes("ellipse") || first2.includes("at ") || first2.includes("closest") || first2.includes("farthest")) {
+          colorStartIndex2 = 1;
+        }
+        const colorParts2 = parts.slice(colorStartIndex2).map((s) => s.trim());
+        if (colorParts2.length < 2) return null;
+        const gradientStops2 = colorParts2.map((stop, index) => {
+          const color = parseCssColor(stop) || { r: 0, g: 0, b: 0, a: 1 };
+          return { color, position: index / (colorParts2.length - 1) };
+        });
+        return {
+          type: "GRADIENT_RADIAL",
+          gradientStops: gradientStops2,
+          gradientTransform: [[0.5, 0, 0.25], [0, 0.5, 0.25]]
+          // centered radial
+        };
+      }
+      if (isConic) {
+        let colorStartIndex2 = 0;
+        const first2 = parts[0].trim().toLowerCase();
+        if (first2.includes("from") || first2.includes("at ")) {
+          colorStartIndex2 = 1;
+        }
+        const colorParts2 = parts.slice(colorStartIndex2).map((s) => s.trim());
+        if (colorParts2.length < 2) return null;
+        const gradientStops2 = colorParts2.map((stop, index) => {
+          const color = parseCssColor(stop) || { r: 0, g: 0, b: 0, a: 1 };
+          return { color, position: index / (colorParts2.length - 1) };
+        });
+        return {
+          type: "GRADIENT_ANGULAR",
+          gradientStops: gradientStops2,
+          gradientTransform: [[0.5, 0, 0.25], [0, 0.5, 0.25]]
+          // centered angular
+        };
+      }
+      const first = parts[0].trim();
+      let angleDeg = 180;
+      let colorStartIndex = 0;
+      const directionMap = {
+        "to top": 0,
+        "to right": 90,
+        "to bottom": 180,
+        "to left": 270,
+        "to top right": 45,
+        "to bottom right": 135,
+        "to bottom left": 225,
+        "to top left": 315
+      };
+      if (directionMap[first] !== void 0) {
+        angleDeg = directionMap[first];
+        colorStartIndex = 1;
+      } else if (first.endsWith("deg")) {
+        angleDeg = parseFloat(first);
+        colorStartIndex = 1;
+      }
+      const colorParts = parts.slice(colorStartIndex).map((s) => s.trim());
+      if (colorParts.length < 2) return null;
+      const gradientStops = colorParts.map((stop, index) => {
+        const color = parseCssColor(stop) || { r: 0, g: 0, b: 0, a: 1 };
+        return { color, position: index / (colorParts.length - 1) };
+      });
+      const radians = (angleDeg - 90) * Math.PI / 180;
+      const cos = Math.cos(radians);
+      const sin = Math.sin(radians);
+      const gradientTransform = [
+        [cos, sin, 0.5 - cos * 0.5 - sin * 0.5],
+        [-sin, cos, 0.5 + sin * 0.5 - cos * 0.5]
+      ];
+      return { type: "GRADIENT_LINEAR", gradientStops, gradientTransform };
+    } catch {
+      return null;
+    }
+  }
+  function parseBoxShadow(shadow) {
+    if (!shadow || shadow === "none") return null;
+    const isInset = shadow.trim().startsWith("inset");
+    const cleanedShadow = shadow.replace(/^inset\s+/, "").trim();
+    const match = cleanedShadow.match(
+      /([-\d.]+)(?:px)?\s+([-\d.]+)(?:px)?\s+([-\d.]+)(?:px)?(?:\s+([-\d.]+)(?:px)?)?\s+(.*)/
+    );
+    if (!match) return null;
+    const color = parseCssColor(match[5].trim());
+    if (!color) return null;
+    return {
+      type: isInset ? "INNER_SHADOW" : "DROP_SHADOW",
+      offset: { x: parseFloat(match[1]), y: parseFloat(match[2]) },
+      radius: parseFloat(match[3]),
+      spread: match[4] ? parseFloat(match[4]) : 0,
+      color
+    };
+  }
+
+  // plugin/src/ui/converter/build-text.ts
+  function mapTextAlign(cssAlign) {
+    if (cssAlign === "center") return "CENTER";
+    if (cssAlign === "right") return "RIGHT";
+    if (cssAlign === "justify") return "JUSTIFIED";
+    return "LEFT";
+  }
+  function buildTextNode(el, cs, win) {
+    const tag = el.tagName;
+    const isHeading = /^H[1-6]$/.test(tag);
+    const fontSize = parseFloat(cs.fontSize) || 16;
+    const fontWeight = parseInt(cs.fontWeight) || 400;
+    const fontFamily = cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim() || "Inter";
+    const lineHeight = cs.lineHeight !== "normal" ? parseFloat(cs.lineHeight) : void 0;
+    let normalizedLineHeight = lineHeight;
+    if (lineHeight && lineHeight < 5) {
+      normalizedLineHeight = Math.round(fontSize * lineHeight * 10) / 10;
+    }
+    const letterSpacing = cs.letterSpacing !== "normal" ? parseFloat(cs.letterSpacing) : void 0;
+    const textColor = parseCssColor(cs.color);
+    const textAlignHorizontal = mapTextAlign(cs.textAlign);
+    const rect = el.getBoundingClientRect();
+    const segments = [];
+    let fullText = "";
+    if (el.children.length > 0) {
+      for (const child of Array.from(el.childNodes)) {
+        if (child.nodeType === 3) {
+          const text = (child.textContent || "").replace(/\s+/g, " ");
+          if (text.trim()) {
+            segments.push({
+              characters: text,
+              fontFamily,
+              fontSize,
+              fontWeight,
+              lineHeight,
+              letterSpacing,
+              textColor: textColor || void 0
+            });
+            fullText += text;
+          } else if (text === " ") {
+            fullText += " ";
+          }
+        } else if (child.nodeType === 1) {
+          const childEl = child;
+          const childCs = win.getComputedStyle(childEl);
+          const childText = (childEl.innerText || childEl.textContent || "").replace(/\s+/g, " ");
+          if (childText.trim()) {
+            const seg = {
+              characters: childText,
+              fontFamily: childCs.fontFamily.split(",")[0].replace(/['"]/g, "").trim() || fontFamily,
+              fontSize: parseFloat(childCs.fontSize) || fontSize,
+              fontWeight: parseInt(childCs.fontWeight) || fontWeight,
+              fontStyle: childCs.fontStyle === "italic" ? "italic" : void 0,
+              lineHeight: childCs.lineHeight !== "normal" ? parseFloat(childCs.lineHeight) : lineHeight,
+              letterSpacing: childCs.letterSpacing !== "normal" ? parseFloat(childCs.letterSpacing) : letterSpacing,
+              textColor: parseCssColor(childCs.color) || textColor || void 0
+            };
+            const dec = childCs.textDecorationLine;
+            if (dec === "underline") seg.textDecoration = "UNDERLINE";
+            else if (dec === "line-through") seg.textDecoration = "STRIKETHROUGH";
+            const tt = childCs.textTransform;
+            if (tt === "uppercase") seg.textCase = "UPPER";
+            else if (tt === "lowercase") seg.textCase = "LOWER";
+            else if (tt === "capitalize") seg.textCase = "TITLE";
+            segments.push(seg);
+            fullText += childText;
+          }
+        }
+      }
+    }
+    if (segments.length === 0) {
+      fullText = (el.innerText || el.textContent || "").trim();
+    }
+    const trimmedText = fullText.trim() || (el.innerText || el.textContent || "").trim();
+    const lineHeightPx = normalizedLineHeight || Math.round(fontSize * 1.4);
+    const renderedSingleLine = rect.height > 0 && rect.height < lineHeightPx * 1.5;
+    const noWrap = cs.whiteSpace === "nowrap" || cs.whiteSpace === "pre";
+    const shortContent = trimmedText.length <= 40;
+    const node = {
+      type: "TEXT",
+      name: isHeading ? `Heading ${tag[1]}` : tag === "P" ? "Paragraph" : tag === "BUTTON" ? "Button" : "Text",
+      characters: fullText.trim(),
+      fontSize,
+      fontWeight,
+      fontFamily,
+      fontStyle: cs.fontStyle === "italic" ? "italic" : void 0,
+      lineHeight: normalizedLineHeight,
+      letterSpacing,
+      wordSpacing: cs.wordSpacing !== "normal" ? parseFloat(cs.wordSpacing) : void 0,
+      textColor: textColor || void 0,
+      textAlignHorizontal,
+      textAutoResize: renderedSingleLine || noWrap || shortContent ? "WIDTH_AND_HEIGHT" : "HEIGHT",
+      width: Math.round(rect.width) || void 0,
+      height: Math.round(rect.height) || void 0
+    };
+    const clampRaw = cs.webkitLineClamp;
+    const hasLineClamp = !!clampRaw && clampRaw !== "none" && parseInt(clampRaw, 10) > 0;
+    const hasEllipsis = cs.textOverflow === "ellipsis" && cs.whiteSpace === "nowrap";
+    if (hasEllipsis || hasLineClamp) {
+      node.textTruncation = "ENDING";
+    }
+    if (segments.length > 1) node.textSegments = segments;
+    const decoration = cs.textDecorationLine;
+    if (decoration === "underline") node.textDecoration = "UNDERLINE";
+    else if (decoration === "line-through") node.textDecoration = "STRIKETHROUGH";
+    const textTransform = cs.textTransform;
+    if (textTransform === "uppercase") node.textCase = "UPPER";
+    else if (textTransform === "lowercase") node.textCase = "LOWER";
+    else if (textTransform === "capitalize") node.textCase = "TITLE";
+    const textShadow = cs.textShadow;
+    if (textShadow && textShadow !== "none") {
+      const tsEffect = parseBoxShadow(textShadow);
+      if (tsEffect) node.effects = [tsEffect];
+    }
+    return node;
+  }
+  function extractPseudoElement(el, win, pseudo) {
+    try {
+      const pcs = win.getComputedStyle(el, pseudo);
+      const content = pcs.content;
+      if (!content || content === "none" || content === "normal") return null;
+      if (pcs.display === "none" || pcs.visibility === "hidden") return null;
+      if (pcs.opacity === "0") return null;
+      const width = parseFloat(pcs.width) || 0;
+      const height = parseFloat(pcs.height) || 0;
+      const bgColor = parseCssColor(pcs.backgroundColor);
+      const borderColor = parseCssColor(pcs.borderTopColor);
+      const textColor = parseCssColor(pcs.color);
+      const textContent = content.replace(/^["']|["']$/g, "");
+      const hasText = textContent && textContent !== "" && textContent !== '""' && textContent !== "''";
+      if (hasText && textContent.length < 200) {
+        return {
+          type: "TEXT",
+          name: pseudo === "::before" ? "Before" : "After",
+          characters: textContent,
+          fontSize: parseFloat(pcs.fontSize) || 12,
+          fontWeight: parseInt(pcs.fontWeight) || 400,
+          fontFamily: pcs.fontFamily.split(",")[0].replace(/['"]/g, "").trim() || "Inter",
+          textColor: textColor || void 0,
+          width: width > 0 ? Math.round(width) : void 0,
+          height: height > 0 ? Math.round(height) : void 0
+        };
+      }
+      const hasBg = bgColor && bgColor.a > 0;
+      const hasBorder = borderColor && borderColor.a > 0;
+      const hasSize = width > 0 || height > 0;
+      if ((hasBg || hasBorder) && hasSize) {
+        const node = {
+          type: "RECTANGLE",
+          name: pseudo === "::before" ? "Decoration-Before" : "Decoration-After",
+          width: Math.round(width) || 1,
+          height: Math.round(height) || 1
+        };
+        if (hasBg) node.fills = [{ type: "SOLID", color: bgColor }];
+        if (hasBorder) {
+          node.strokes = [{ type: "SOLID", color: borderColor }];
+          node.strokeWeight = Math.round(parseFloat(pcs.borderTopWidth) || 1);
+        }
+        const borderRadius = parseFloat(pcs.borderRadius) || 0;
+        if (borderRadius > 0) node.cornerRadius = Math.round(borderRadius);
+        const opacity = parseFloat(pcs.opacity);
+        if (opacity < 1) node.opacity = opacity;
+        return node;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  function buildDirectTextNode(el, win, directText) {
+    const textCs = win.getComputedStyle(el);
+    const textColor = parseCssColor(textCs.color);
+    const textNode = {
+      type: "TEXT",
+      name: "Text",
+      characters: directText,
+      fontSize: parseFloat(textCs.fontSize) || 16,
+      fontWeight: parseInt(textCs.fontWeight) || 400,
+      fontFamily: textCs.fontFamily.split(",")[0].replace(/['"]/g, "").trim() || "Inter",
+      lineHeight: textCs.lineHeight !== "normal" ? parseFloat(textCs.lineHeight) : void 0,
+      letterSpacing: textCs.letterSpacing !== "normal" ? parseFloat(textCs.letterSpacing) : void 0,
+      textColor: textColor || void 0,
+      textAlignHorizontal: mapTextAlign(textCs.textAlign),
+      textAutoResize: "WIDTH_AND_HEIGHT"
+    };
+    const tt = textCs.textTransform;
+    if (tt === "uppercase") textNode.textCase = "UPPER";
+    else if (tt === "lowercase") textNode.textCase = "LOWER";
+    else if (tt === "capitalize") textNode.textCase = "TITLE";
+    const td = textCs.textDecorationLine;
+    if (td === "underline") textNode.textDecoration = "UNDERLINE";
+    else if (td === "line-through") textNode.textDecoration = "STRIKETHROUGH";
+    return textNode;
+  }
+
+  // plugin/src/ui/converter/build-frame-children.ts
+  function hasExplicitDimension(el, prop, win) {
+    const inlineVal = el.style[prop];
+    if (inlineVal && inlineVal !== "auto" && inlineVal !== "") return true;
+    const cs = win.getComputedStyle(el);
+    if (cs[prop] === "auto") return false;
+    if (cs.flexBasis && cs.flexBasis !== "auto" && cs.flexBasis !== "0px") return true;
+    if (el.getAttribute("style")?.includes(prop)) return true;
+    if (el.getAttribute(prop)) return true;
+    const display = cs.display;
+    if (prop === "width" && (display === "block" || display === "flex" || display === "grid")) return false;
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const parentDisplay = win.getComputedStyle(parentEl).display;
+      if (parentDisplay.includes("flex") || parentDisplay === "grid") {
+        if (prop === "width" && (parseFloat(cs.flexGrow) || 0) === 0 && cs.flexBasis === "auto") return false;
+      }
+    }
+    return false;
+  }
+  function collectOrderedEntries(el) {
+    const entries = [];
+    if (el.children.length === 0 && (el.innerText || "").trim()) {
+      entries.push({ kind: "text", text: el.innerText.trim() });
+      return entries;
+    }
+    let textRun = "";
+    for (const child of Array.from(el.childNodes)) {
+      if (child.nodeType === 3) {
+        textRun += child.textContent || "";
+      } else if (child.nodeType === 1) {
+        if (textRun.trim()) entries.push({ kind: "text", text: textRun.trim() });
+        textRun = "";
+        entries.push({ kind: "el", el: child });
+      }
+    }
+    if (textRun.trim()) entries.push({ kind: "text", text: textRun.trim() });
+    if (el.shadowRoot) {
+      for (const shadowChild of Array.from(el.shadowRoot.children)) {
+        if (shadowChild.nodeType === 1 && shadowChild.tagName !== "STYLE") {
+          entries.push({ kind: "el", el: shadowChild });
+        }
+      }
+    }
+    return entries;
+  }
+  function buildChildNodes(el, cs, parentNode, win, depth) {
+    const children = [];
+    const beforeNode = extractPseudoElement(el, win, "::before");
+    if (beforeNode) children.push(beforeNode);
+    const display = cs.display;
+    const sizingDir = parentNode.layoutMode === "GRID" ? "HORIZONTAL" : parentNode.layoutMode;
+    const parentAlignItems = cs.alignItems || "stretch";
+    const entries = collectOrderedEntries(el);
+    const hasTextRuns = entries.some((e) => e.kind === "text");
+    const hasElementEntries = entries.some((e) => e.kind === "el");
+    if (hasTextRuns && hasElementEntries) {
+      const fontPx = parseFloat(cs.fontSize) || 16;
+      parentNode.layoutMode = "HORIZONTAL";
+      parentNode.counterAxisAlignItems = "BASELINE";
+      if (parentNode.itemSpacing === void 0 || parentNode.itemSpacing === 0) {
+        parentNode.itemSpacing = Math.round(fontPx * 0.28);
+      }
+      parentNode.layoutSizingHorizontal = "HUG";
+      parentNode.layoutSizingVertical = "HUG";
+      parentNode.primaryAxisSizingMode = "AUTO";
+      parentNode.counterAxisSizingMode = "AUTO";
+    }
+    if (!hasTextRuns && entries.length > 1 && (display === "flex" || display === "inline-flex")) {
+      entries.sort((a, b) => {
+        const orderOf = (e) => e.kind === "el" ? parseInt(win.getComputedStyle(e.el).order) || 0 : 0;
+        return orderOf(a) - orderOf(b);
+      });
+    }
+    for (const entry of entries) {
+      if (entry.kind === "text") {
+        children.push(buildDirectTextNode(el, win, entry.text));
+        continue;
+      }
+      const childEl = entry.el;
+      const childNode = computedElementToNode(childEl, win, depth + 1);
+      if (!childNode) continue;
+      const childCs = win.getComputedStyle(childEl);
+      const flexGrow = parseFloat(childCs.flexGrow) || 0;
+      const childDisplay = childCs.display;
+      const alignSelf = childCs.alignSelf;
+      const effectiveAlign = alignSelf && alignSelf !== "auto" ? alignSelf : parentAlignItems;
+      const hasExplicitW = hasExplicitDimension(childEl, "width", win);
+      const hasExplicitH = hasExplicitDimension(childEl, "height", win);
+      if (flexGrow > 0) childNode.layoutGrow = flexGrow;
+      if (childNode.absolutePosition) {
+        children.push(childNode);
+        continue;
+      }
+      const flexShrink = parseFloat(childCs.flexShrink) || 0;
+      const basisPx = childCs.flexBasis && childCs.flexBasis.endsWith("px") ? parseFloat(childCs.flexBasis) : 0;
+      const fixedBasis = flexGrow === 0 && flexShrink === 0 && basisPx > 0;
+      if (sizingDir === "VERTICAL") {
+        if (childNode.layoutSizingVertical === void 0) {
+          if (flexGrow > 0) childNode.layoutSizingVertical = "FILL";
+          else if (fixedBasis) {
+            childNode.layoutSizingVertical = "FIXED";
+            childNode.height = Math.round(basisPx);
+          } else if (hasExplicitH) childNode.layoutSizingVertical = "FIXED";
+          else childNode.layoutSizingVertical = "HUG";
+        }
+        if (childNode.layoutSizingHorizontal === void 0) {
+          if (hasExplicitW) childNode.layoutSizingHorizontal = "FIXED";
+          else if (effectiveAlign === "stretch" || childDisplay === "block" || childDisplay === "flex" || childDisplay === "grid") {
+            childNode.layoutSizingHorizontal = "FILL";
+          } else childNode.layoutSizingHorizontal = "HUG";
+        }
+      } else if (sizingDir === "HORIZONTAL") {
+        if (childNode.layoutSizingHorizontal === void 0) {
+          if (flexGrow > 0) childNode.layoutSizingHorizontal = "FILL";
+          else if (fixedBasis) {
+            childNode.layoutSizingHorizontal = "FIXED";
+            childNode.width = Math.round(basisPx);
+          } else if (hasExplicitW) childNode.layoutSizingHorizontal = "FIXED";
+          else childNode.layoutSizingHorizontal = "HUG";
+        }
+        if (childNode.layoutSizingVertical === void 0) {
+          if (hasExplicitH) childNode.layoutSizingVertical = "FIXED";
+          else if (effectiveAlign === "stretch") childNode.layoutSizingVertical = "FILL";
+          else childNode.layoutSizingVertical = "HUG";
+        }
+      }
+      if (parentNode.layoutMode === "GRID" && childNode.type !== "TEXT" && !hasExplicitW) {
+        childNode.layoutSizingHorizontal = "FILL";
+      }
+      if (childNode.type === "TEXT") {
+        childNode.layoutSizingHorizontal = childNode.textAutoResize === "WIDTH_AND_HEIGHT" ? "HUG" : "FIXED";
+        childNode.layoutSizingVertical = "HUG";
+      }
+      if (childNode.type === "FRAME" && !hasExplicitW) {
+        const tileRect = childEl.getBoundingClientRect();
+        const tw = Math.round(tileRect.width);
+        const th = Math.round(tileRect.height);
+        const hasTextInside = (childNode.children ?? []).some((c) => c.type === "TEXT");
+        if (tw > 0 && tw === th && tw <= 80 && !hasTextInside) {
+          childNode.layoutSizingHorizontal = "FIXED";
+          childNode.layoutSizingVertical = "FIXED";
+          childNode.width = tw;
+          childNode.height = th;
+        }
+      }
+      children.push(childNode);
+    }
+    const afterNode = extractPseudoElement(el, win, "::after");
+    if (afterNode) children.push(afterNode);
+    return children;
+  }
+
+  // plugin/src/ui/converter/build-frame.ts
+  function countGridTracks(template) {
+    if (!template || template === "none") return 0;
+    const tokens = [];
+    let depth = 0;
+    let cur = "";
+    for (const ch of template) {
+      if (ch === "(" || ch === "[") depth++;
+      else if (ch === ")" || ch === "]") depth--;
+      if (/\s/.test(ch) && depth === 0) {
+        if (cur) tokens.push(cur);
+        cur = "";
+      } else cur += ch;
+    }
+    if (cur) tokens.push(cur);
+    let count = 0;
+    for (const tok of tokens) {
+      if (tok.startsWith("[")) continue;
+      if (/^repeat\(\s*(auto-fill|auto-fit)/.test(tok)) return 0;
+      const rep = tok.match(/^repeat\((\d+)\s*,/);
+      if (rep) {
+        const inner = tok.slice(tok.indexOf(",") + 1, tok.lastIndexOf(")")).trim();
+        count += parseInt(rep[1], 10) * (countGridTracks(inner) || 1);
+      } else {
+        count += 1;
+      }
+    }
+    return count;
+  }
+  function deriveComputedNodeName(el) {
+    const ariaLabel = el.getAttribute("aria-label");
+    if (ariaLabel) return ariaLabel;
+    const id = el.getAttribute("id");
+    if (id) return id;
+    const tagNames = {
+      NAV: "Navigation",
+      HEADER: "Header",
+      FOOTER: "Footer",
+      MAIN: "Main",
+      ASIDE: "Sidebar",
+      SECTION: "Section",
+      ARTICLE: "Article",
+      FORM: "Form",
+      UL: "List",
+      OL: "List",
+      LI: "List Item",
+      TABLE: "Table",
+      BUTTON: "Button"
+    };
+    if (tagNames[el.tagName]) return tagNames[el.tagName];
+    const classes = (el.getAttribute("class") || "").split(/\s+/).filter(Boolean);
+    const meaningfulClass = classes.find((c) => !c.startsWith("flex") && !c.startsWith("grid") && !c.startsWith("p-") && !c.startsWith("m-") && !c.startsWith("w-") && !c.startsWith("h-") && !c.startsWith("bg-") && !c.startsWith("text-") && !c.startsWith("rounded") && !c.startsWith("border") && !c.startsWith("shadow") && !c.startsWith("gap") && !c.startsWith("items-") && !c.startsWith("justify-") && !c.startsWith("space-") && !c.startsWith("overflow") && !c.startsWith("relative") && !c.startsWith("absolute") && !c.startsWith("min-") && !c.startsWith("max-") && c !== "inline-flex");
+    if (meaningfulClass) return meaningfulClass;
+    return "Frame";
+  }
+  function buildFrameNode(el, cs, win, depth) {
+    const node = { type: "FRAME", name: deriveComputedNodeName(el) };
+    const display = cs.display;
+    const flexDir = cs.flexDirection;
+    if (display.includes("flex") || display === "inline-flex") {
+      node.layoutMode = flexDir === "column" || flexDir === "column-reverse" ? "VERTICAL" : "HORIZONTAL";
+      node.primaryAxisSizingMode = "AUTO";
+      node.counterAxisSizingMode = "FIXED";
+      if ((cs.flexWrap === "wrap" || cs.flexWrap === "wrap-reverse") && node.layoutMode === "HORIZONTAL") {
+        node.layoutWrap = "WRAP";
+      }
+      const alignItems = cs.alignItems;
+      if (alignItems === "center") node.counterAxisAlignItems = "CENTER";
+      else if (alignItems === "flex-end" || alignItems === "end") node.counterAxisAlignItems = "MAX";
+      else if (alignItems === "baseline") node.counterAxisAlignItems = "BASELINE";
+      else node.counterAxisAlignItems = "MIN";
+      const justifyContent = cs.justifyContent;
+      if (justifyContent === "center") node.primaryAxisAlignItems = "CENTER";
+      else if (justifyContent === "flex-end" || justifyContent === "end") node.primaryAxisAlignItems = "MAX";
+      else if (justifyContent === "space-between") node.primaryAxisAlignItems = "SPACE_BETWEEN";
+      else node.primaryAxisAlignItems = "MIN";
+    } else if (display === "grid" || display === "inline-grid") {
+      node.primaryAxisSizingMode = "AUTO";
+      node.counterAxisSizingMode = "FIXED";
+      const colCount = countGridTracks(cs.gridTemplateColumns);
+      if (colCount > 0) {
+        node.layoutMode = "GRID";
+        node.gridColumnCount = colCount;
+        const rowCount = countGridTracks(cs.gridTemplateRows);
+        if (rowCount > 0) node.gridRowCount = rowCount;
+        const gRowGap = Math.round(parseFloat(cs.rowGap) || 0);
+        const gColGap = Math.round(parseFloat(cs.columnGap) || parseFloat(cs.gap) || 0);
+        if (gRowGap > 0) node.gridRowGap = gRowGap;
+        if (gColGap > 0) node.gridColumnGap = gColGap;
+      } else {
+        node.layoutMode = "HORIZONTAL";
+      }
+      node.layoutWrap = "WRAP";
+    } else if (display === "inline" || display === "inline-block") {
+      node.layoutMode = "HORIZONTAL";
+      node.primaryAxisSizingMode = "AUTO";
+      node.counterAxisSizingMode = "AUTO";
+    } else {
+      node.layoutMode = "VERTICAL";
+      node.primaryAxisSizingMode = "AUTO";
+      node.counterAxisSizingMode = "FIXED";
+    }
+    const gap = parseFloat(cs.gap) || parseFloat(cs.rowGap) || parseFloat(cs.columnGap) || 0;
+    if (gap > 0) node.itemSpacing = Math.round(gap);
+    if (node.layoutWrap === "WRAP") {
+      const rowGap = parseFloat(cs.rowGap) || 0;
+      const colGap = parseFloat(cs.columnGap) || parseFloat(cs.gap) || 0;
+      if (colGap > 0) node.itemSpacing = Math.round(colGap);
+      if (rowGap > 0 && rowGap !== colGap) node.counterAxisSpacing = Math.round(rowGap);
+    }
+    if (!node.itemSpacing || node.itemSpacing === 0) {
+      const childEls = Array.from(el.children).filter((c) => c.nodeType === 1);
+      if (childEls.length >= 2) {
+        const isVertical = node.layoutMode === "VERTICAL";
+        const margins = [];
+        for (let i = 0; i < Math.min(childEls.length, 5); i++) {
+          const childCs = win.getComputedStyle(childEls[i]);
+          if (isVertical) {
+            margins.push(Math.max(parseFloat(childCs.marginBottom) || 0, parseFloat(childCs.marginTop) || 0));
+          } else {
+            margins.push(Math.max(parseFloat(childCs.marginRight) || 0, parseFloat(childCs.marginLeft) || 0));
+          }
+        }
+        const freq = {};
+        for (const m of margins) {
+          if (m > 0) {
+            const rounded = Math.round(m);
+            freq[rounded] = (freq[rounded] || 0) + 1;
+          }
+        }
+        let bestMargin = 0;
+        let bestCount = 0;
+        for (const [val, count] of Object.entries(freq)) {
+          if (count > bestCount || count === bestCount && Number(val) > bestMargin) {
+            bestMargin = Number(val);
+            bestCount = count;
+          }
+        }
+        if (bestMargin > 0) node.itemSpacing = bestMargin;
+      }
+    }
+    const pt = parseFloat(cs.paddingTop) || 0;
+    const pr = parseFloat(cs.paddingRight) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    const pl = parseFloat(cs.paddingLeft) || 0;
+    if (pt > 0) node.paddingTop = Math.round(pt);
+    if (pr > 0) node.paddingRight = Math.round(pr);
+    if (pb > 0) node.paddingBottom = Math.round(pb);
+    if (pl > 0) node.paddingLeft = Math.round(pl);
+    const overflow = cs.overflow || cs.overflowX || cs.overflowY;
+    if (overflow === "hidden" || overflow === "clip" || overflow === "scroll" || overflow === "auto") {
+      node.clipsContent = true;
+    }
+    const rect = el.getBoundingClientRect();
+    const width = rect.width || el.offsetWidth;
+    const height = rect.height || el.offsetHeight;
+    if (width > 0) node.width = Math.round(width);
+    if (height > 0) node.height = Math.round(height);
+    if (cs.position === "absolute" || cs.position === "fixed") {
+      node.absolutePosition = true;
+      const parentRect = el.parentElement?.getBoundingClientRect();
+      if (parentRect) {
+        node.x = Math.round(rect.left - parentRect.left);
+        node.y = Math.round(rect.top - parentRect.top);
+      } else {
+        node.x = el.offsetLeft;
+        node.y = el.offsetTop;
+      }
+    }
+    if (cs.marginLeft === "auto" && cs.marginRight === "auto") {
+      node.layoutSizingHorizontal = "FIXED";
+    }
+    const bgImage = cs.backgroundImage;
+    if (bgImage && bgImage !== "none" && bgImage.includes("gradient")) {
+      const gradientFill = parseCssGradient(bgImage);
+      if (gradientFill) {
+        const bgColor = parseCssColor(cs.backgroundColor);
+        node.fills = bgColor && bgColor.a > 0 ? [{ type: "SOLID", color: bgColor }, gradientFill] : [gradientFill];
+      }
+    } else if (bgImage && bgImage !== "none") {
+      const urlMatch = bgImage.match(/url\(['"]?(.*?)['"]?\)/);
+      if (urlMatch && urlMatch[1]) {
+        node.backgroundImageUrl = urlMatch[1];
+        if (cs.backgroundSize && cs.backgroundSize !== "auto") node.backgroundSize = cs.backgroundSize;
+        if (cs.backgroundPosition && cs.backgroundPosition !== "0% 0%") node.backgroundPosition = cs.backgroundPosition;
+      }
+      const bgColor = parseCssColor(cs.backgroundColor);
+      if (bgColor && bgColor.a > 0) node.fills = [{ type: "SOLID", color: bgColor }];
+    } else {
+      const bgColor = parseCssColor(cs.backgroundColor);
+      if (bgColor && bgColor.a > 0) node.fills = [{ type: "SOLID", color: bgColor }];
+    }
+    const tl = parseFloat(cs.borderTopLeftRadius) || 0;
+    const tr = parseFloat(cs.borderTopRightRadius) || 0;
+    const br = parseFloat(cs.borderBottomRightRadius) || 0;
+    const bl = parseFloat(cs.borderBottomLeftRadius) || 0;
+    if (tl > 0 || tr > 0 || br > 0 || bl > 0) {
+      if (tl === tr && tr === br && br === bl) {
+        if (tl < 9999) node.cornerRadius = Math.round(tl);
+      } else {
+        node.cornerRadii = { tl: Math.round(tl), tr: Math.round(tr), br: Math.round(br), bl: Math.round(bl) };
+      }
+    }
+    const bTopW = parseFloat(cs.borderTopWidth) || 0;
+    const bRightW = parseFloat(cs.borderRightWidth) || 0;
+    const bBottomW = parseFloat(cs.borderBottomWidth) || 0;
+    const bLeftW = parseFloat(cs.borderLeftWidth) || 0;
+    const maxBorderW = Math.max(bTopW, bRightW, bBottomW, bLeftW);
+    if (maxBorderW > 0) {
+      let dominantColor = null;
+      if (bTopW === maxBorderW) dominantColor = parseCssColor(cs.borderTopColor);
+      else if (bRightW === maxBorderW) dominantColor = parseCssColor(cs.borderRightColor);
+      else if (bBottomW === maxBorderW) dominantColor = parseCssColor(cs.borderBottomColor);
+      else if (bLeftW === maxBorderW) dominantColor = parseCssColor(cs.borderLeftColor);
+      if (!dominantColor) dominantColor = parseCssColor(cs.borderTopColor);
+      if (dominantColor && dominantColor.a > 0) {
+        node.strokes = [{ type: "SOLID", color: dominantColor }];
+        node.strokeWeight = Math.round(maxBorderW);
+        node.strokeAlign = "INSIDE";
+      }
+    }
+    const maxW = parseFloat(cs.maxWidth) || 0;
+    const minW = parseFloat(cs.minWidth) || 0;
+    const maxH = parseFloat(cs.maxHeight) || 0;
+    const minH = parseFloat(cs.minHeight) || 0;
+    if (maxW > 0 && maxW < 1e4) node.maxWidth = Math.round(maxW);
+    if (minW > 0) node.minWidth = Math.round(minW);
+    if (maxH > 0 && maxH < 1e4) node.maxHeight = Math.round(maxH);
+    if (minH > 0) node.minHeight = Math.round(minH);
+    const boxShadow = cs.boxShadow;
+    if (boxShadow && boxShadow !== "none") {
+      const shadowParts = boxShadow.split(/,(?![^(]*\))/);
+      const effects = [];
+      for (const part of shadowParts) {
+        const effect = parseBoxShadow(part.trim());
+        if (effect) effects.push(effect);
+      }
+      if (effects.length > 0) node.effects = effects;
+    }
+    const opacity = parseFloat(cs.opacity);
+    if (opacity < 1 && opacity > 0.01) node.opacity = opacity;
+    const extCs = cs;
+    const backdropFilter = extCs.backdropFilter || extCs.webkitBackdropFilter || "";
+    if (backdropFilter && backdropFilter !== "none") {
+      const blurMatch = backdropFilter.match(/blur\(([\d.]+)px\)/);
+      if (blurMatch) {
+        node.effects = [...node.effects || [], { type: "BACKGROUND_BLUR", radius: parseFloat(blurMatch[1]) }];
+      }
+    }
+    const filter = cs.filter;
+    if (filter && filter !== "none") {
+      const effects = node.effects || [];
+      const blurMatch = filter.match(/blur\(([\d.]+)px\)/);
+      if (blurMatch) effects.push({ type: "LAYER_BLUR", radius: parseFloat(blurMatch[1]) });
+      const dsMatch = filter.match(/drop-shadow\(([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px\s+(.*?)\)/);
+      if (dsMatch) {
+        const dsColor = parseCssColor(dsMatch[4].trim());
+        if (dsColor) {
+          effects.push({
+            type: "DROP_SHADOW",
+            offset: { x: parseFloat(dsMatch[1]), y: parseFloat(dsMatch[2]) },
+            radius: parseFloat(dsMatch[3]),
+            spread: 0,
+            color: dsColor
+          });
+        }
+      }
+      if (effects.length > 0) node.effects = effects;
+    }
+    const blendMode = cs.mixBlendMode;
+    if (blendMode && blendMode !== "normal") {
+      const blendMap = {
+        "multiply": "MULTIPLY",
+        "screen": "SCREEN",
+        "overlay": "OVERLAY",
+        "darken": "DARKEN",
+        "lighten": "LIGHTEN",
+        "color-dodge": "COLOR_DODGE",
+        "color-burn": "COLOR_BURN",
+        "hard-light": "HARD_LIGHT",
+        "soft-light": "SOFT_LIGHT",
+        "difference": "DIFFERENCE",
+        "exclusion": "EXCLUSION",
+        "hue": "HUE",
+        "saturation": "SATURATION",
+        "color": "COLOR",
+        "luminosity": "LUMINOSITY"
+      };
+      node.blendMode = blendMap[blendMode] || void 0;
+    }
+    const transform = cs.transform;
+    if (transform && transform !== "none") {
+      const matrixMatch = transform.match(/matrix\(([-\d.]+),\s*([-\d.]+)/);
+      if (matrixMatch) {
+        const degrees = Math.atan2(parseFloat(matrixMatch[2]), parseFloat(matrixMatch[1])) * (180 / Math.PI);
+        if (Math.abs(degrees) > 0.1) node.rotation = -degrees;
+      }
+      const rotateMatch = transform.match(/rotate\(([-\d.]+)deg\)/);
+      if (rotateMatch) node.rotation = -parseFloat(rotateMatch[1]);
+    }
+    if (cs.alignContent === "space-between") node.counterAxisAlignContent = "SPACE_BETWEEN";
+    const outlineWidth = parseFloat(cs.outlineWidth) || 0;
+    if (outlineWidth > 0 && cs.outlineStyle !== "none") {
+      const outlineColor = parseCssColor(cs.outlineColor);
+      if (outlineColor && outlineColor.a > 0) {
+        node.effects = [...node.effects || [], {
+          type: "DROP_SHADOW",
+          offset: { x: 0, y: 0 },
+          radius: 0,
+          spread: outlineWidth,
+          color: outlineColor
+        }];
+      }
+    }
+    const children = buildChildNodes(el, cs, node, win, depth);
+    const textOnlyChildren = children.length > 0 && children.every((c) => c.type === "TEXT");
+    if (textOnlyChildren) {
+      const flexLike = display.includes("flex");
+      const pillShape = (node.cornerRadius !== void 0 || node.cornerRadii !== void 0) && ((node.paddingLeft || 0) > 0 || (node.paddingRight || 0) > 0);
+      if (flexLike || pillShape || el.tagName === "BUTTON") {
+        const squareTile = node.width !== void 0 && node.width > 0 && node.width === node.height;
+        if (squareTile) {
+          node.layoutSizingHorizontal = "FIXED";
+          node.layoutSizingVertical = "FIXED";
+        } else if (!hasExplicitDimension(el, "width", win)) {
+          node.layoutSizingHorizontal = "HUG";
+          node.layoutSizingVertical = "HUG";
+          node.primaryAxisSizingMode = "AUTO";
+          node.counterAxisSizingMode = "AUTO";
+        }
+      }
+    }
+    if (children.length > 0) node.children = children;
+    return node;
+  }
+
+  // plugin/src/ui/converter/computed-walk.ts
+  var RENDERED_SKIP_TAGS = /* @__PURE__ */ new Set(["SCRIPT", "STYLE", "LINK", "META", "HEAD", "NOSCRIPT", "BR"]);
+  function prepareSvgContent(svg, computedColor) {
+    let result = svg;
+    result = result.replace(/stroke-width="2"/g, 'stroke-width="1.5"');
+    result = result.replace(/stroke-width='2'/g, "stroke-width='1.5'");
+    if (computedColor) {
+      const hex = rgbaToHex(computedColor);
+      result = result.replace(/currentColor/g, hex);
+      result = result.replace(/currentcolor/gi, hex);
+    }
+    return result;
+  }
+  function computedElementToNode(el, win, depth) {
+    if (RENDERED_SKIP_TAGS.has(el.tagName)) return null;
+    if (depth > 20) return null;
+    const cs = win.getComputedStyle(el);
+    const tag = el.tagName;
+    if (cs.display === "none") return null;
+    if (cs.visibility === "hidden") return null;
+    if (tag === "IMG") {
+      return {
+        type: "IMAGE",
+        name: el.getAttribute("alt") || "Image",
+        imageUrl: el.getAttribute("src") || "",
+        width: el.offsetWidth || 200,
+        height: el.offsetHeight || 200
+      };
+    }
+    if (tag === "HR") {
+      const hrColor = parseCssColor(cs.borderTopColor) || parseCssColor(cs.backgroundColor);
+      return {
+        type: "RECTANGLE",
+        name: "Divider",
+        width: el.offsetWidth || 200,
+        height: Math.max(parseFloat(cs.borderTopWidth) || 1, el.offsetHeight || 1),
+        fills: hrColor && hrColor.a > 0 ? [{ type: "SOLID", color: hrColor }] : [{ type: "SOLID", color: { r: 0.8, g: 0.8, b: 0.8, a: 1 } }]
+      };
+    }
+    if (tag === "VIDEO") {
+      const videoEl = el;
+      return {
+        type: "IMAGE",
+        name: "Video",
+        imageUrl: videoEl.poster || videoEl.getAttribute("poster") || "",
+        width: el.offsetWidth || 320,
+        height: el.offsetHeight || 180
+      };
+    }
+    if (tag === "svg" || tag === "SVG") {
+      const rawSvg = el.outerHTML;
+      const w = el.clientWidth || parseInt(el.getAttribute("width") || "24") || 24;
+      const h = el.clientHeight || parseInt(el.getAttribute("height") || "24") || 24;
+      const computedColor = parseCssColor(cs.color);
+      return {
+        type: "IMAGE",
+        name: el.closest("[data-lucide]")?.getAttribute("data-lucide") || "Icon",
+        svgContent: prepareSvgContent(rawSvg, computedColor),
+        width: w,
+        height: h,
+        fills: computedColor ? [{ type: "SOLID", color: computedColor }] : void 0
+      };
+    }
+    if (tag === "I" && el.hasAttribute("data-lucide")) {
+      const svg = el.querySelector("svg");
+      const iconColor = parseCssColor(cs.color);
+      if (svg) {
+        return {
+          type: "IMAGE",
+          name: el.getAttribute("data-lucide") || "Icon",
+          svgContent: prepareSvgContent(svg.outerHTML, iconColor),
+          width: svg.clientWidth || parseInt(svg.getAttribute("width") || "24") || 24,
+          height: svg.clientHeight || parseInt(svg.getAttribute("height") || "24") || 24,
+          fills: iconColor ? [{ type: "SOLID", color: iconColor }] : void 0
+        };
+      }
+      return {
+        type: "RECTANGLE",
+        name: el.getAttribute("data-lucide") || "Icon",
+        width: parseInt(cs.width) || 16,
+        height: parseInt(cs.height) || 16,
+        fills: iconColor ? [{ type: "SOLID", color: iconColor }] : [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4, a: 1 } }]
+      };
+    }
+    if (tag === "I" && el.children.length === 0) {
+      const iconColor = parseCssColor(cs.color);
+      return {
+        type: "RECTANGLE",
+        name: "Icon",
+        width: parseInt(cs.width) || 16,
+        height: parseInt(cs.height) || 16,
+        fills: iconColor ? [{ type: "SOLID", color: iconColor }] : [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4, a: 1 } }]
+      };
+    }
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") {
+      const bgColor = parseCssColor(cs.backgroundColor);
+      const borderColor = parseCssColor(cs.borderTopColor);
+      const inputEl = el;
+      const placeholder = inputEl.placeholder || inputEl.value || "";
+      const node = {
+        type: "FRAME",
+        name: placeholder || (tag === "INPUT" ? "Input" : tag === "SELECT" ? "Select" : "Textarea"),
+        width: el.offsetWidth || 200,
+        height: el.offsetHeight || 36,
+        layoutMode: "HORIZONTAL",
+        primaryAxisSizingMode: "AUTO",
+        counterAxisSizingMode: "FIXED",
+        counterAxisAlignItems: "CENTER",
+        paddingLeft: Math.round(parseFloat(cs.paddingLeft) || 0),
+        paddingRight: Math.round(parseFloat(cs.paddingRight) || 0)
+      };
+      if (bgColor && bgColor.a > 0) node.fills = [{ type: "SOLID", color: bgColor }];
+      if (borderColor && borderColor.a > 0) {
+        node.strokes = [{ type: "SOLID", color: borderColor }];
+        node.strokeWeight = Math.round(parseFloat(cs.borderTopWidth) || 1);
+        node.strokeAlign = "INSIDE";
+      }
+      const cornerR = parseFloat(cs.borderRadius) || 0;
+      if (cornerR > 0) node.cornerRadius = Math.round(cornerR);
+      if (placeholder) {
+        const textColor = parseCssColor(cs.color);
+        const isPlaceholder = !inputEl.value;
+        node.children = [{
+          type: "TEXT",
+          name: "Placeholder",
+          characters: placeholder.toUpperCase(),
+          fontSize: parseFloat(cs.fontSize) || 14,
+          fontWeight: parseInt(cs.fontWeight) || 400,
+          fontFamily: cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim() || "Inter",
+          textColor: textColor || void 0,
+          textAutoResize: "WIDTH_AND_HEIGHT",
+          opacity: isPlaceholder ? 0.4 : 1
+        }];
+      }
+      return node;
+    }
+    if (isRenderedTextNode(el, win)) {
+      const textNode = buildTextNode(el, cs, win);
+      if (cs.position === "absolute" || cs.position === "fixed") {
+        textNode.absolutePosition = true;
+        const rect = el.getBoundingClientRect();
+        const parentRect = el.parentElement?.getBoundingClientRect();
+        if (parentRect) {
+          textNode.x = Math.round(rect.left - parentRect.left);
+          textNode.y = Math.round(rect.top - parentRect.top);
+        } else {
+          textNode.x = el.offsetLeft;
+          textNode.y = el.offsetTop;
+        }
+      }
+      return textNode;
+    }
+    return buildFrameNode(el, cs, win, depth);
+  }
+  function isRenderedTextNode(el, win) {
+    const tag = el.tagName;
+    const hasContainerStyling = () => {
+      const cs = win.getComputedStyle(el);
+      const bgColor = parseCssColor(cs.backgroundColor);
+      const hasBg = !!(bgColor && bgColor.a > 0);
+      const hasBorder = (parseFloat(cs.borderTopWidth) || 0) > 0 && parseCssColor(cs.borderTopColor)?.a !== void 0 && (parseCssColor(cs.borderTopColor)?.a || 0) > 0;
+      const hasPadding = (parseFloat(cs.paddingTop) || 0) > 8 || (parseFloat(cs.paddingLeft) || 0) > 8;
+      return hasBg || hasBorder || hasPadding;
+    };
+    if (el.children.length === 0 && (el.textContent || "").trim()) {
+      return !hasContainerStyling();
+    }
+    if (/^H[1-6]$/.test(tag) || tag === "P" || tag === "SPAN" || tag === "LABEL" || tag === "A" || tag === "BUTTON") {
+      if (hasContainerStyling()) return false;
+      if (el.children.length === 0) return true;
+      for (const child of Array.from(el.children)) {
+        if (!["SPAN", "STRONG", "B", "EM", "I", "U", "A", "SMALL", "MARK", "CODE", "LABEL", "BR", "SVG", "IMG"].includes(child.tagName)) {
+          return false;
+        }
+        if (inlineChildBreaksMerge(child, el, win)) return false;
+      }
+      return true;
+    }
+    return false;
+  }
+  function inlineChildBreaksMerge(childEl, parentEl, win) {
+    const ccs = win.getComputedStyle(childEl);
+    const bg = parseCssColor(ccs.backgroundColor);
+    if (bg && bg.a > 0) {
+      const parentBg = parseCssColor(win.getComputedStyle(parentEl).backgroundColor);
+      if (!parentBg || parentBg.a === 0 || rgbaToHex(bg) !== rgbaToHex(parentBg)) return true;
+    }
+    if ((parseFloat(ccs.borderTopLeftRadius) || 0) > 0 || (parseFloat(ccs.borderBottomRightRadius) || 0) > 0) return true;
+    if ((parseFloat(ccs.borderTopWidth) || 0) > 0 && (parseCssColor(ccs.borderTopColor)?.a || 0) > 0) return true;
+    if ((ccs.display === "inline-flex" || ccs.display === "inline-block") && ((parseFloat(ccs.paddingLeft) || 0) > 0 || (parseFloat(ccs.paddingTop) || 0) > 0)) return true;
+    return false;
+  }
+
+  // plugin/src/ui/converter/tokens.ts
+  function extractFigmaTokens(rootNode) {
+    const colorSet = /* @__PURE__ */ new Map();
+    const fontSet = /* @__PURE__ */ new Map();
+    const spacingSet = /* @__PURE__ */ new Set();
+    const radiiSet = /* @__PURE__ */ new Set();
+    function walk(node) {
+      if (node.fills) {
+        for (const fill of node.fills) {
+          if (fill.color) colorSet.set(rgbaToHex(fill.color), fill.color);
+        }
+      }
+      if (node.textColor) {
+        colorSet.set(rgbaToHex(node.textColor), node.textColor);
+      }
+      if (node.strokes) {
+        for (const stroke of node.strokes) {
+          if (stroke.color) colorSet.set(rgbaToHex(stroke.color), stroke.color);
+        }
+      }
+      if (node.type === "TEXT" && node.fontSize) {
+        const key = `${node.fontFamily || "Inter"}-${node.fontSize}-${node.fontWeight || 400}`;
+        fontSet.set(key, {
+          family: node.fontFamily || "Inter",
+          size: node.fontSize,
+          weight: node.fontWeight || 400,
+          lineHeight: node.lineHeight
+        });
+      }
+      if (node.itemSpacing && node.itemSpacing > 0) spacingSet.add(node.itemSpacing);
+      if (node.paddingTop && node.paddingTop > 0) spacingSet.add(node.paddingTop);
+      if (node.paddingRight && node.paddingRight > 0) spacingSet.add(node.paddingRight);
+      if (node.paddingBottom && node.paddingBottom > 0) spacingSet.add(node.paddingBottom);
+      if (node.paddingLeft && node.paddingLeft > 0) spacingSet.add(node.paddingLeft);
+      if (node.cornerRadius && node.cornerRadius > 0 && node.cornerRadius < 9999) {
+        radiiSet.add(node.cornerRadius);
+      }
+      if (node.children) {
+        for (const child of node.children) walk(child);
+      }
+    }
+    walk(rootNode);
+    const colors = Array.from(colorSet.entries()).map(([hex, color]) => ({ name: `color/${hex.replace("#", "")}`, hex, color })).sort((a, b) => a.hex.localeCompare(b.hex));
+    const typography = Array.from(fontSet.entries()).map(([, val]) => ({
+      name: `type/${val.family.toLowerCase()}-${val.size}-${val.weight}`,
+      ...val
+    })).sort((a, b) => a.size - b.size);
+    const spacing = Array.from(spacingSet).sort((a, b) => a - b).map((v) => ({ name: `spacing/${v}`, value: v }));
+    const radii = Array.from(radiiSet).sort((a, b) => a - b).map((v) => ({ name: `radius/${v}`, value: v }));
+    return { colors, typography, spacing, radii, shadows: [] };
+  }
+  function annotateTokenRefs(rootNode, tokens) {
+    const colorByHex = new Map(tokens.colors.map((t) => [t.hex, t.name]));
+    const spacingByValue = new Map(tokens.spacing.map((t) => [t.value, t.name]));
+    const radiusByValue = new Map(tokens.radii.map((t) => [t.value, t.name]));
+    function walk(node) {
+      const refs = {};
+      const fillColor = node.fills?.find((f) => f.type === "SOLID" && f.color)?.color;
+      if (fillColor) {
+        const name = colorByHex.get(rgbaToHex(fillColor));
+        if (name) refs.fill = name;
+      }
+      if (node.textColor) {
+        const name = colorByHex.get(rgbaToHex(node.textColor));
+        if (name) refs.textColor = name;
+      }
+      const strokeColor = node.strokes?.find((s) => s.color)?.color;
+      if (strokeColor) {
+        const name = colorByHex.get(rgbaToHex(strokeColor));
+        if (name) refs.stroke = name;
+      }
+      if (node.cornerRadius && node.cornerRadius > 0) {
+        const name = radiusByValue.get(node.cornerRadius);
+        if (name) refs.radius = name;
+      }
+      if (node.itemSpacing && node.itemSpacing > 0) {
+        const name = spacingByValue.get(node.itemSpacing);
+        if (name) refs.gap = name;
+      }
+      const pt = node.paddingTop;
+      if (pt && pt > 0 && pt === node.paddingRight && pt === node.paddingBottom && pt === node.paddingLeft) {
+        const name = spacingByValue.get(pt);
+        if (name) refs.padding = name;
+      }
+      if (Object.keys(refs).length > 0) node.tokenRefs = refs;
+      for (const child of node.children ?? []) walk(child);
+    }
+    walk(rootNode);
+  }
+
+  // plugin/src/ui/converter/extract.ts
+  function waitForStylesReady(iframe) {
+    return new Promise((resolve) => {
+      const maxWait = 3e3;
+      const pollInterval = 100;
+      let elapsed = 0;
+      const check = () => {
+        elapsed += pollInterval;
+        const doc = iframe.contentDocument;
+        const win = iframe.contentWindow;
+        if (!doc || !win) {
+          if (elapsed < maxWait) setTimeout(check, pollInterval);
+          else resolve();
+          return;
+        }
+        const body = doc.body;
+        if (body) {
+          const parsed = parseCssColor(win.getComputedStyle(body).backgroundColor);
+          if (parsed && parsed.a > 0 && !(parsed.r === 1 && parsed.g === 1 && parsed.b === 1)) {
+            resolve();
+            return;
+          }
+        }
+        let hasRuntimeStyles = false;
+        try {
+          const sheets = doc.styleSheets;
+          for (let i = 0; i < sheets.length; i++) {
+            if (sheets[i].cssRules && sheets[i].cssRules.length > 50) {
+              hasRuntimeStyles = true;
+              break;
+            }
+          }
+        } catch {
+        }
+        if (hasRuntimeStyles) {
+          setTimeout(resolve, 200);
+          return;
+        }
+        if (elapsed < maxWait) setTimeout(check, pollInterval);
+        else resolve();
+      };
+      setTimeout(check, 200);
+    });
+  }
+  function prepareDocForExtraction(doc) {
+    const win = doc.defaultView;
+    if (!win) return;
+    const killMotion = doc.createElement("style");
+    killMotion.textContent = `
+    *, *::before, *::after {
+      transition: none !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+      animation: none !important;
+      animation-duration: 0s !important;
+      animation-delay: 0s !important;
+    }
+  `;
+    doc.head.appendChild(killMotion);
+    void doc.body.offsetHeight;
+    doc.body.classList.remove("h-screen", "min-h-screen", "max-h-screen");
+    doc.body.style.height = "auto";
+    doc.body.style.maxHeight = "none";
+    doc.body.style.overflow = "visible";
+    doc.body.style.overflowX = "visible";
+    doc.body.style.overflowY = "visible";
+    const revealSelectors = [".reveal", ".reveal-left", ".reveal-right", ".reveal-scale", ".reveal-hero", ".reveal-stagger"];
+    for (const selector of revealSelectors) {
+      doc.querySelectorAll(selector).forEach((el) => el.classList.add("active"));
+    }
+    void doc.body.offsetHeight;
+    doc.querySelectorAll("*").forEach((el) => {
+      const htmlEl = el;
+      if (!htmlEl.style) return;
+      const cs = win.getComputedStyle(htmlEl);
+      if (cs.opacity === "0") htmlEl.style.opacity = "1";
+      if (cs.overflow === "hidden" || cs.overflow === "auto" || cs.overflow === "scroll") htmlEl.style.overflow = "visible";
+      if (cs.overflowX === "hidden" || cs.overflowX === "auto" || cs.overflowX === "scroll") htmlEl.style.overflowX = "visible";
+      if (cs.overflowY === "hidden" || cs.overflowY === "auto" || cs.overflowY === "scroll") htmlEl.style.overflowY = "visible";
+      if (cs.maxHeight !== "none" && parseFloat(cs.maxHeight) < 1e4) htmlEl.style.maxHeight = "none";
+      htmlEl.classList.remove("h-screen", "max-h-screen");
+    });
+  }
+  function extractFromIframe(iframe, width) {
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
+    if (!doc || !win) {
+      return { type: "FRAME", name: "Page", width, height: 900 };
+    }
+    const body = doc.body;
+    if (!body || body.children.length === 0) {
+      return { type: "FRAME", name: "Page", width, height: 900 };
+    }
+    prepareDocForExtraction(doc);
+    const bodyStyle = win.getComputedStyle(body);
+    const htmlStyle = win.getComputedStyle(doc.documentElement);
+    let pageBgColor = parseCssColor(bodyStyle.backgroundColor) || parseCssColor(htmlStyle.backgroundColor) || { r: 1, g: 1, b: 1, a: 1 };
+    if (pageBgColor.a === 0) pageBgColor = { r: 1, g: 1, b: 1, a: 1 };
+    let bodyLayoutMode = "VERTICAL";
+    if (bodyStyle.display.includes("flex")) {
+      const dir = bodyStyle.flexDirection;
+      bodyLayoutMode = dir === "row" || dir === "row-reverse" ? "HORIZONTAL" : "VERTICAL";
+    }
+    const pageFrame = {
+      type: "FRAME",
+      name: "Page",
+      width,
+      height: Math.round(body.scrollHeight) || 900,
+      layoutMode: bodyLayoutMode,
+      primaryAxisSizingMode: "AUTO",
+      counterAxisSizingMode: "FIXED",
+      fills: [{ type: "SOLID", color: pageBgColor }],
+      children: []
+    };
+    const bodyGap = parseFloat(bodyStyle.gap) || 0;
+    if (bodyGap > 0) pageFrame.itemSpacing = Math.round(bodyGap);
+    const bpt = parseFloat(bodyStyle.paddingTop) || 0;
+    const bpr = parseFloat(bodyStyle.paddingRight) || 0;
+    const bpb = parseFloat(bodyStyle.paddingBottom) || 0;
+    const bpl = parseFloat(bodyStyle.paddingLeft) || 0;
+    if (bpt > 0) pageFrame.paddingTop = Math.round(bpt);
+    if (bpr > 0) pageFrame.paddingRight = Math.round(bpr);
+    if (bpb > 0) pageFrame.paddingBottom = Math.round(bpb);
+    if (bpl > 0) pageFrame.paddingLeft = Math.round(bpl);
+    for (const child of Array.from(body.children)) {
+      if (child.nodeType === 1) {
+        const node = computedElementToNode(child, win, 0);
+        if (node) pageFrame.children.push(node);
+      }
+    }
+    return pageFrame;
+  }
+  function buildPayloadFromIframe(iframe, name, width) {
+    const rootNode = extractFromIframe(iframe, width);
+    const tokens = extractFigmaTokens(rootNode);
+    annotateTokenRefs(rootNode, tokens);
+    return {
+      version: 1,
+      name,
+      width: rootNode.width || width,
+      height: rootNode.height || 900,
+      tokens,
+      rootNode
+    };
+  }
+
+  // plugin/src/ui/render-host.ts
+  var IFRAME_LOAD_TIMEOUT_MS = 1e4;
+  var DEFAULT_RENDER_HEIGHT_PX = 4e3;
+  function waitForIframeLoad(iframe, html) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, IFRAME_LOAD_TIMEOUT_MS);
+      iframe.addEventListener("load", () => {
+        clearTimeout(timer);
+        resolve();
+      }, { once: true });
+      iframe.srcdoc = html;
+    });
+  }
+  async function renderHtmlToPayload(html, width, name) {
+    if (!html || typeof html !== "string") {
+      throw new Error("renderHtmlToPayload: html must be a non-empty string");
+    }
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.position = "absolute";
+    iframe.style.left = "-100000px";
+    iframe.style.top = "0";
+    iframe.style.width = `${width}px`;
+    iframe.style.height = `${DEFAULT_RENDER_HEIGHT_PX}px`;
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+    try {
+      await waitForIframeLoad(iframe, html);
+      await waitForStylesReady(iframe);
+      if (!iframe.contentDocument || !iframe.contentWindow) {
+        throw new Error("render iframe has no document \u2014 srcdoc blocked by sandbox?");
+      }
+      return buildPayloadFromIframe(iframe, name, width);
+    } finally {
+      iframe.remove();
+    }
+  }
+
+  // plugin/src/ui/ui-relay.ts
+  var PLUGIN_VERSION = "0.1.0";
+  var PORT_PROBE_TIMEOUT_MS = 2500;
+  var RECONNECT_BACKOFF_MAX_MS = 15e3;
+  var ws = null;
+  var reconnectBackoffMs = 1e3;
+  var fileInfo = {};
+  var chunkBuffers = /* @__PURE__ */ new Map();
+  function setStatus(text, cls = "", detail = "") {
+    const statusEl = document.getElementById("status");
+    const detailEl = document.getElementById("detail");
+    if (statusEl) {
+      statusEl.textContent = `figma-agent: ${text}`;
+      statusEl.className = cls;
+    }
+    if (detailEl) detailEl.textContent = detail;
+  }
+  function wsSend(msg) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const json = JSON.stringify(msg);
+    if (json.length <= CHUNK_LIMIT || !("id" in msg)) {
+      ws.send(json);
+      return;
+    }
+    const total = Math.ceil(json.length / CHUNK_LIMIT);
+    for (let seq = 0; seq < total; seq++) {
+      const chunk = {
+        id: msg.id,
+        seq,
+        last: seq === total - 1,
+        chunk: json.slice(seq * CHUNK_LIMIT, (seq + 1) * CHUNK_LIMIT)
+      };
+      ws.send(JSON.stringify(chunk));
+    }
+  }
+  function sendErr(id, code, message) {
+    wsSend({ id, ok: false, error: { code, message } });
+  }
+  function handleWireData(raw) {
+    let msg;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (typeof msg.chunk === "string" && typeof msg.seq === "number" && typeof msg.id === "string") {
+      handleChunk(msg);
+      return;
+    }
+    if (typeof msg.cmd === "string" && typeof msg.id === "string") {
+      void handleRequest(msg);
+    }
+  }
+  function handleChunk(c) {
+    let buf = chunkBuffers.get(c.id);
+    if (!buf) {
+      buf = [];
+      chunkBuffers.set(c.id, buf);
+    }
+    buf[c.seq] = c.chunk;
+    if (!c.last) return;
+    chunkBuffers.delete(c.id);
+    for (let i = 0; i <= c.seq; i++) {
+      if (buf[i] === void 0) {
+        sendErr(c.id, "E_CHUNK_LOST", `missing chunk ${i} of ${c.seq + 1}`);
+        return;
+      }
+    }
+    handleWireData(buf.join(""));
+  }
+  async function handleRequest(req) {
+    try {
+      if (req.cmd === "HTML_TO_FIGMA") {
+        const p = req.params ?? {};
+        if (!p.html) {
+          sendErr(req.id, "E_INVALID_ARGS", "HTML_TO_FIGMA requires params.html");
+          return;
+        }
+        setStatus("connected \u2014 rendering html\u2026", "ok");
+        const payload = await renderHtmlToPayload(p.html, p.width ?? 1280, p.name ?? "HTML Import");
+        setStatus("connected", "ok");
+        parent.postMessage({
+          pluginMessage: {
+            requestId: req.id,
+            cmd: "IMPORT_PAYLOAD",
+            params: { payload, x: p.x, y: p.y, parentId: p.parentId, replaceId: p.replaceId }
+          }
+        }, "*");
+      } else {
+        parent.postMessage({ pluginMessage: { requestId: req.id, cmd: req.cmd, params: req.params } }, "*");
+      }
+    } catch (err) {
+      setStatus("connected", "ok");
+      sendErr(req.id, "E_PLUGIN_ERROR", err instanceof Error ? err.message : String(err));
+    }
+  }
+  window.addEventListener("message", (ev) => {
+    const pm = ev.data?.pluginMessage;
+    if (!pm) return;
+    if (pm.type === "FILE_INFO") {
+      fileInfo = pm.data ?? {};
+      wsSend({ type: "FILE_INFO", data: fileInfo });
+      return;
+    }
+    if (typeof pm.requestId === "string") {
+      const reply = pm.ok ? { id: pm.requestId, ok: true, result: pm.result } : {
+        id: pm.requestId,
+        ok: false,
+        error: pm.error ?? { code: "E_PLUGIN_ERROR", message: "main thread returned no error detail" }
+      };
+      wsSend(reply);
+    }
+  });
+  function probePort(port, host) {
+    return new Promise((resolve) => {
+      let settled = false;
+      let socket;
+      try {
+        socket = new WebSocket(`ws://${host}:${port}`);
+      } catch {
+        resolve(null);
+        return;
+      }
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (!result) {
+          try {
+            socket.close();
+          } catch {
+          }
+        }
+        resolve(result);
+      };
+      const timer = setTimeout(() => finish(null), PORT_PROBE_TIMEOUT_MS);
+      socket.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(String(ev.data));
+          if (msg?.type === "BROKER_HELLO") finish(socket);
+        } catch {
+        }
+      };
+      socket.onerror = () => finish(null);
+      socket.onclose = () => finish(null);
+    });
+  }
+  async function scanForBroker() {
+    for (let port = PORT_RANGE_START; port <= PORT_RANGE_END; port++) {
+      setStatus(`searching broker on localhost:${port}\u2026`);
+      const socket = await probePort(port, "localhost");
+      if (socket) return socket;
+    }
+    return null;
+  }
+  function adoptSocket(socket) {
+    ws = socket;
+    reconnectBackoffMs = 1e3;
+    chunkBuffers.clear();
+    socket.onmessage = (ev) => handleWireData(String(ev.data));
+    socket.onerror = () => {
+    };
+    socket.onclose = () => {
+      ws = null;
+      setStatus("broker connection lost \u2014 reconnecting\u2026", "err");
+      scheduleReconnect();
+    };
+    wsSend({ type: "PLUGIN_HELLO", data: { ...fileInfo, pluginVersion: PLUGIN_VERSION, protocolV: PROTOCOL_VERSION } });
+    const url = socket.url.replace(/\/$/, "");
+    setStatus("connected", "ok", `broker at ${url} \xB7 protocol v${PROTOCOL_VERSION}`);
+  }
+  function scheduleReconnect() {
+    setTimeout(() => void connectLoop(), reconnectBackoffMs);
+    reconnectBackoffMs = Math.min(reconnectBackoffMs * 2, RECONNECT_BACKOFF_MAX_MS);
+  }
+  async function connectLoop() {
+    try {
+      const socket = await scanForBroker();
+      if (!socket) {
+        setStatus(
+          `no broker on :${PORT_RANGE_START}-${PORT_RANGE_END} \u2014 retrying\u2026`,
+          "err",
+          "start one with: figma-agent status"
+        );
+        scheduleReconnect();
+        return;
+      }
+      adoptSocket(socket);
+    } catch (err) {
+      setStatus("relay error \u2014 retrying\u2026", "err", err instanceof Error ? err.message : String(err));
+      scheduleReconnect();
+    }
+  }
+  void connectLoop();
+})();
+</script>
