@@ -96,6 +96,35 @@ describe("transformSnapshot — inline style sanitisation", () => {
     expect(out).toContain("opacity:0.8");
     expect(removed.inlineOpacityHides).toBe(0);
   });
+
+  it("strips Framer's near-zero opacity:0.001 reveal sentinel", () => {
+    const html = `<div style="display:inline-block;opacity:0.001"></div>`;
+    const { html: out, removed } = transformSnapshot(html, [], ORIGIN);
+    expect(out).not.toMatch(/opacity:\s*0\.001/);
+    expect(out).toContain("display:inline-block");
+    expect(removed.inlineOpacityHides).toBe(1);
+  });
+
+  it("strips opacity:0.001 paired with a scale reveal transform", () => {
+    const html = `<div style="opacity:0.001;transform:scale(0.5)"></div>`;
+    const { html: out } = transformSnapshot(html, [], ORIGIN);
+    expect(out).not.toContain("style=");
+  });
+
+  it("strips transform:perspective reveal init", () => {
+    const html = `<div style="transform:perspective(1200px) translateY(40px); color:green"></div>`;
+    const { html: out, removed } = transformSnapshot(html, [], ORIGIN);
+    expect(out).not.toMatch(/transform:/);
+    expect(out).toContain("color:green");
+    expect(removed.inlineTransformTranslates).toBe(1);
+  });
+
+  it("preserves a perceptible low opacity like 0.05", () => {
+    const html = `<div style="opacity:0.05"></div>`;
+    const { html: out, removed } = transformSnapshot(html, [], ORIGIN);
+    expect(out).toContain("opacity:0.05");
+    expect(removed.inlineOpacityHides).toBe(0);
+  });
 });
 
 describe("transformSnapshot — URL absolutisation", () => {

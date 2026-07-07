@@ -10,9 +10,10 @@
  *   - All <script> tags are stripped.
  *   - All <link rel="preload|prefetch|modulepreload|dns-prefetch|preconnect">
  *     tags are stripped.
- *   - Inline style="..." declarations containing opacity:0 or
- *     transform:translate* are sanitised (just those declarations
- *     removed; rest of the inline style preserved).
+ *   - Inline style="..." reveal-init declarations are sanitised: a
+ *     near-zero opacity sentinel (< 0.01, e.g. Framer's opacity:0.001)
+ *     and companion reveal transforms (translate, scale, perspective)
+ *     are removed; the rest of the inline style is preserved.
  *   - Root-relative URLs (src="/...", href="/...", srcset="/..." and
  *     url(/...)) are absolutised against the supplied --origin.
  *
@@ -111,21 +112,36 @@ export function transformSnapshot(
   );
   removed.preloads = preloadCountBefore;
 
-  // ── 4. Sanitise inline style="..." declarations ──────────────────────────────
+  // ── 4. Sanitise inline style="..." reveal-init declarations ──────────────────
+  //   Scroll-reveal libraries (Framer, GSAP, AOS) hide pre-animation content with
+  //   a near-zero opacity sentinel — commonly `opacity:0.001`, sometimes paired
+  //   with an offset/scale transform — then animate to the final state via JS.
+  //   Because step 2 strips that JS, the init state would otherwise persist and
+  //   leave the whole page invisible. We remove just the hiding declarations and
+  //   preserve every other declaration in the inline style.
   out = out.replace(/style="([^"]*)"/g, (m, body) => {
     let s = body as string;
     let touched = false;
 
-    // opacity: 0 (exactly zero; do not match opacity:0.5)
-    if (/(?:^|;)\s*opacity\s*:\s*0(?:\.0+)?\s*(?:;|$)/i.test(s)) {
-      s = s.replace(/(?:^|;)\s*opacity\s*:\s*0(?:\.0+)?\s*(?=;|$)/gi, "");
-      removed.inlineOpacityHides++;
-      touched = true;
-    }
+    // opacity: a near-zero value (< 0.01, e.g. Framer's 0.001) is an imperceptible
+    // reveal sentinel — strip it. Perceptible opacities (0.05, 0.5, 0.8, …) stay.
+    s = s.replace(
+      /(?:^|;)\s*opacity\s*:\s*([0-9]*\.?[0-9]+)\s*(?=;|$)/gi,
+      (whole, valueRaw) => {
+        const v = parseFloat(valueRaw as string);
+        if (Number.isFinite(v) && v < 0.01) {
+          removed.inlineOpacityHides++;
+          touched = true;
+          return "";
+        }
+        return whole as string;
+      },
+    );
 
-    // transform: translate*(...)
-    if (/(?:^|;)\s*transform\s*:[^;]*translate/i.test(s)) {
-      s = s.replace(/(?:^|;)\s*transform\s*:[^;]*translate[^;]*(?=;|$)/gi, "");
+    // transform: reveal offsets — translate*, scale*, perspective(...). These are
+    // the companion init transforms scroll-reveal applies before animating to none.
+    if (/(?:^|;)\s*transform\s*:[^;]*(?:translate|scale|perspective)/i.test(s)) {
+      s = s.replace(/(?:^|;)\s*transform\s*:[^;]*(?:translate|scale|perspective)[^;]*(?=;|$)/gi, "");
       removed.inlineTransformTranslates++;
       touched = true;
     }
