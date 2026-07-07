@@ -2,10 +2,10 @@
  * Antigravity adapter — generates the adapter artifact list for the antigravity runtime.
  *
  * Emits:
- *   10 workflow files → <cwd>/.agent/workflows/ui-<verb>.md
- *   7 skill files     → <cwd>/.agent/skills/ease-design-<name>/SKILL.md
+ *   11 workflow files → <cwd>/.agent/workflows/ui-<verb>.md
+ *   8 skill files     → <cwd>/.agent/skills/ease-design-<name>/SKILL.md
  *
- * Total: 17 artifacts, all mode "write".
+ * Total: 19 artifacts, all mode "write".
  *
  * Antigravity uses the same YAML-frontmatter Markdown shape as Claude.
  * Shell blocks are preceded by `// turbo` to mark them as auto-executable.

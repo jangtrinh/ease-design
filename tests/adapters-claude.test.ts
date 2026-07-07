@@ -13,10 +13,10 @@ function makeArtifacts() {
 }
 
 describe("generateClaudeAdapter", () => {
-  it("returns exactly 17 artifacts (10 commands + 7 skills)", () => {
+  it("returns exactly 19 artifacts (11 commands + 8 skills)", () => {
     const arts = makeArtifacts();
     expect(arts).toHaveLength(WORKFLOW_VERBS.length + SKILL_NAMES.length);
-    expect(arts).toHaveLength(17);
+    expect(arts).toHaveLength(19);
   });
 
   it("all artifacts have mode 'write'", () => {
@@ -25,7 +25,7 @@ describe("generateClaudeAdapter", () => {
     }
   });
 
-  it("10 artifacts are slash-command paths under .claude/commands/ui/", () => {
+  it("11 artifacts are slash-command paths under .claude/commands/ui/", () => {
     const commands = makeArtifacts().filter((a) =>
       a.absPath.includes(".claude/commands/ui/"),
     );
@@ -37,7 +37,7 @@ describe("generateClaudeAdapter", () => {
     expect(commands.some((c) => c.absPath.endsWith("/from-url.md"))).toBe(true);
   });
 
-  it("7 artifacts are skill paths under .claude/skills/ease-design-*/SKILL.md", () => {
+  it("8 artifacts are skill paths under .claude/skills/ease-design-*/SKILL.md", () => {
     const skills = makeArtifacts().filter((a) =>
       a.absPath.includes(".claude/skills/ease-design-"),
     );

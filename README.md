@@ -8,7 +8,7 @@ commands. The host model writes the HTML; ease-design supplies the taste — per
 compiled design system, and a hard quality gate — so the output looks like a pro
 designer made it. **No API keys, no design tokens to hand-edit, no taste vocabulary to learn.**
 
-<sub>`v0.1.0` · Node ≥ 20 · MIT · zero runtime dependencies · 766 tests green</sub>
+<sub>`v0.1.0` · Node ≥ 20 · MIT · zero runtime dependencies · 768 tests green</sub>
 
 > Distilled from EaseUI's design engine. The binary and slash-command namespace are
 > `ui` / `/ui:*`.
@@ -74,7 +74,7 @@ ui doctor --cwd .              # confirm the project wired up correctly
 ```
 
 `ui init` writes a per-runtime adapter tree. For **Claude Code** that is
-**10 `/ui:*` workflow commands** (`.claude/commands/ui/`) + **7 supporting skills**
+**11 `/ui:*` workflow commands** (`.claude/commands/ui/`) + **8 supporting skills**
 (`.claude/skills/ease-design-*/`). Codex gets an `AGENTS.md` block; Antigravity gets the
 equivalent workflow tree. Every generated wrapper anchors the absolute `knowledge/` path,
 so the workflows resolve no matter where the project lives.
@@ -118,14 +118,29 @@ These surface as slash-commands in your agent CLI (Claude Code namespace shown).
 | `/ui:redesign <intent>` | Reimagine an existing page in a different persona/direction. |
 | `/ui:from-url <url>`    | Extract a **live site's** design system into a self-contained `./<slug>/` folder (spec + tokens + audit). |
 | `/ui:from-ref <path>`   | Generate from a reference (image/markup), matching its look on your design system. |
-| `/ui:figma`             | Reproduce a Figma source 1:1 (keeps source colors intentionally). |
+| `/ui:figma`             | Reproduce a Figma source 1:1 as HTML (keeps source colors intentionally). |
+| `/ui:to-figma <intent>` | The inverse: **author idiomatic Figma** on the canvas (Figma Free) from intent — auto-layout, instances, token-bound variables. Needs the external figma-agent hand (see below). |
 | `/ui:extract`           | Inverse direction — pull a design system **out of** existing HTML. |
 | `/ui:slides <intent>`   | Generate a token-bound slide deck. |
 
-All HTML-emitting workflows defer to an internal **critique gate** (10th workflow): the
+All HTML-emitting workflows defer to an internal **critique gate** (11th workflow): the
 model scores 6 craft axes + 1 consistency axis, and a deterministic `ui taste-lint` floor
 enforces the machine-checkable rules underneath — so an axis with a real rule breach
 *cannot* pass. Quality is enforced, not merely suggested.
+
+### The Figma authoring track (`/ui:to-figma`)
+
+`/ui:to-figma` gives ease-design a second output medium: **real, idiomatic Figma** on the
+canvas (Figma Free), not just HTML. It reuses the same design brain — personas, tokens, and
+the critique gate — plus a Figma **construction knowledge** core (`knowledge/figma-craft/`):
+auto-layout / sizing mastery, components + variables over hardcoded values, and 14
+construction lints that keep the layer structure senior-grade.
+
+The **hands** are an *external* tool — the `figma-agent` CLI, which drives a Figma plugin. In
+keeping with ease-design's deterministic-binary principle, it is **not** part of the `ui`
+binary and is **not** installed by ease-design: it lives in the separate **figma-design-agent**
+repo. Set it up per `knowledge/figma-agent-hand.md`, or fall back to `/ui:generate` (HTML) if
+the hand is unavailable.
 
 ### `/ui:from-url` output
 
@@ -222,11 +237,11 @@ The happy path, mechanically:
 - **`knowledge/` core:** a 6+1-axis taste rubric, 23 personas across 7 families, 32
   components across 8 categories, color science, token taxonomy, prompt modes.
 - **`ui` binary:** 15 deterministic commands (see table above).
-- **Workflows:** 10 host-model workflows + 7 skills, adapter-generated per runtime by `ui init`.
+- **Workflows:** 11 host-model workflows + 8 skills, adapter-generated per runtime by `ui init`.
 - **Critique gate:** a hard pass/fail loop — model-scored subjective axes + a deterministic
   `ui taste-lint` floor (body ≥ 16px, on-grid spacing, one icon family, tinted shadows,
   non-linear easing, token-bound colors).
-- **766 tests passing**; zero runtime dependencies; four CI gates green (typecheck, lint,
+- **768 tests passing**; zero runtime dependencies; four CI gates green (typecheck, lint,
   build, test).
 
 **Known boundaries (honest):**

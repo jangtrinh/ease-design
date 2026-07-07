@@ -15,6 +15,7 @@ export const VERB_SKILL_REFS: Readonly<Record<string, readonly string[]>> = {
   "from-ref":["apply-prompt-mode", "pick-persona"],
   "from-url":["pick-persona", "designmd-emit", "color-decision", "token-model"],
   figma:     ["apply-prompt-mode"],
+  "to-figma":["figma-craft", "pick-persona", "score-taste"],
   slides:    ["pick-persona", "score-taste"],
   init:      [],
 };

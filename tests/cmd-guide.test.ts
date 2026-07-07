@@ -60,11 +60,11 @@ describe("ui guide — designer on-ramp", () => {
     expect(json.data.quality).toContain("taste");
   });
 
-  it("covers all nine /ui:* workflows", () => {
+  it("covers all ten /ui:* workflows", () => {
     const { out } = captureRun(["guide", "--json"]);
     const json = JSON.parse(out) as { data: { workflow: { command: string }[] } };
     const cmds = json.data.workflow.map((s) => s.command).join(" ");
-    for (const verb of ["generate", "iterate", "refine", "redesign", "from-ref", "from-url", "figma", "slides", "extract"]) {
+    for (const verb of ["generate", "iterate", "refine", "redesign", "from-ref", "from-url", "figma", "to-figma", "slides", "extract"]) {
       expect(cmds).toContain(`/ui:${verb}`);
     }
   });

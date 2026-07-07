@@ -65,6 +65,11 @@ const WORKFLOW: GuideStep[] = [
     detail: "Reproduces a Figma frame as clean HTML.",
   },
   {
+    want: "Design straight into Figma",
+    command: "/ui:to-figma <describe what you want>",
+    detail: "Builds real, idiomatic Figma on the canvas (Figma Free) — needs the external figma-agent hand set up.",
+  },
+  {
     want: "Build a slide deck",
     command: "/ui:slides <topic>",
     detail: "Generates a full, on-brand presentation, one slide at a time.",

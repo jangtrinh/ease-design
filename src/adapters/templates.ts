@@ -18,7 +18,7 @@ import { createHash } from "node:crypto";
 
 /**
  * All user-facing workflow verbs. "init" is synthetic (no template file).
- * The remaining 9 correspond to files in templates/workflows/.
+ * The remaining 10 correspond to files in templates/workflows/.
  */
 export const WORKFLOW_VERBS = [
   "generate",
@@ -29,6 +29,7 @@ export const WORKFLOW_VERBS = [
   "from-ref",
   "from-url",
   "figma",
+  "to-figma",
   "slides",
   "init",
 ] as const satisfies readonly string[];
@@ -46,6 +47,7 @@ export const SKILL_NAMES = [
   "token-model",
   "apply-prompt-mode",
   "designmd-emit",
+  "figma-craft",
 ] as const satisfies readonly string[];
 
 export type SkillName = (typeof SKILL_NAMES)[number];

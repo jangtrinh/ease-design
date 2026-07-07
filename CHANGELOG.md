@@ -7,6 +7,15 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **Figma authoring track** — `/ui:to-figma` (11th workflow) + a `figma-craft` skill.
+  ease-design can now author **idiomatic Figma** on the canvas (Figma Free) from intent —
+  auto-layout, component instances, token-bound variables — not just HTML. Reuses the
+  existing design brain (personas, tokens, critique gate) plus new Figma construction
+  knowledge in `knowledge/figma-craft/` (craft philosophy, decision ladder, 5 deep-dive
+  references, L1–L14 construction lints) and `knowledge/figma-agent-hand.md`. The Figma
+  "hands" are an **external** `figma-agent` CLI (the figma-design-agent repo + a Figma
+  plugin) — deliberately **not** bundled into the deterministic `ui` binary. Ported from the
+  figma-design-agent project. Complements `/ui:figma` (which imports Figma → HTML).
 - `ui guide` — plain-language, intent-organized map of the `/ui:*` workflow (the
   designer on-ramp). Root help points newcomers to it.
 - `ui doctor` — install/project health check (Node ≥20, bundled `knowledge/` +
