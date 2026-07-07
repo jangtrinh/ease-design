@@ -11,6 +11,7 @@ examples/synthetic/output/
 # Local agent-CLI dev environment — not part of the distributable repo
 .claude/
 plans/
+docs/journals/
 release-manifest.json
 .repomixignore
 .fog-context/

@@ -9,8 +9,8 @@ ease-design itself.
 
 ## What this project is
 
-ease-design is a multi-runtime design-cli. See `README.md` for the concept and
-`plans/ease-design/implementation-plan.md` (in the EaseUI repo) for the 8-phase plan.
+ease-design is a multi-runtime design-cli. See `README.md` for the concept and the
+implementation plan (kept in the internal design-engine repo) for the 8-phase plan.
 
 ## Two sources of truth
 

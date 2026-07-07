@@ -17,9 +17,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/easestart/ease-design.git"
+    "url": "git+https://github.com/jangtrinh/ease-design.git"
   },
-  "homepage": "https://github.com/easestart/ease-design#readme",
+  "homepage": "https://github.com/jangtrinh/ease-design#readme",
   "bin": {
     "ui": "./dist/cli.js"
   },

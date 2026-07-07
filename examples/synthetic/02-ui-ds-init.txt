@@ -4,10 +4,10 @@
   "data": {
     "name": "demo",
     "paths": {
-      "dir": "/Users/jangtrinh/Desktop/Design/ease-design/examples/synthetic/output/ds-demo/design",
-      "tokens": "/Users/jangtrinh/Desktop/Design/ease-design/examples/synthetic/output/ds-demo/design/design.tokens.json",
-      "registry": "/Users/jangtrinh/Desktop/Design/ease-design/examples/synthetic/output/ds-demo/design/component-registry.json",
-      "manifest": "/Users/jangtrinh/Desktop/Design/ease-design/examples/synthetic/output/ds-demo/design/ds.manifest.json"
+      "dir": "/path/to/ease-design/examples/synthetic/output/ds-demo/design",
+      "tokens": "/path/to/ease-design/examples/synthetic/output/ds-demo/design/design.tokens.json",
+      "registry": "/path/to/ease-design/examples/synthetic/output/ds-demo/design/component-registry.json",
+      "manifest": "/path/to/ease-design/examples/synthetic/output/ds-demo/design/ds.manifest.json"
     },
     "persona": {
       "slug": "liquid-glass",
