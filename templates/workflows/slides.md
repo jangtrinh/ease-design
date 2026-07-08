@@ -1,3 +1,7 @@
+---
+description: "Generate a full presentation slide deck from a topic. Use when the user asks for slides, a deck, or a presentation."
+---
+
 # `/ui:slides` — Generate a slide deck
 
 Generate a full presentation deck from a topic string. The workflow plans an outline,
@@ -38,7 +42,7 @@ Open and keep in context:
 Same gate as every generation workflow:
 
 ```sh
-ui ds context --format markdown --max-bytes 4096 --strict
+ui ds context --format markdown --max-bytes 4096 --strict --with-theme
 ```
 
 If the call fails because no design system is initialised, compile one:
@@ -52,22 +56,18 @@ Pick the persona either from `--persona` or by feeding the topic through
 applying the diverse top-K rule (pick the single best fit — the deck must be
 visually consistent, so no variant fan-out at the deck level).
 
-Capture the design-system context block as `design_system_context` for the rest of
-the workflow.
+The one call returns both blocks the workflow needs:
 
-Then compile the design tokens to a Tailwind `@theme` block so every slide
-consumes the palette **mechanically** (token-bound utilities) rather than by
-re-typing hex — this is what makes the "stay inside the DS palette" rule in
-step 5 verifiable:
-
-```sh
-ui tokens compile design/design.tokens.json --target tailwind
-```
-
-Capture stdout as `design_system_theme`. Step 4 inlines it once into the
-deck's shared chrome `<style>`, so `--color-primary` → `bg-primary`,
-`--space-4` → `p-4`, etc. (Adjust the tokens path if `ui ds status` reports a
-non-default location.)
+- Capture the design-system context block as `design_system_context` for the
+  rest of the workflow.
+- Capture the appended Tailwind `@theme` fenced section as
+  `design_system_theme` — `--with-theme` compiles it from the full resolved
+  token map (it discovers the tokens path itself and is immune to
+  `--max-bytes` truncation). Step 4 inlines it once into the deck's shared
+  chrome `<style>`, so `--color-primary` → `bg-primary`, `--space-4` → `p-4`,
+  etc. This is what makes the "stay inside the DS palette" rule in step 5
+  verifiable — every slide consumes the palette **mechanically**
+  (token-bound utilities) rather than by re-typing hex.
 
 ### 3. Plan the outline
 

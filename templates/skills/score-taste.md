@@ -1,3 +1,7 @@
+---
+description: "Evaluate a generated design against the 6+1-axis taste rubric. Use when a workflow gate asks to score a variant, run the taste gate, or judge whether a design clears the ship bar."
+---
+
 # Skill: Score Taste
 
 Use when the host model needs to evaluate a generated design against the 6+1-axis taste rubric.

@@ -1,3 +1,7 @@
+---
+description: "Define, alias, or change design tokens. Use when creating or editing design tokens, adding an alias, or propagating a token value change through the design system."
+---
+
 # Skill: Token Model
 
 Use when the host model is defining, aliasing, or changing design tokens.

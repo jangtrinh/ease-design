@@ -42,6 +42,10 @@ Subcommands:
 Options:
   --json    Emit a JSON envelope instead of human-readable text
   -h, --help  Show this help
+
+Error codes:
+  BAD_ARG   Missing/invalid argument (e.g. malformed --oklch triple)
+  BAD_HEX   A color value is not a valid 3- or 6-digit hex color
 `;
 
 // ─── Hex normalisation ────────────────────────────────────────────────────────

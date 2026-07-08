@@ -1,3 +1,7 @@
+---
+description: "Make a color choice, build a palette, or check WCAG contrast. Use when picking a brand or semantic color, generating a perceptual scale, or validating contrast in any design workflow."
+---
+
 # Skill: Color Decision
 
 Use when the host model is making a color choice — picking a primary, building a palette, or deciding whether a text/background pair meets contrast.

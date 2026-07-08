@@ -34,6 +34,65 @@ export function stripFences(input: string): string {
   return s;
 }
 
+// ─── stripFencesDetailed ─────────────────────────────────────────────────────
+
+export interface StripFencesResult {
+  /** The cleaned output. */
+  html: string;
+  /** True when a leading/trailing code fence was removed. */
+  strippedFences: boolean;
+  /** True when prose BEFORE the document open was absorbed. */
+  strippedLeading: boolean;
+  /** True when commentary AFTER `</html>` was absorbed. */
+  strippedTrailing: boolean;
+}
+
+/**
+ * Fence-strip PLUS full-document boundary trimming for LLM output.
+ *
+ * LLMs sometimes wrap a complete HTML document in preamble ("Here is the
+ * page:") or postamble ("Let me know if…") that a fence check alone cannot
+ * absorb. When — and only when — the input contains a full-document open
+ * (`<!doctype` or `<html`, case-insensitive), everything before the first
+ * open is trimmed; when it contains a closing `</html>`, everything after
+ * the last close is trimmed.
+ *
+ * Deliberately NO fuzzy "first `<`-tag" heuristic: Component/Slide FRAGMENTS
+ * have no document boundary, and guessing one would eat legitimate leading
+ * content. Fragments pass through fence-stripped only.
+ */
+export function stripFencesDetailed(input: string): StripFencesResult {
+  const fenceStripped = stripFences(input);
+  const strippedFences = fenceStripped !== input.trim();
+
+  let html = fenceStripped;
+  let strippedLeading = false;
+  let strippedTrailing = false;
+
+  // Leading trim: everything before the first document open.
+  const lower = html.toLowerCase();
+  const doctypeIdx = lower.indexOf("<!doctype");
+  const htmlIdx = lower.indexOf("<html");
+  const openIdx =
+    doctypeIdx === -1 ? htmlIdx : htmlIdx === -1 ? doctypeIdx : Math.min(doctypeIdx, htmlIdx);
+  if (openIdx > 0) {
+    html = html.substring(openIdx);
+    strippedLeading = true;
+  }
+
+  // Trailing trim: everything after the last document close.
+  const closeIdx = html.toLowerCase().lastIndexOf("</html>");
+  if (closeIdx !== -1) {
+    const end = closeIdx + "</html>".length;
+    if (html.substring(end).trim().length > 0) {
+      strippedTrailing = true;
+    }
+    html = html.substring(0, end);
+  }
+
+  return { html, strippedFences, strippedLeading, strippedTrailing };
+}
+
 // ─── parseJsonStream ─────────────────────────────────────────────────────────
 
 export interface JsonStreamResult {

@@ -12,7 +12,7 @@ import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJson } from "../core/output.js";
 import { readAllStdin } from "../core/stdin-reader.js";
-import { stripFences } from "../core/stream-parse.js";
+import { stripFencesDetailed } from "../core/stream-parse.js";
 
 const CMD = "strip-fences";
 
@@ -27,6 +27,12 @@ Options:
 
 Notes:
   - Strips leading \`\`\`html or \`\`\` and trailing \`\`\` fences.
+  - For FULL documents (input contains <!doctype or <html>): also absorbs
+    stray prose before the document open and commentary after </html>.
+    Fragments (no document boundary) pass through fence-stripped only —
+    no fuzzy first-tag guessing.
+  - --json reports strippedFences / strippedLeading / strippedTrailing
+    booleans for observability.
   - No file is written; output always goes to stdout.
   - Use \`-\` to read from stdin: cat model-output.txt | ui strip-fences -
 
@@ -74,12 +80,17 @@ export const stripFencesCommand = {
       }
     }
 
-    const strippedHtml = stripFences(raw);
-    const removedFences = strippedHtml !== raw.trim();
+    const result = stripFencesDetailed(raw);
 
     if (useJson) {
-      return okJson(CMD, { file: filePath, strippedHtml, removedFences });
+      return okJson(CMD, {
+        file: filePath,
+        strippedHtml: result.html,
+        removedFences: result.strippedFences,
+        strippedLeading: result.strippedLeading,
+        strippedTrailing: result.strippedTrailing,
+      });
     }
-    return { exitCode: 0, stdout: strippedHtml + "\n" };
+    return { exitCode: 0, stdout: result.html + "\n" };
   },
 };

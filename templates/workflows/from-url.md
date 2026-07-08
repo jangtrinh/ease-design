@@ -1,3 +1,7 @@
+---
+description: "Extract a portable DESIGN.md spec folder from a live URL. Use when the user points at a website and wants its design system captured for reuse."
+---
+
 # Workflow — `/ui:from-url`
 
 ## Title

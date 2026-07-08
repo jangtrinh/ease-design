@@ -11,7 +11,10 @@ import { fileURLToPath } from "node:url";
 
 import { parseArgs } from "./core/cli-args.js";
 import type { ParsedArgs } from "./core/cli-args.js";
+import { errJson } from "./core/output.js";
 import type { CommandResult } from "./core/output.js";
+import { signatureFor } from "./core/command-signatures.js";
+import { findUnknownFlag, unknownFlagMessage } from "./core/flag-guard.js";
 
 import { colorCommand } from "./commands/color.js";
 import { tokensCommand } from "./commands/tokens.js";
@@ -28,6 +31,7 @@ import { doctorCommand } from "./commands/doctor.js";
 import { guideCommand } from "./commands/guide.js";
 import { dsCommand } from "./commands/ds.js";
 import { designmdCommand } from "./commands/designmd.js";
+import { schemaCommand } from "./commands/schema.js";
 
 // Keep in sync with package.json "version". A test (tests/cli-version.test.ts)
 // asserts these match, so drift fails CI rather than shipping silently.
@@ -60,6 +64,7 @@ COMMANDS[initCommand.name] = initCommand;
 COMMANDS[doctorCommand.name] = doctorCommand;
 COMMANDS[dsCommand.name] = dsCommand;
 COMMANDS[designmdCommand.name] = designmdCommand;
+COMMANDS[schemaCommand.name] = schemaCommand;
 
 // ─── Root help ────────────────────────────────────────────────────────────────
 
@@ -140,6 +145,27 @@ export function run(args: string[]): number {
   if (!cmd.hasSubcommands && parsed.subcommand !== undefined) {
     parsed.positionals.unshift(parsed.subcommand);
     parsed.subcommand = undefined;
+  }
+
+  // Central unknown-flag guard: every (sub)command with a declared signature
+  // (src/core/command-signatures.ts) rejects flags outside it — a hallucinated
+  // `--brand-color` fails loud with a did-you-mean hint instead of silently
+  // no-opping. Unresolvable signatures (unknown subcommand, dispatcher without
+  // a subcommand) fall through to the command's own BAD_ARG handling.
+  const sig = signatureFor(parsed.command, parsed.subcommand);
+  if (sig !== null) {
+    const unknown = findUnknownFlag(parsed.flags, sig.flags.map((f) => f.name));
+    if (unknown !== null) {
+      const msg = unknownFlagMessage(unknown);
+      const label =
+        parsed.subcommand !== undefined ? `${parsed.command} ${parsed.subcommand}` : parsed.command;
+      const res = parsed.json
+        ? errJson(label, "UNKNOWN_FLAG", msg)
+        : { exitCode: 1, stderr: `ui: ${msg}\n` };
+      if (res.stdout !== undefined) stdout.write(res.stdout);
+      if (res.stderr !== undefined) stderr.write(res.stderr);
+      return res.exitCode;
+    }
   }
 
   // Wrap dispatch so any unexpected throw becomes a clean exit 2 instead of

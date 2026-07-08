@@ -1,3 +1,7 @@
+---
+description: "Extract a design system from existing HTML. Use when the user provides HTML and wants its tokens and components harvested into a project design system."
+---
+
 # Workflow — `/ui:extract`
 
 ## Title
@@ -206,6 +210,17 @@ ui ds status --json
 
 `<name>` is the project's design-system name — default to the artifact's
 filename stem (`my-page.html` → `my-page`) if the user does not supply one.
+
+If `ui ds init` exits non-zero, split by **argument provenance** (run with
+`--json` for `error.code` + `error.message`). Recoverable — the failing
+argument was model-derived; fix it and re-invoke ONCE (hard cap, one
+retry): `BAD_NAME` → re-slugify the filename stem; `PERSONA_NOT_FOUND` →
+re-run the step-5 synthesis and pick the next-nearest persona;
+`BAD_INTENT` → trim to ≤ 512 chars. Terminal — surface `error.message`
+and stop: `BAD_BRAND_HEX` (user-supplied — ask for a valid `#RRGGBB`),
+`DS_TAMPERED`, `DS_EXISTS` without confirmed `--force`, and any
+privacy/permission stop. If the single retry fails again, treat it as
+terminal.
 
 `ui ds init` writes the three artifacts under `design/`:
 `design.tokens.json`, `component-registry.json`, `ds.manifest.json`. The

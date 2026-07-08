@@ -8,30 +8,25 @@
  * - Wrappers point AT template files; they never copy their content.
  */
 
-// ─── Summaries ────────────────────────────────────────────────────────────────
+// ─── Descriptions ─────────────────────────────────────────────────────────────
+//
+// Wrapper `description:` frontmatter is the ONLY preloaded discovery signal a
+// runtime sees for a skill/command, so it is sourced from the template's own
+// frontmatter (single source of truth — see templates.ts readTemplateDescription)
+// and passed in explicitly by the adapters. The builders stay pure string
+// functions: no fs access here, the bare name is the legacy fallback.
 
-/** One-line description for each workflow verb used in adapter frontmatter. */
-const VERB_SUMMARIES: Record<string, string> = {
-  generate:  "Generate UI variants from a plain-language intent",
-  iterate:   "Apply a focused vibe-word edit to an existing variant",
-  refine:    "Self-correction pass that fixes execution quality without redesigning",
-  redesign:  "Radical contra-persona redesign of an existing variant",
-  extract:   "Extract a design system from existing HTML",
-  "from-ref":"Generate high-fidelity HTML from a reference screenshot or image",
-  figma:     "Import a Figma frame and produce an HTML reproduction",
-  slides:    "Generate a full presentation slide deck from a topic",
-  init:      "Initialise ease-design for this project",
-};
+/** Description for the synthetic `init` verb, which has no template file. */
+export const INIT_VERB_DESCRIPTION = "Initialise ease-design for this project";
 
-/** One-line description for each skill name used in adapter frontmatter. */
-const SKILL_SUMMARIES: Record<string, string> = {
-  "pick-persona":       "Choose one or more design personas for a generation task",
-  "score-taste":        "Evaluate a generated design against the 6+1-axis taste rubric",
-  "check-consistency":  "Score the Consistency axis — DS token and component reuse",
-  "color-decision":     "Make a color choice, build a palette, or check contrast",
-  "token-model":        "Define, alias, or change design tokens",
-  "apply-prompt-mode":  "Decide how faithfully to track a reference input",
-};
+/**
+ * Render a description as a single-line double-quoted YAML scalar. Sourced
+ * descriptions are multi-sentence ("… Use when …") with commas/colons, which
+ * are unsafe as plain YAML scalars.
+ */
+function yamlQuote(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\s+/g, " ").trim()}"`;
+}
 
 // ─── Path normalisation ────────────────────────────────────────────────────────
 
@@ -82,20 +77,22 @@ function buildSkillRefLines(skillRefs: readonly string[]): string {
  * @param verb          The workflow verb (e.g. "generate").
  * @param templatePath  Absolute path to the workflow template file, or null for "init".
  * @param skillRefs     Skill names the command should delegate to.
+ * @param description   Discovery description sourced from the template's frontmatter.
  */
 export function buildClaudeCommand(
   verb: string,
   templatePath: string | null,
   skillRefs: readonly string[],
   knowledgeRoot?: string,
+  description?: string,
 ): string {
-  const summary = VERB_SUMMARIES[verb] ?? verb;
+  const summary = description ?? (verb === "init" ? INIT_VERB_DESCRIPTION : verb);
   const skillBlock = buildSkillRefLines(skillRefs);
 
   if (verb === "init" || templatePath === null) {
     return [
       "---",
-      `description: ease-design /ui:init — ${summary}`,
+      `description: ${yamlQuote(`ease-design /ui:init — ${description ?? INIT_VERB_DESCRIPTION}`)}`,
       "---",
       "",
       "# /ui:init",
@@ -114,7 +111,7 @@ export function buildClaudeCommand(
   const tplPath = toFwdSlash(templatePath);
   return [
     "---",
-    `description: ease-design /ui:${verb} — ${summary}`,
+    `description: ${yamlQuote(`ease-design /ui:${verb} — ${summary}`)}`,
     "---",
     "",
     `# /ui:${verb}`,
@@ -131,18 +128,20 @@ export function buildClaudeCommand(
  *
  * @param name         The skill name (e.g. "pick-persona").
  * @param templatePath Absolute path to the skill template file.
+ * @param description  Discovery description sourced from the template's frontmatter.
  */
 export function buildClaudeSkill(
   name: string,
   templatePath: string,
   knowledgeRoot?: string,
+  description?: string,
 ): string {
-  const summary = SKILL_SUMMARIES[name] ?? name;
+  const summary = description ?? name;
   const tplPath = toFwdSlash(templatePath);
   return [
     "---",
     `name: ease-design-${name}`,
-    `description: ${summary}`,
+    `description: ${yamlQuote(summary)}`,
     "---",
     "",
     "Follow the runtime-neutral skill at:",
@@ -168,13 +167,14 @@ export function buildAntigravityWorkflow(
   verb: string,
   templatePath: string | null,
   knowledgeRoot?: string,
+  description?: string,
 ): string {
-  const summary = VERB_SUMMARIES[verb] ?? verb;
+  const summary = description ?? (verb === "init" ? INIT_VERB_DESCRIPTION : verb);
 
   if (verb === "init" || templatePath === null) {
     return [
       "---",
-      `description: ease-design ui-init — ${summary}`,
+      `description: ${yamlQuote(`ease-design ui-init — ${description ?? INIT_VERB_DESCRIPTION}`)}`,
       "---",
       "",
       "# ui-init",
@@ -194,7 +194,7 @@ export function buildAntigravityWorkflow(
   const tplPath = toFwdSlash(templatePath);
   return [
     "---",
-    `description: ease-design ui-${verb} — ${summary}`,
+    `description: ${yamlQuote(`ease-design ui-${verb} — ${summary}`)}`,
     "---",
     "",
     `# ui-${verb}`,
@@ -220,8 +220,9 @@ export function buildAntigravitySkill(
   name: string,
   templatePath: string,
   knowledgeRoot?: string,
+  description?: string,
 ): string {
-  return buildClaudeSkill(name, templatePath, knowledgeRoot);
+  return buildClaudeSkill(name, templatePath, knowledgeRoot, description);
 }
 
 // ─── Codex builder ────────────────────────────────────────────────────────────
@@ -260,7 +261,9 @@ export function buildCodexBlock(
     `\`${tplRoot}/workflows/\` and \`${tplRoot}/skills/\`. Invoke them`,
     "by following the relevant Markdown file when the user asks for design",
     `work. ${knowledgeLine}The \`ui\` binary handles all non-LLM work (autofix, layout`,
-    "validation, token compilation, color math).",
+    "validation, token compilation, color math). Before forming a `ui`",
+    "invocation, run `ui schema --json` for the machine-readable signature",
+    "(positionals, flags, enums, error codes) of every (sub)command.",
     "",
     "Available slash-commands when proxied: /ui:generate /ui:iterate /ui:refine",
     "/ui:redesign /ui:extract /ui:from-ref /ui:figma /ui:slides /ui:init.",

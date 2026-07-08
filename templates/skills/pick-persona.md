@@ -1,3 +1,7 @@
+---
+description: "Choose one or more design personas for a generation, redesign, or extraction task. Use when a workflow step says to select N personas from intent, pick a contrasting persona, or resolve a persona the user named to a concrete slug."
+---
+
 # Skill: Pick Persona
 
 Use when the host model needs to choose one or more design personas for a generation, redesign, or extraction task.

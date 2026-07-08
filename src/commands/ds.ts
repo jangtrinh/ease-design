@@ -25,6 +25,19 @@ Subcommands:
   change-token   Update one token's $value (only sanctioned mutation post-init)
   status         Show the manifest summary (generation, persona, hashes)
 
+'ds init' options:
+  --persona <slug>   Persona slug from personas.json (required)
+  --intent "<text>"  Plain-language design intent, max 512 chars (required)
+  --brand-hex <hex>  Brand seed color (#RRGGBB)
+  --force            Overwrite an existing DS (preserves changelog history)
+  --persona-data <f> Override the personas.json path (test support)
+  --dir <path>       Override the project directory
+
+'ds change-token' options:
+  --value <v>        New $value for the token (required)
+  --reason "<text>"  Changelog note recorded with the mutation
+  --dir <path>       Override the project directory
+
 'ds context' options:
   --strict       Prepend the registered-components-only enforcement preamble
   --with-theme   Also emit the compiled Tailwind v4 @theme block (full token map,
@@ -69,12 +82,14 @@ Error codes:
   BAD_NAME           Invalid <name> on 'ds init'
   BAD_INTENT         Invalid --intent
   BAD_BRAND_HEX      Invalid --brand-hex
+  BAD_TOKEN          Compiled token set failed validation on 'ds init'
   PERSONA_NOT_FOUND  --persona slug not in personas.json
   TOKEN_NOT_FOUND    'change-token' on a non-existent path
   BAD_VALUE          'change-token' --value fails type/format check
   ALIAS_CYCLE        New alias graph has a cycle
   DANGLING_ALIAS     New alias points to a missing token
   TYPE_MISMATCH      New alias crosses incompatible $type
+  WRITE_ERROR        A design/ artifact could not be written
   BAD_ARG            Missing required flag, unknown subcommand, etc.
   UNKNOWN_FLAG       Unrecognised --flag (rejected, with a did-you-mean hint)
 `;

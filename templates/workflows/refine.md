@@ -1,3 +1,7 @@
+---
+description: "Self-correction pass that fixes execution quality without redesigning. Use when a variant scores low on craft axes or the user asks to polish or clean up a design."
+---
+
 ## `/ui:refine` — Self-correction pass on the current variant
 
 A focused **execution-quality** pass that fixes visual issues in an existing UI **without
@@ -103,7 +107,30 @@ hint to weight that axis higher, but still run the full checklist.
    uniques duplicate `id`s. It is idempotent; running it on already-clean HTML is a
    no-op.
 
-   ### 4d. Early-exit check
+   ### 4d. Run the structural linter (deterministic floor)
+
+   Refine re-emits the whole document, and `autofix` does not balance tags — a dropped
+   closing tag from a re-emit would otherwise reach critique (and the user) with no
+   machine check. Mirror the gate that `iterate.md` and `redesign.md` already run:
+
+   ```bash
+   ui validate-layout <variant.html> --json
+   ```
+
+   **Hard rule:** if it reports any `error`-severity finding (missing `<html>`/`<body>`,
+   unbalanced structural tags), the re-emit corrupted the markup — restore the pre-pass
+   copy kept in step 2, re-emit ONCE with the linter's findings appended to the
+   checklist analysis, and re-run this check. If the second attempt still trips an
+   error, keep the restored pre-pass copy and hand THAT to critique — never forward
+   corrupted markup. Warning-severity findings (the layout-smell heuristics) are
+   advisory: note them and let the quality gate weigh them.
+
+   **Pre-existing-error exception:** if the *original input* variant (the step-2 copy,
+   before any refine pass) already trips the same `error`-severity finding on its first
+   check, treat it as a pre-existing condition of the source — do not block the pass on
+   it; only NEW structural errors introduced by a re-emit gate the loop.
+
+   ### 4e. Early-exit check
 
    Compare the post-autofix HTML to the pass's input HTML (trimmed for whitespace at the
    ends). If they are **byte-identical**, the pass made no changes — there is nothing
@@ -127,6 +154,8 @@ Defer to `templates/workflows/critique.md`. A refine pass is only "done" when:
 
 - The file parses as valid HTML with CDN links intact.
 - `ui autofix` reports zero findings on a re-run (idempotence proof).
+- `ui validate-layout` reports zero `error`-severity findings introduced by refine
+  (pre-existing source errors are exempt per step 4d).
 - The critique verdict is **pass** across all 7 axes; axes that were not the focus of
   refine must still not regress against the baseline.
 

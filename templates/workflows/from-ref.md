@@ -1,3 +1,7 @@
+---
+description: "Generate high-fidelity HTML from a reference screenshot or image. Use when the user provides an image to reproduce or draw inspiration from."
+---
+
 # `/ui:from-ref` — Generate from a reference
 
 Generate a high-fidelity HTML page from a **reference** — a screenshot, mockup,
@@ -146,9 +150,17 @@ Check the project root for `ds.manifest.json`.
   ```sh
   ui ds init <project-name> --persona <chosen-persona-slug> --intent "<user prompt + brief.persona_label>"
   ```
+  If `ui ds init` exits non-zero, split by **argument provenance** (run with
+  `--json` for `error.code` + `error.message`). Recoverable — model-derived;
+  fix and re-invoke ONCE (hard cap, one retry): `BAD_NAME` → re-slugify
+  `<project-name>`; `PERSONA_NOT_FOUND` → substitute the next-best persona
+  from step 5; `BAD_INTENT` → trim the intent to ≤ 512 chars. Terminal —
+  surface `error.message` and stop: `BAD_BRAND_HEX` (user-supplied — ask for
+  a valid `#RRGGBB`), `DS_TAMPERED`, `DS_EXISTS`, and any privacy/permission
+  stop. If the single retry fails again, treat it as terminal.
 - If present, verify it is intact:
   ```sh
-  ui ds context --strict --format markdown --max-bytes 4096
+  ui ds context --strict --format markdown --max-bytes 4096 --with-theme
   ```
   `--strict` activates the hash-tamper check and the registered-components-only
   enforcement preamble. A non-zero exit means the manifest is stale, the
@@ -167,7 +179,9 @@ Invoke `templates/workflows/generate.md` with this payload bound into its prompt
 - **mode** — the UI mode (from `--mode` or inferred from `brief.ui_type` via
   `knowledge/mode-constraints.md`'s mode-selection table).
 - **design_system_context** — the output of `ui ds context --format markdown
-  --max-bytes 4096 --strict`.
+  --max-bytes 4096 --strict --with-theme` (the appended `@theme` fenced
+  section fills generate's `<design_tokens>` slot; the context block fills
+  `<design_system>`).
 
 For multimodal-capable hosts, keep the source image attached so the model can
 cross-check pixels while it generates — especially under **replicate** mode.

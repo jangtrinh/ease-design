@@ -170,6 +170,7 @@ envelope.
 | Command | Summary |
 |---|---|
 | `ui guide` | Plain-language map of the `/ui:*` workflow (**start here if you're new**) |
+| `ui schema` | Machine-readable signatures for every (sub)command — flags, enums, error codes |
 | `ui doctor` | Verify an ease-design install (and, with `--cwd`, a project) is healthy |
 | `ui init` | Write the ease-design manifest and per-runtime adapter tree |
 | `ui ds` | Compile, inspect, and mutate the project's design system (`init`/`context`/`change-token`/`status`) |
@@ -182,7 +183,7 @@ envelope.
 | `ui edit-strategy` | Select edit strategy, number HTML lines, apply ln-diff patch |
 | `ui designmd` | Extract tokens, snapshot, and audit `DESIGN.md` folders |
 | `ui export` | Export HTML as a standalone self-contained file |
-| `ui strip-fences` | Remove ` ```html / ``` ` fences from LLM HTML output |
+| `ui strip-fences` | Remove fences + stray prose around a full LLM HTML document |
 | `ui parse-json-stream` | Extract concatenated JSON objects from a file or stdin |
 
 ---

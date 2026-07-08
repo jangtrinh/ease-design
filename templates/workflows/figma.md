@@ -1,3 +1,7 @@
+---
+description: "Import a Figma frame and produce an HTML reproduction. Use when the user provides a figma.com URL or frame to convert to code."
+---
+
 # `/ui:figma` — Import a Figma frame and produce HTML
 
 Import a Figma frame (file + node) and generate a 1:1 HTML/Tailwind reproduction. The

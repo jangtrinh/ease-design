@@ -212,24 +212,40 @@ If the variant failed and `round < 3`:
    palette, layout, copy do not change unless the failing axis itself
    demands it.
 
-   The targeted prompt skeleton:
+   The targeted prompt skeleton (XML tags separate instructions from the
+   large pasted data blocks — do not rename them):
 
    ```
-   [ROLE] You are revising one specific axis of an existing UI variant.
+   <role>
+   You are revising one specific axis of an existing UI variant.
    The other axes are passing — do not touch them.
+   </role>
 
-   [VARIANT — current HTML]
-   <current variant HTML, verbatim>
+   <variant_html>
+   {current variant HTML, verbatim — including its accumulated leading
+   AI_CRITIQUE_LOG comments, which are the round history}
+   </variant_html>
 
-   [PERSONA DNA — <persona-slug>, family <family>]
-   <persona DNA from step 1>
+   <persona_dna slug="{persona-slug}" family="{family}">
+   {persona DNA from step 1}
+   </persona_dna>
 
-   [FAILING AXIS] <axis-name>  (current score: <n>/10, target: ≥ 7)
+   <failing_axis name="{axis-name}" score="{n}/10" target="≥ 7" />
 
-   [WHAT TO FIX]
-   <axis-specific directive from the table below>
+   <what_to_fix>
+   {axis-specific directive from the table below}
+   </what_to_fix>
 
-   [CONSTRAINTS]
+   <prior_attempts axis="{axis-name}">
+   {ONE line per earlier round that targeted THIS axis, read from the
+   accumulated AI_CRITIQUE_LOG blocks at the top of the variant:
+   "round {N}: {change summary} → {prev}/10 → {post}/10".
+   Omit this tag entirely when no earlier round targeted this axis.}
+   These attempts did not clear the bar. Do NOT re-apply any of them —
+   pull a different lever on the same axis.
+   </prior_attempts>
+
+   <constraints>
    - Preserve design identity: same palette, same typography system,
      same overall composition, same content. The viewer should recognise
      it as the same variant.
@@ -244,13 +260,16 @@ If the variant failed and `round < 3`:
      found — otherwise the Consistency axis will flag the arbitrary
      value as a raw literal and the loop will ping-pong.
    - Keep CDN links, image `onerror` fallbacks, and Lucide init intact.
+   </constraints>
 
-   [FORMAT]
-   Return RAW HTML only — `<html>…</html>`, no markdown fences, no
-   commentary.
+   <output_format>
+   Return RAW HTML only — a complete `<html>…</html>` document that
+   begins with the accumulated `<!-- AI_CRITIQUE_LOG -->` comments; no
+   markdown fences, no commentary.
+   </output_format>
    ```
 
-2. **Per-axis directives** for the `[WHAT TO FIX]` slot:
+2. **Per-axis directives** for the `<what_to_fix>` slot:
 
    | Failing axis | Targeted directive |
    |---|---|
@@ -273,11 +292,16 @@ If the variant failed and `round < 3`:
    guarantee is unprovable.
 
 4. **Write the revised HTML** to the variant file path, replacing the
-   previous content. Begin the file with a brief HTML-comment critique
-   log: which axis was targeted, the previous and target scores, a
-   one-line summary of the change, and (after step 5 runs) a single line
-   summarising the autofix findings applied this round. No markdown
-   fences around the document. Skeleton:
+   previous content. **Prepend** this round's critique-log block ABOVE any
+   earlier rounds' blocks — accumulate, newest first, never replace. The
+   accumulated history is the episodic memory that fills
+   `<prior_attempts>` in later rounds, so a round-3 refine can see what
+   rounds 1–2 already tried on the same axis and not re-apply a rejected
+   fix. Each block records: which axis was targeted, the previous and
+   target scores, a one-line summary of the change, and (after step 5.5
+   runs) a single line summarising the autofix findings applied this
+   round. Keep each block to the four lines below — the history must stay
+   cheap to carry. No markdown fences around the document. Skeleton:
 
    ```
    <!-- AI_CRITIQUE_LOG round=<N>:

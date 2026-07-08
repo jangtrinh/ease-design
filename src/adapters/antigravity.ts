@@ -12,7 +12,12 @@
  */
 import { join, resolve } from "node:path";
 import type { AdapterArtifact, AdapterInput } from "./index.js"; // AdapterInput: {cwd, templatesRoot}
-import { WORKFLOW_VERBS, SKILL_NAMES, resolveTemplatePath } from "./templates.js";
+import {
+  WORKFLOW_VERBS,
+  SKILL_NAMES,
+  resolveTemplatePath,
+  readTemplateDescription,
+} from "./templates.js";
 import { buildAntigravityWorkflow, buildAntigravitySkill } from "./wrapper-shapes.js";
 
 /**
@@ -28,7 +33,10 @@ export function generateAntigravityAdapter(input: AdapterInput): AdapterArtifact
   // ── Workflow files ─────────────────────────────────────────────────────────
   for (const verb of WORKFLOW_VERBS) {
     const templatePath = resolveTemplatePath(templatesRoot, "workflow", verb);
-    const content = buildAntigravityWorkflow(verb, templatePath, knowledgeRoot);
+    // Discovery description comes from the template's own frontmatter (SSOT).
+    const description =
+      templatePath !== null ? readTemplateDescription(templatePath) ?? undefined : undefined;
+    const content = buildAntigravityWorkflow(verb, templatePath, knowledgeRoot, description);
     artifacts.push({
       mode: "write",
       absPath: join(cwd, ".agent", "workflows", `ui-${verb}.md`),
@@ -42,7 +50,8 @@ export function generateAntigravityAdapter(input: AdapterInput): AdapterArtifact
     if (templatePath === null) {
       throw new Error(`skill template not found for "${name}" under ${templatesRoot}`);
     }
-    const content = buildAntigravitySkill(name, templatePath, knowledgeRoot);
+    const description = readTemplateDescription(templatePath) ?? undefined;
+    const content = buildAntigravitySkill(name, templatePath, knowledgeRoot, description);
     artifacts.push({
       mode: "write",
       absPath: join(cwd, ".agent", "skills", `ease-design-${name}`, "SKILL.md"),

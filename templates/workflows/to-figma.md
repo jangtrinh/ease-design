@@ -1,3 +1,7 @@
+---
+description: "Author idiomatic Figma on the canvas from intent or an existing ease-design output. Use when the user wants a design built or edited in Figma (auto-layout, components, variables) via the figma-agent hand."
+---
+
 # `/ui:to-figma` — Author idiomatic Figma from intent
 
 Turn a plain-language intent (or a design you already produced with ease-design) into

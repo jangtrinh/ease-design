@@ -1,3 +1,7 @@
+---
+description: "Apply a focused vibe-word edit to an existing variant. Use when the user asks to tweak, adjust, or nudge a generated design without redesigning it."
+---
+
 ## `/ui:iterate` — Surgical edit of an existing variant
 
 Apply a focused change to a UI that already exists, **preserving its design identity** (color
@@ -103,9 +107,19 @@ never picks the strategy itself — it executes the strategy the binary returned
       - `BAD_DIFF` — zero chunks parsed; the diff was malformed. Re-emit the diff,
         paying attention to the exact `@@ line N-M @@` header and the `- / + /   `
         prefixes.
-      - `DIFF_NO_MATCH` — chunks parsed but no chunk matched within ±5 lines (the
-        source moved since the diff was produced, or the `-` lines were paraphrased).
-        Fall through to step 4c (full regen). Do not retry the diff.
+      - `DIFF_NO_MATCH` — one or more chunks matched no lines within ±5 (the source
+        moved since the diff was produced, or the `-` lines were paraphrased). The
+        envelope's `data.unmatched[]` is a per-chunk diagnostic: the quoted `-` lines
+        the binary looked for, the nearest window where a trimmed match *does* exist
+        (with its line number), and which matching rule failed. **Repair the diff
+        EXACTLY ONCE using that diagnostic** — re-target each unmatched chunk to the
+        reported nearest window and copy the `-` lines verbatim from the numbered
+        view (the file was not modified on failure, so the numbered view from
+        substep 1 is still valid; do not re-run `number-lines`). Chunks that DID
+        match must be re-sent too — apply is all-or-nothing. Re-apply with the same
+        command. If the repaired diff fails again for ANY reason, fall through to
+        step 4c (full regen — the identity-risky path this one repair attempt
+        exists to avoid). Never attempt a second repair.
 
       On success the binary writes the patched HTML in place and reports
       `chunksApplied`.

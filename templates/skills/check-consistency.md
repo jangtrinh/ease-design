@@ -1,3 +1,7 @@
+---
+description: "Score the Consistency axis — design-system token and component reuse. Use when auditing whether generated HTML uses the project's DS tokens and registered components instead of ad-hoc values."
+---
+
 # Skill: Check Consistency
 
 Use when the host model needs to score the seventh **Consistency** axis — did the generation reuse the project's design-system tokens and registered components, with correct canonical naming?

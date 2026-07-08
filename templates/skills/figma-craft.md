@@ -1,3 +1,7 @@
+---
+description: "Pick and verify idiomatic Figma constructions when building or editing a canvas via the external figma-agent CLI. Use before building (choose auto-layout, component, and variable structure) and after building (run the construction lints)."
+---
+
 # Skill: Figma Craft
 
 Use when the host model is building, editing, converting, or fixing anything on a Figma

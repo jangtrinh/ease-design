@@ -1,3 +1,7 @@
+---
+description: "Decide how faithfully to track a reference input. Use when a workflow consumes a screenshot, URL, or Figma frame and must choose between faithful reproduction and inspired reinterpretation."
+---
+
 # Skill: Apply Prompt Mode
 
 Use when the host model has a reference input (a screenshot, image, or existing design) and needs to decide how faithfully to track it.

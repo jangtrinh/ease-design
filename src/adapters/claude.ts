@@ -9,7 +9,12 @@
  */
 import { join, resolve } from "node:path";
 import type { AdapterArtifact, AdapterInput } from "./index.js"; // AdapterInput: {cwd, templatesRoot}
-import { WORKFLOW_VERBS, SKILL_NAMES, resolveTemplatePath } from "./templates.js";
+import {
+  WORKFLOW_VERBS,
+  SKILL_NAMES,
+  resolveTemplatePath,
+  readTemplateDescription,
+} from "./templates.js";
 import { buildClaudeCommand, buildClaudeSkill } from "./wrapper-shapes.js";
 import { VERB_SKILL_REFS } from "./skill-refs.js";
 
@@ -28,7 +33,10 @@ export function generateClaudeAdapter(input: AdapterInput): AdapterArtifact[] {
   for (const verb of WORKFLOW_VERBS) {
     const templatePath = resolveTemplatePath(templatesRoot, "workflow", verb);
     const skillRefs = VERB_SKILL_REFS[verb] ?? [];
-    const content = buildClaudeCommand(verb, templatePath, skillRefs, knowledgeRoot);
+    // Discovery description comes from the template's own frontmatter (SSOT).
+    const description =
+      templatePath !== null ? readTemplateDescription(templatePath) ?? undefined : undefined;
+    const content = buildClaudeCommand(verb, templatePath, skillRefs, knowledgeRoot, description);
     artifacts.push({
       mode: "write",
       absPath: join(cwd, ".claude", "commands", "ui", `${verb}.md`),
@@ -43,7 +51,8 @@ export function generateClaudeAdapter(input: AdapterInput): AdapterArtifact[] {
       // Skills always have a template file; null here indicates a registry/fs mismatch.
       throw new Error(`skill template not found for "${name}" under ${templatesRoot}`);
     }
-    const content = buildClaudeSkill(name, templatePath, knowledgeRoot);
+    const description = readTemplateDescription(templatePath) ?? undefined;
+    const content = buildClaudeSkill(name, templatePath, knowledgeRoot, description);
     artifacts.push({
       mode: "write",
       absPath: join(cwd, ".claude", "skills", `ease-design-${name}`, "SKILL.md"),

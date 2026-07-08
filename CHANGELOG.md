@@ -7,6 +7,55 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **`ui schema [--json]`** — machine-readable invocation contract for every `ui`
+  (sub)command: positionals, flags (type/required/enums), documented error codes, and
+  global flags/error codes. Nested per-subcommand signatures for the dispatcher commands
+  (`ds`, `color`, `tokens`, `registry`, `edit-strategy`, `designmd`). A cross-consistency
+  test pins every declared flag/error code to the command's `--help` text so the table
+  cannot silently drift. The Codex adapter block now points agents at it before forming
+  an invocation.
+- **Central unknown-flag guard** — the schema signatures power a dispatcher-level flag
+  guard: EVERY (sub)command now rejects unknown/misspelled flags with a did-you-mean
+  hint (`UNKNOWN_FLAG`), extending the Phase-A per-command guard from 5 commands to all 16.
+- **Skill/workflow discovery descriptions from template frontmatter** — all 18 templates
+  now carry a `description:` (what + when + triggers); `ui init` sources the wrapper
+  frontmatter from it via `readTemplateDescription()`. Kills the code-vs-template drift
+  (the `SKILL_SUMMARIES`/`VERB_SUMMARIES` tables are gone) and fixes four
+  previously-undiscoverable wrappers (`designmd-emit`, `figma-craft`, `from-url`,
+  `to-figma`) that shipped a bare slug as their only discovery signal.
+- **`ui strip-fences` full-document boundaries** — absorbs stray prose before
+  `<!doctype`/`<html` and commentary after `</html>` (full documents only; fragments pass
+  through untouched — no fuzzy first-tag guessing). `--json` reports
+  `strippedLeading`/`strippedTrailing`. Now wired into `generate.md`'s raw→html step.
+
+### Changed (workflow templates — propagate via `ui init --force`)
+- `generate.md`/`slides.md`/`redesign.md`/`from-ref.md` consume the DS context + Tailwind
+  `@theme` pair via ONE call — `ui ds context --strict --with-theme` — retiring the
+  separate `ui tokens compile` step and its "adjust the tokens path" foot-gun.
+- `generate.md` + `critique.md` prompt skeletons converted from `[BRACKET]` labels to
+  XML tags (`<role>`, `<persona_dna>`, `<design_system>`, `<design_tokens>`,
+  `<mode_constraints>`, `<output_format>`, …) — instructions separated from large pasted
+  data blocks; the output contract explicitly permits the leading `AI_CRITIQUE_LOG`
+  comment.
+- `generate.md` persona hardening: an anti-default steer (resolve ambiguity inside the
+  persona's DNA, never regress to generic clean-modern-SaaS) + an empty-DNA self-STOP at
+  the point the family file is read (substitute the next-highest scorer, tell the user).
+  Universal Style Guide / Mode Constraints / a11y floors explicitly override persona
+  latitude on conflict.
+- `generate.md`/`extract.md`/`from-ref.md` split `ui ds init` failures by **argument
+  provenance**: model-derived errors (`BAD_NAME`, `PERSONA_NOT_FOUND`, over-long
+  `BAD_INTENT`) self-correct with exactly ONE retry; user-supplied/state errors
+  (`BAD_BRAND_HEX`, `DS_TAMPERED`, `DS_EXISTS`) surface immediately.
+- `iterate.md` recovers `DIFF_NO_MATCH` cheaply: repair the diff ONCE from the envelope's
+  `data.unmatched[]` diagnostics (nearest-window + quoted old lines) before falling back
+  to identity-risky full regen.
+- `refine.md` gains the `ui validate-layout` structural floor that `iterate.md`/
+  `redesign.md` already had — gate on error-severity findings introduced by a re-emit
+  (pre-existing source errors exempt), restore the pre-pass copy instead of forwarding
+  corrupted markup.
+- `critique.md` refine rounds now **accumulate** their `AI_CRITIQUE_LOG` blocks (prepend,
+  newest first) and feed a `<prior_attempts>` slot so a later round never re-applies a
+  fix an earlier round already tried on the same axis.
 - **Figma authoring track** — `/ui:to-figma` (11th workflow) + a `figma-craft` skill.
   ease-design can now author **idiomatic Figma** on the canvas (Figma Free) from intent —
   auto-layout, component instances, token-bound variables — not just HTML. Reuses the

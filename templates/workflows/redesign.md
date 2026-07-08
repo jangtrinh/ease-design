@@ -1,3 +1,7 @@
+---
+description: "Radical contra-persona redesign of an existing variant. Use when the user rejects the current direction and asks for something completely different."
+---
+
 # Workflow — `/ui:redesign`
 
 ## Title
@@ -155,11 +159,13 @@ component catalog naming. If not, generate the redesigned components inline —
 the **Consistency axis** in `templates/workflows/critique.md` will flag low
 reuse so a follow-up `/ui:iterate` can register the new pieces.
 
-**Consume the design tokens mechanically.** Compile the DS tokens to a Tailwind
-`@theme` block and inline it in the redesigned page's `<head>`:
+**Consume the design tokens mechanically.** Get the compiled Tailwind `@theme`
+block and inline it in the redesigned page's `<head>` (one read-only call also
+re-verifies the manifest hash; the theme is compiled from the full resolved
+token map, no tokens path to adjust):
 
 ```bash
-ui tokens compile design/design.tokens.json --target tailwind
+ui ds context --strict --with-theme
 ```
 
 Build the redesign with the token-bound utilities (`bg-surface`, `text-primary`,

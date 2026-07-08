@@ -1,3 +1,7 @@
+---
+description: "Compose a DESIGN.md file from harvested tokens, observed components, and a chosen persona family. Use inside the from-url workflow when writing the 8-section Google-Labs-spec DESIGN.md."
+---
+
 # Skill: DESIGN.md Emit
 
 Use when the host model is composing a `DESIGN.md` file at project root from
