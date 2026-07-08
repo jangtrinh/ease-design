@@ -144,11 +144,13 @@ the critique gate — plus a Figma **construction knowledge** core (`knowledge/f
 auto-layout / sizing mastery, components + variables over hardcoded values, and 14
 construction lints that keep the layer structure senior-grade.
 
-The **hands** are an *external* tool — the `figma-agent` CLI, which drives a Figma plugin. In
-keeping with ease-design's deterministic-binary principle, it is **not** part of the `ui`
-binary and is **not** installed by ease-design: it lives in the separate **figma-design-agent**
-repo. Set it up per `knowledge/figma-agent-hand.md`, or fall back to `/ui:generate` (HTML) if
-the hand is unavailable.
+The **hands** are the `figma-agent` CLI, which drives a Figma Free plugin over a local
+broker. In keeping with ease-design's deterministic-binary principle it is deliberately kept
+*out* of the `ui` binary (it needs the network and a live plugin) and is not published with
+the `ease-design` npm package — but it now ships **in-repo** as an npm workspace at
+`figma-agent/`. Build it once from the repo root with
+`npm run build --workspace=figma-agent`, then follow `knowledge/figma-agent-hand.md` to load
+the plugin. Fall back to `/ui:generate` (HTML) if the hand is unavailable.
 
 ### `/ui:from-url` output
 

@@ -6,7 +6,15 @@ All notable changes to ease-design are documented here. Format follows
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **`figma-agent/` in-repo workspace** — the Figma authoring "hands" (the `figma-agent`
+  CLI + Figma Free plugin behind `/ui:to-figma`) now ship in this repo as an npm workspace
+  instead of a separate external repository. Build from the root with
+  `npm run build --workspace=figma-agent` (see `knowledge/figma-agent-hand.md`). It remains
+  optional and outside the deterministic `ui` binary.
+- **CI job for the figma-agent workspace** — a dedicated `figma-agent` job typechecks and
+  builds the workspace on every push/PR so it can't silently rot; the four `ui` gates are
+  unchanged.
 
 ## [0.1.0] - 2026-07-08
 
