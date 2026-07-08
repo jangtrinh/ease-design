@@ -31,6 +31,9 @@ hand is unavailable, stop and tell the user how to obtain it, or fall back to `/
 - *(optional)* `--from <path>` — start from an existing artifact instead of pure intent:
   a `DESIGN.md` folder, a generated `index.html`, or a persona-compiled design system.
   When given, reuse that design system's tokens rather than deriving new ones.
+  **Behavioral clone handoff:** point `--from` at a `<slug>/capture/` folder produced by
+  `/ui:from-url`'s `figma-agent capture` — build from `page.html`, then replay
+  `behavior.json` states as variant reactions + keyframes as Motion tracks (intent-recipe 15).
 - *(optional)* `--mode <mobile|desktop>` — target surface; infer from intent if omitted.
 
 ## What to read (in order)

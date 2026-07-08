@@ -7,6 +7,24 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **Behavioral web-clone (Track 5)** — rebuild a live site's *animation, interaction, and
+  state*, not just its pixels. Five parts land in the `figma-agent` workspace:
+  - **Converter core fills** — CSS `background-image` now paints as a real Figma IMAGE fill
+    (the old blank-background bug is closed), `background-size` → scaleMode, `img.currentSrc`
+    under srcset/`<picture>`/lazy, multi box-shadow spread → `clipsContent`, WebP fallback.
+  - **Registry-driven font matching** — brand fonts + their CSS-stack fallbacks resolve
+    against the installed Figma font set (cached `listAvailableFontsAsync`) before Inter.
+  - **`figma-agent capture <url>`** — a Playwright hand that writes the unified per-URL folder
+    `<slug>/capture/`: `manifest.json` (fonts + background-image bboxes + `<img>`/canvas/video),
+    `behavior.json` (keyframes, transitions, hover/focus deltas, carousels with `autoplayMs`),
+    `page.html`, `assets/`, `screenshots/`. Headed real-Chrome default, consent/hydration/scroll,
+    graded WAF ladder (logged, never auto-escalated).
+  - **Interaction + animation → Figma** — hover/focus state deltas become Default/Hover variant
+    component sets with an `ON_HOVER` CHANGE_TO Smart-Animate reaction; captured keyframes become
+    real Figma Motion tracks (`applyManualKeyframeTrack`), metronome-gated with variant fallback.
+  - **Knowledge + templates** — intent-recipe 15 "Rebuild a live website on the canvas
+    (with behavior)" + editable-vs-image heuristic + T1–T6 motion mapping; `from-url` gains a
+    "Capture hostile/SPA sites" subsection; `to-figma` gains the capture→variants handoff.
 - **Design Memory (`ui memory`)** — a per-project, append-only event ledger
   (`design/memory.events.jsonl`) + a deterministically compiled graph
   (`design/memory.graph.json`) + a cross-project taste profile under `~/.ease-design/`

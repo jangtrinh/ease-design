@@ -371,6 +371,44 @@ One CTA, not three (Hick's-law lint); real copy, not lorem (anti-slop). The body
 
 ---
 
+## 15. Rebuild a live website on the canvas (with behavior)
+
+Not "screenshot → trace". Copy the site's **structure, animation, interaction, and state** —
+everything, not the pixels only. The loop is capture → convert → author behavior → verify.
+
+```
+1. CAPTURE   FA capture <url>                     → <slug>/capture/{manifest.json, behavior.json, page.html, assets/, screenshots/}
+2. CONVERT   html-to-figma <slug>/capture/page.html  → auto-layout tree (bg-image fills, fonts, ::before/::after all wired)
+3. INTERACT  behavior.json states  → variant sets + ON_HOVER Smart-Animate reactions (executor-components)
+4. ANIMATE   behavior.json keyframes → Figma Motion tracks, metronome-gated (executor-motion)
+5. VERIFY    export-png (resting) + export-video (motion) → critique-rubric → fix-loop
+```
+
+**Editable-vs-image heuristic — decide per node BEFORE building:**
+
+| Signal | Build as | Why |
+|---|---|---|
+| Structured DOM: nav, cards, grids, forms, headings | **Rebuild** (auto-layout + text + variants) | It's a layout — editable, token-bindable, respects the two iron laws |
+| Baked artwork: hero illustrations, logos, WebGL/Canvas scenes, Lottie | **Image** (place the captured asset) | Rebuilding vaporizes fidelity; `manifest.canvases[]`/`videos[]` already hold the pixels |
+| Content photos (`<img>`, product shots) | **Image** — prefer the real `<img>`/`currentSrc` | Higher fidelity than a bg-image fill; use `manifest.images[].currentSrc` |
+| Decorative CSS `background-image` (textures, gradients-as-image) | **bg-image fill** (now supported, Commit 1) | Cheap, on-node; `background-size` maps to scaleMode (cover→FILL, contain→FIT) |
+
+> bg-image data-URIs now paint as real IMAGE fills — the old blank-background gap is closed.
+> Still prefer a true `<img>` node for content photography (crisper, independently movable).
+
+**Motion mapping (→ `../motion-craft.md` T1–T6):** capture reads the **T1** layer — CSS
+transitions + `@keyframes` — which is where hover/focus/entrances/carousels live. On the canvas:
+- hover/focus **state deltas** → Smart-Animate **variant reactions** (4a).
+- scroll-reveal / autoplay-carousel / infinite loops → Figma **Motion timelines** (4b), gated on
+  the metronome probe; if Motion is unavailable, fall back to the variant reaction.
+- **T4–T6** (Motion/GSAP/anime.js libs, Lottie, WebGL) are captured motions we do **not** rebuild —
+  they're baked artwork by the heuristic above; carry the asset, don't reverse-engineer the tween.
+
+`behavior.json` carries `carousels[].autoplayMs` + `slideTransition`, `keyframes`, per-element
+`transitions`/`animations`/`states`, and `timers` — read it, don't re-derive the motion by eye.
+
+---
+
 ## Recipe → lint map (maps to figma-craft.md's construction lints)
 
 | Recipe | Guards against |

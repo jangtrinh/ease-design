@@ -109,6 +109,31 @@ the user which rung succeeded so the choice is auditable:
 Record the exact fetch path used. It becomes part of the run-summary
 written in step 8.
 
+#### Capture hostile / SPA sites (behavioral clone)
+
+When the goal is the whole site — **animation, interaction, and state**, not
+just tokens — or when the target is a JS-rendered SPA / WAF-guarded page, use
+the `figma-agent capture <url>` hand instead of a plain fetch. Trigger it when
+any degrade signal shows: **splash/loader-only body**, **empty `<title>`**,
+**403 / anti-bot challenge**, or **`< 8` links** after load.
+
+`capture` drives a **headed real browser** (the ethical posture: only pages the
+owner can view, no aggressive evasion) and handles the long tail a fetch can't:
+consent dismissal, hydration polling, and lazy-load auto-scroll. It writes the
+unified per-URL folder `<slug>/capture/` — `manifest.json` (fonts + background
+images with bboxes + `<img>`/canvas/video), `behavior.json` (keyframes,
+transitions, hover/focus deltas, carousels with `autoplayMs`), `page.html`,
+`assets/`, and `screenshots/`. Each later step **appends** to the same folder.
+
+- Default is headed real-Chrome for the WAF long tail; the graded ladder is
+  logged in `capture-summary.md`, never auto-escalated, and stops before
+  Cloudflare-Enterprise / DataDome (out of scope).
+- Headless (`--headless`) is faster but trips "under attack" challenges — use it
+  only for cooperative sites or local fixtures.
+
+This is runtime-neutral: the host model calls the Bash command; the deterministic
+`ui` binary is never involved (capture is the non-deterministic hand).
+
 ### 3. Read the knowledge core
 
 Open these files once, in this order, and keep them in context for the
