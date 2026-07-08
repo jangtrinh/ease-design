@@ -47,6 +47,12 @@ never picks the strategy itself — it executes the strategy the binary returned
    Read the `strategy` field from the JSON envelope. It will be exactly one of
    `deterministic`, `ln_diff`, `full_regen`. Do not second-guess it.
 
+   If the current file's fingerprint differs from the last one recorded for this design (a manual edit happened outside ease-design), first record it:
+
+   ```bash
+   ui memory record manual_edit --data '{"summary":"<one-line of the visible change>"}' --design "<design-id>"
+   ```
+
 4. **Execute the chosen strategy** — exactly one branch:
 
    ### 4a. `deterministic` branch
@@ -176,6 +182,12 @@ never picks the strategy itself — it executes the strategy the binary returned
    The critique returns a per-axis score plus a verdict. If the verdict is **fail**, fold
    the critique's recommended fixes into the next iterate pass — but never loop forever:
    the critique's own pass budget is the hard ceiling.
+
+   Record the vibe edit so recurring taste is learned:
+
+   ```bash
+   ui memory record vibe_edit --data '{"word":"<vibe-word>","axis":"<mapped-axis>"}' --design "<design-id>"
+   ```
 
 ## Outputs
 

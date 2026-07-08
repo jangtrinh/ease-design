@@ -130,6 +130,7 @@ These surface as slash-commands in your agent CLI (Claude Code namespace shown).
 | `/ui:to-figma <intent>` | The inverse: **author idiomatic Figma** on the canvas (Figma Free) from intent — auto-layout, instances, token-bound variables. Needs the external figma-agent hand (see below). |
 | `/ui:extract`           | Inverse direction — pull a design system **out of** existing HTML. |
 | `/ui:slides <intent>`   | Generate a token-bound slide deck. |
+| `/ui:why <question>`    | Answer *why* a past design decision was made — traces picks, edits, verdicts, and token changes from the project's design memory, with provenance. |
 
 All HTML-emitting workflows defer to an internal **critique gate** (12th workflow): the
 model scores 6 craft axes + 1 consistency axis, and a deterministic `ui taste-lint` floor

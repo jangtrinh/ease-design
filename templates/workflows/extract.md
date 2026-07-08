@@ -267,6 +267,12 @@ time using the only sanctioned mutation:
 ui ds change-token <path> --value <v>
 ```
 
+Mirror the change into memory with the same reason:
+
+```sh
+ui memory record token_change --data '{"path":"<token.path>","from":"<old>","to":"<new>","reason":"<same reason>"}'
+```
+
 Walk the diff between the persona-default tokens and the extracted draft
 from step 4. Read the persona-default tree by parsing `design/design.tokens.json`
 directly from disk — do **not** use `ui ds context --format json` for the
@@ -291,6 +297,12 @@ If the count of changes is large enough that one-by-one is unwieldy
 (common — a fresh extraction differs on dozens of tokens), the host model
 may batch the calls in a single shell invocation; each call is still
 atomic.
+
+Record the harvest as the provenance seed:
+
+```sh
+ui memory record harvested --data '{"source":"<url-or-path>","what":"<tokens/components summary>"}'
+```
 
 ### 8. Register every extracted component
 

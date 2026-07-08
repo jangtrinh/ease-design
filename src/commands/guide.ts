@@ -84,6 +84,11 @@ const WORKFLOW: GuideStep[] = [
     command: "/ui:extract <file.html>",
     detail: "The reverse of generate: turn existing HTML into a reusable token + component system.",
   },
+  {
+    want: "Ask why a past decision was made",
+    command: "/ui:why <question>",
+    detail: "e.g. /ui:why is the accent warm? — answers from the project's design memory (what got picked, which vibe edit fixed what, why a token changed), with provenance.",
+  },
 ];
 
 const SETUP_NOTE =

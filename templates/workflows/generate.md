@@ -220,6 +220,14 @@ Tailwind v4 `@theme` block in ONE read-only call:
 ui ds context --strict --with-theme
 ```
 
+Also load the project's design-memory prior — this is safe on a cold start, where it simply prints `memory: empty`:
+
+```sh
+ui memory context --for generate
+```
+
+Keep this block in scratch and inline it into the Step-5 prompt skeleton as `<project_memory>` immediately AFTER the `<design_system>` block, labelled "a prior — the brief and the loaded DS always win."
+
 `--strict` adds the registered-components-only enforcement preamble.
 `--with-theme` appends the compiled `@theme { --color-primary: …; … }`
 block as a fenced section after the context — compiled from the full
@@ -273,6 +281,16 @@ deterministically before anything reads it:
 ```sh
 ui strip-fences variant-<n>-<persona-slug>.raw.html \
   > variant-<n>-<persona-slug>.html
+```
+
+Record that this variant was generated (the taste signal future runs read back):
+
+```sh
+ui memory record variant_generated \
+  --data '{"persona":"<persona-slug>","mode":"<effective-mode>"}' \
+  --design "<n>-<persona-slug>" --medium html \
+  --artifact-ref "variant-<n>-<persona-slug>.html" \
+  --fingerprint "$(ui memory fingerprint variant-<n>-<persona-slug>.html)"
 ```
 
 `strip-fences` removes markdown fences AND absorbs stray prose before
@@ -379,6 +397,14 @@ passes, applies `ui autofix` between passes, and returns one of:
   return the best-scoring revision plus the lowest-scoring axis name so
   the user can decide.
 
+After critique returns for a variant, record its verdict (critique itself stays pure — the CALLER records):
+
+```sh
+ui memory record taste_verdict \
+  --data '{"scores":<axis-scores>,"lowestAxis":"<axis>","round":<n>,"pass":<true|false>}' \
+  --design "<n>-<persona-slug>" --medium html
+```
+
 Do not loop indefinitely; the cap is enforced by the critique workflow.
 
 ### Step 7 — Final deterministic pass + register new components
@@ -423,7 +449,14 @@ emit a single status line:
 variant <n> · persona <slug> · family <family> · taste <PASS|FAIL: lowest=<axis>>
 ```
 
-The user picks one by eye (north-star UX: never by parameter). Their pick
+The user picks one by eye (north-star UX: never by parameter). Record the choice — the strongest taste signal:
+
+```sh
+ui memory record user_pick \
+  --data '{"chosen":"<picked-design-id>","rejected":["<other-design-ids>"]}'
+```
+
+Their pick
 becomes the starting point for `/ui:iterate` (vibe-word edits) or
 `/ui:refine` (self-correction pass) or `/ui:redesign` (radical
 contra-persona).

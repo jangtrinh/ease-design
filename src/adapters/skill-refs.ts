@@ -13,6 +13,7 @@ export const VERB_SKILL_REFS: Readonly<Record<string, readonly string[]>> = {
   redesign:  ["pick-persona", "score-taste", "color-decision"],
   extract:   ["token-model", "color-decision"],
   learn:     ["token-model", "color-decision"],
+  why:       [],
   "from-ref":["apply-prompt-mode", "pick-persona"],
   "from-url":["pick-persona", "designmd-emit", "color-decision", "token-model"],
   figma:     ["apply-prompt-mode"],

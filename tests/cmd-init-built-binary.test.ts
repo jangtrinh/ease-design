@@ -84,8 +84,8 @@ describe("built binary: ui init --runtime claude", () => {
     expect(json.data.manifests[0]?.written).toBe(true);
     expect(existsSync(join(cwd, ".claude", "ease-design.json"))).toBe(true);
 
-    // Adapter tree written — 20 files (12 workflows + 8 skills)
-    expect(json.data.adapters[0]?.paths.length).toBe(20);
+    // Adapter tree written — 21 files (13 workflows + 8 skills)
+    expect(json.data.adapters[0]?.paths.length).toBe(21);
     expect(existsSync(join(cwd, ".claude", "commands", "ui", "generate.md"))).toBe(true);
     expect(existsSync(join(cwd, ".claude", "skills", "ease-design-pick-persona", "SKILL.md"))).toBe(true);
   });
@@ -140,7 +140,7 @@ describe("built binary: ui init --runtime antigravity", () => {
     expect(code).toBe(0);
     const json = JSON.parse(stdout) as { ok: boolean; data: { adapters: { paths: string[] }[] } };
     expect(json.ok).toBe(true);
-    expect(json.data.adapters[0]?.paths.length).toBe(20);
+    expect(json.data.adapters[0]?.paths.length).toBe(21);
     expect(existsSync(join(cwd, ".agent", "workflows", "ui-generate.md"))).toBe(true);
     expect(existsSync(join(cwd, ".agent", "workflows", "ui-from-url.md"))).toBe(true);
   });

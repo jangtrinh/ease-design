@@ -112,6 +112,12 @@ ui ds status --json
 ui ds context --strict --with-theme
 ```
 
+Record the harvest as the provenance seed:
+
+```sh
+ui memory record harvested --data '{"source":"<url-or-path>","what":"<tokens/components summary>"}'
+```
+
 `ds status` must exit 0 (not `DS_TAMPERED`); `ds context --strict --with-theme`
 must emit the context block and the compiled `@theme` block. A `DS_TAMPERED`
 exit is terminal — surface it and stop.

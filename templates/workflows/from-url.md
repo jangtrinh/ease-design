@@ -278,6 +278,12 @@ Step sequence:
    - Persona family chosen for the Overview prose.
    - Any overrides recorded in step 5.
 
+Record the harvest as the provenance seed:
+
+```sh
+ui memory record harvested --data '{"source":"<url-or-path>","what":"<tokens/components summary>"}'
+```
+
 ### 9. Audit gate (hard exit-code gate)
 
 Run the deterministic audit. Its exit code drives workflow success —

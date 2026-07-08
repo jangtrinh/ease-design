@@ -445,6 +445,8 @@ Consistency axis was scored — the flat list from step 3 — so the consuming
 workflow can register missing components or surface unresolved tokens to
 the user.
 
+Do NOT read or write design memory here — critique stays craft-only (memory must never bias the score). The caller (e.g. generate.md Step 6) records the `taste_verdict`.
+
 ## Outputs
 
 - The variant HTML file at its input path, updated in place. On a pass,

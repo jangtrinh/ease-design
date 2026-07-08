@@ -60,6 +60,8 @@ Motion axis for grading
 **Onboard an existing project** (`/ui:learn`) — `ui scan` routes into the `extract.md`
 flow, which draws on `token-taxonomy.md` + `color-science.md`
 
+**Ask why a decision was made** — `/ui:why` (reads the design memory; no knowledge file needed).
+
 ## Relationship to the `ui` binary
 
 These files hold *design knowledge and reasoning*. Deterministic work — color math, token

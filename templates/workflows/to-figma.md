@@ -83,6 +83,12 @@ instances over copies, variables over hardcoded values.
 
 Do all experiments on a scratch page named `[FA …]`, never on a user page.
 
+Record the Figma rendition (same design id, figma medium):
+
+```bash
+ui memory record rendition_created --data '{"sourceDesignId":"<design-id>"}' --design "<design-id>" --medium figma --artifact-ref "<node-id>"
+```
+
 ### 4. Construction lints — after EVERY build, before critique
 
 Run the `figma-craft` L1–L14 lints (one combined `exec-js` walk over the built frame) —
@@ -101,6 +107,14 @@ $FA export-png --node <BUILT_FRAME_ID> --out out.png --scale 2
 scored against the `knowledge/taste-rubric.md` axes. Fix the failing axis with targeted
 `exec-js`, re-export, re-score. Iterate to the ship bar or a hard cap of 5 rounds; an honest
 STOP beats a discounted ship.
+
+Once a canvas critique verdict is produced, record it (mirroring generate.md Step 6c, with the figma medium):
+
+```bash
+ui memory record taste_verdict \
+  --data '{"scores":<axis-scores>,"lowestAxis":"<axis>","round":<n>,"pass":<true|false>}' \
+  --design "<design-id>" --medium figma
+```
 
 ### 6. Deliver
 

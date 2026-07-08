@@ -27,6 +27,7 @@ export const WORKFLOW_VERBS = [
   "redesign",
   "extract",
   "learn",
+  "why",
   "from-ref",
   "from-url",
   "figma",
