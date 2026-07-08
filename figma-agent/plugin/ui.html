@@ -257,6 +257,8 @@
       fontSize,
       fontWeight,
       fontFamily,
+      fontStack: cs.fontFamily,
+      // full stack → registry match falls back inside the stack
       fontStyle: cs.fontStyle === "italic" ? "italic" : void 0,
       lineHeight: normalizedLineHeight,
       letterSpacing,
@@ -310,6 +312,7 @@
           fontSize: parseFloat(pcs.fontSize) || 12,
           fontWeight: parseInt(pcs.fontWeight) || 400,
           fontFamily: pcs.fontFamily.split(",")[0].replace(/['"]/g, "").trim() || "Inter",
+          fontStack: pcs.fontFamily,
           textColor: textColor || void 0,
           width: width > 0 ? Math.round(width) : void 0,
           height: height > 0 ? Math.round(height) : void 0
@@ -351,6 +354,7 @@
       fontSize: parseFloat(textCs.fontSize) || 16,
       fontWeight: parseInt(textCs.fontWeight) || 400,
       fontFamily: textCs.fontFamily.split(",")[0].replace(/['"]/g, "").trim() || "Inter",
+      fontStack: textCs.fontFamily,
       lineHeight: textCs.lineHeight !== "normal" ? parseFloat(textCs.lineHeight) : void 0,
       letterSpacing: textCs.letterSpacing !== "normal" ? parseFloat(textCs.letterSpacing) : void 0,
       textColor: textColor || void 0,

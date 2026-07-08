@@ -1,5 +1,65 @@
 "use strict";
 (() => {
+  // plugin/src/main/font-match.ts
+  var GENERIC_FAMILIES = /* @__PURE__ */ new Set([
+    "serif",
+    "sans-serif",
+    "monospace",
+    "cursive",
+    "fantasy",
+    "system-ui",
+    "ui-serif",
+    "ui-sans-serif",
+    "ui-monospace",
+    "ui-rounded",
+    "math",
+    "emoji",
+    "fangsong",
+    "-apple-system",
+    "blinkmacsystemfont"
+  ]);
+  function normalizeFamily(name) {
+    return name.toLowerCase().replace(/["']/g, "").replace(/\s+/g, " ").trim();
+  }
+  function parseFontStack(raw) {
+    if (!raw) return [];
+    const out = [];
+    for (const part of raw.split(",")) {
+      const fam = part.replace(/["']/g, "").trim();
+      if (!fam) continue;
+      if (GENERIC_FAMILIES.has(normalizeFamily(fam))) continue;
+      out.push(fam);
+    }
+    return out;
+  }
+  function matchFamily(requested, available) {
+    const want = normalizeFamily(requested);
+    if (!want) return null;
+    for (const a of available) if (normalizeFamily(a) === want) return a;
+    for (const a of available) {
+      const na = normalizeFamily(a);
+      if (na.startsWith(`${want} `) || want.startsWith(`${na} `)) return a;
+    }
+    return null;
+  }
+  function matchFamilyStack(stack, available) {
+    for (const fam of stack) {
+      const hit = matchFamily(fam, available);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  function pickStyle(variants, availableStyles) {
+    const norm = (s) => s.toLowerCase().replace(/\s+/g, "");
+    const byNorm = /* @__PURE__ */ new Map();
+    for (const s of availableStyles) byNorm.set(norm(s), s);
+    for (const v of variants) {
+      const hit = byNorm.get(norm(v));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
   // plugin/src/main/executor-fonts.ts
   function getFontStyleVariants(weight, isItalic = false) {
     const regularMap = {
@@ -39,8 +99,40 @@
     }
     return null;
   }
-  async function loadBestFont(family, weight, isItalic = false) {
+  var availableFontsCache = null;
+  async function getAvailableFonts() {
+    if (availableFontsCache) return availableFontsCache;
+    const stylesByFamily = /* @__PURE__ */ new Map();
+    try {
+      const list = await figma.listAvailableFontsAsync();
+      for (const f of list) {
+        const arr = stylesByFamily.get(f.fontName.family) ?? [];
+        arr.push(f.fontName.style);
+        stylesByFamily.set(f.fontName.family, arr);
+      }
+    } catch {
+    }
+    availableFontsCache = { families: [...stylesByFamily.keys()], stylesByFamily };
+    return availableFontsCache;
+  }
+  async function loadBestFont(family, weight, isItalic = false, stack) {
     const variants = getFontStyleVariants(weight, isItalic);
+    const { families, stylesByFamily } = await getAvailableFonts();
+    if (families.length > 0) {
+      const candidates = stack ? [...parseFontStack(stack), family] : [family];
+      const matchedFamily = matchFamilyStack(candidates, families) ?? matchFamily(family, families);
+      if (matchedFamily) {
+        const styles = stylesByFamily.get(matchedFamily) ?? [];
+        const style = pickStyle(variants, styles) ?? (isItalic ? pickStyle(getFontStyleVariants(weight, false), styles) : null) ?? pickStyle(["Regular", "Normal", "Book", "Medium"], styles) ?? styles[0];
+        if (style) {
+          try {
+            await figma.loadFontAsync({ family: matchedFamily, style });
+            return { family: matchedFamily, style };
+          } catch {
+          }
+        }
+      }
+    }
     const requested = await tryLoadFont(family, variants);
     if (requested) return requested;
     if (isItalic) {
@@ -314,7 +406,7 @@
     const family = exportNode.fontFamily || "Inter";
     const weight = exportNode.fontWeight || 400;
     const isItalic = exportNode.fontStyle === "italic";
-    const loadedFont = await loadBestFont(family, weight, isItalic);
+    const loadedFont = await loadBestFont(family, weight, isItalic, exportNode.fontStack);
     textNode.fontName = loadedFont;
     textNode.characters = exportNode.characters || "";
     textNode.fontSize = exportNode.fontSize || 16;

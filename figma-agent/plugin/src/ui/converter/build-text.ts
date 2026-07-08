@@ -109,6 +109,7 @@ export function buildTextNode(el: HTMLElement, cs: CSSStyleDeclaration, win: Win
     fontSize,
     fontWeight,
     fontFamily,
+    fontStack: cs.fontFamily, // full stack → registry match falls back inside the stack
     fontStyle: cs.fontStyle === 'italic' ? 'italic' : undefined,
     lineHeight: normalizedLineHeight,
     letterSpacing,
@@ -190,6 +191,7 @@ export function extractPseudoElement(el: HTMLElement, win: Window, pseudo: '::be
         fontSize: parseFloat(pcs.fontSize) || 12,
         fontWeight: parseInt(pcs.fontWeight) || 400,
         fontFamily: pcs.fontFamily.split(',')[0].replace(/['"]/g, '').trim() || 'Inter',
+        fontStack: pcs.fontFamily,
         textColor: textColor || undefined,
         width: width > 0 ? Math.round(width) : undefined,
         height: height > 0 ? Math.round(height) : undefined,
@@ -241,6 +243,7 @@ export function buildDirectTextNode(el: HTMLElement, win: Window, directText: st
     fontSize: parseFloat(textCs.fontSize) || 16,
     fontWeight: parseInt(textCs.fontWeight) || 400,
     fontFamily: textCs.fontFamily.split(',')[0].replace(/['"]/g, '').trim() || 'Inter',
+    fontStack: textCs.fontFamily,
     lineHeight: textCs.lineHeight !== 'normal' ? parseFloat(textCs.lineHeight) : undefined,
     letterSpacing: textCs.letterSpacing !== 'normal' ? parseFloat(textCs.letterSpacing) : undefined,
     textColor: textColor || undefined,

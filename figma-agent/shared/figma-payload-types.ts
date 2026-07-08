@@ -80,6 +80,7 @@ export interface FigmaExportNode {
   // Text
   characters?: string;
   fontFamily?: string;
+  fontStack?: string; // raw CSS font-family stack (primary + fallbacks) for registry match
   fontSize?: number;
   fontWeight?: number;
   fontStyle?: 'normal' | 'italic';

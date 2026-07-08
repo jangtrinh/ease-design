@@ -1,6 +1,10 @@
 // Font loading with graceful fallback chain.
-// Ported verbatim from EaseUI figma-plugin/code.ts:147-185 (tryLoadFont,
-// loadBestFont) and code.ts:279-310 (getFontStyleVariants).
+// Ported from EaseUI figma-plugin/code.ts:147-185 (tryLoadFont, loadBestFont)
+// and code.ts:279-310 (getFontStyleVariants). Track 5 Commit 2 COPY #9 adds a
+// registry-driven match: a cached figma.listAvailableFontsAsync() pass + CSS
+// font-stack walk so brand fonts (and their fallbacks) resolve before Inter.
+
+import { matchFamily, matchFamilyStack, parseFontStack, pickStyle } from './font-match';
 
 /**
  * Returns an array of possible font style names for a given weight.
@@ -56,13 +60,60 @@ async function tryLoadFont(family: string, styleVariants: string[]): Promise<Fon
   return null;
 }
 
+// Cached available-font registry (one listAvailableFontsAsync per session).
+interface AvailableFonts { families: string[]; stylesByFamily: Map<string, string[]>; }
+let availableFontsCache: AvailableFonts | null = null;
+
+async function getAvailableFonts(): Promise<AvailableFonts> {
+  if (availableFontsCache) return availableFontsCache;
+  const stylesByFamily = new Map<string, string[]>();
+  try {
+    const list = await figma.listAvailableFontsAsync();
+    for (const f of list) {
+      const arr = stylesByFamily.get(f.fontName.family) ?? [];
+      arr.push(f.fontName.style);
+      stylesByFamily.set(f.fontName.family, arr);
+    }
+  } catch { /* registry unavailable → probe path below still works */ }
+  availableFontsCache = { families: [...stylesByFamily.keys()], stylesByFamily };
+  return availableFontsCache;
+}
+
+/** Test-only: clear the cached registry between runs. */
+export function resetAvailableFontsCache(): void { availableFontsCache = null; }
+
 /**
- * Load the best available font: requested family → Inter → Inter Regular.
+ * Load the best available font. Order:
+ *   1. registry match — CSS stack (primary + fallbacks) → primary, matched
+ *      against listAvailableFontsAsync with a weight/italic style pick
+ *   2. probe requested family with style-name variants
+ *   3. Inter (same weight) → Inter Regular
+ * `stack` is the raw computed `font-family` (comma-separated) when available.
  */
-export async function loadBestFont(family: string, weight: number, isItalic = false): Promise<FontName> {
+export async function loadBestFont(family: string, weight: number, isItalic = false, stack?: string): Promise<FontName> {
   const variants = getFontStyleVariants(weight, isItalic);
 
-  // 1. Try requested family with all style variants
+  // 1. Registry-driven match against installed fonts (brand fonts + fallbacks).
+  const { families, stylesByFamily } = await getAvailableFonts();
+  if (families.length > 0) {
+    const candidates = stack ? [...parseFontStack(stack), family] : [family];
+    const matchedFamily = matchFamilyStack(candidates, families) ?? matchFamily(family, families);
+    if (matchedFamily) {
+      const styles = stylesByFamily.get(matchedFamily) ?? [];
+      const style = pickStyle(variants, styles)
+        ?? (isItalic ? pickStyle(getFontStyleVariants(weight, false), styles) : null)
+        ?? pickStyle(['Regular', 'Normal', 'Book', 'Medium'], styles)
+        ?? styles[0];
+      if (style) {
+        try {
+          await figma.loadFontAsync({ family: matchedFamily, style });
+          return { family: matchedFamily, style };
+        } catch { /* fall through to probe path */ }
+      }
+    }
+  }
+
+  // 2. Try requested family with all style variants
   const requested = await tryLoadFont(family, variants);
   if (requested) return requested;
 

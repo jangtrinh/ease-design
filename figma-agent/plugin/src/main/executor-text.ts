@@ -14,8 +14,9 @@ export async function createTextNode(exportNode: FigmaExportNode, tokenVars?: Ma
   const weight = exportNode.fontWeight || 400;
   const isItalic = exportNode.fontStyle === 'italic';
 
-  // Load the font with fallback chain (italic mapping included)
-  const loadedFont = await loadBestFont(family, weight, isItalic);
+  // Load the font with fallback chain (registry match + italic mapping).
+  // Pass the full CSS stack so fallbacks in the stack resolve before Inter.
+  const loadedFont = await loadBestFont(family, weight, isItalic, exportNode.fontStack);
   textNode.fontName = loadedFont;
 
   textNode.characters = exportNode.characters || '';
