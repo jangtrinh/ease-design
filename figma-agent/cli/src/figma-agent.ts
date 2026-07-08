@@ -6,6 +6,7 @@ import { CliError } from './transport/protocol-helpers.ts';
 import { printErrorJson, printJson } from './util/json-out.ts';
 import * as batch from './commands/batch.ts';
 import * as bindVariable from './commands/bind-variable.ts';
+import * as capture from './commands/capture.ts';
 import * as createFrame from './commands/create-frame.ts';
 import * as createInstance from './commands/create-instance.ts';
 import * as createVariable from './commands/create-variable.ts';
@@ -84,6 +85,7 @@ const COMMAND_MODULES: Record<string, { run(args: CommandArgs): Promise<unknown>
   'export-png': exportPng,
   'html-to-figma': htmlToFigma,
   'exec-js': execJs,
+  capture,
   batch,
 };
 
@@ -106,6 +108,7 @@ Commands:
   export-png           --node <id|selection> --out file.png [--scale 2]
   html-to-figma        --html <file|-> [--width 1280 --x --y --parent id --replace id]
   exec-js              <file|-> [--timeout ms (cap 120000)]
+  capture              <url> [--out dir --headless --channel chrome --width 1440 --timeout ms --carousel-window ms]
   batch                <file.json> [--stop-on-error]
 
 All commands print one JSON object to stdout and exit 0, or {error:{code,message}} and exit 1.`;

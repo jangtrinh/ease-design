@@ -19,7 +19,9 @@ async function buildCli() {
     format: 'esm',
     outfile: resolve(root, 'cli/dist/figma-agent.js'),
     banner: { js: '#!/usr/bin/env node' },
-    external: ['ws'],
+    // ws + the capture-only optional deps stay external (resolved at runtime;
+    // playwright is heavy + has native deps and must not be inlined).
+    external: ['ws', 'playwright', 'playwright-core', 'puppeteer-core', 'pixelmatch', 'pngjs'],
   });
 }
 
