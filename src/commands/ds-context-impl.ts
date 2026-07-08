@@ -7,16 +7,46 @@
 import { resolve } from "node:path";
 
 import { errJson, errText, ok, okJson } from "../core/output.js";
+import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import { discoverDesignSystem, loadDesignSystem, pathsForDir, DSError } from "../core/design-system.js";
 import { DSManifestError } from "../core/ds-manifest.js";
 import { formatMarkdown, formatStructured, parseInclude } from "../core/ds-context.js";
+import { emitTailwind } from "../core/token-emit.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
 const CMD = "ds context";
 
+/** Long flags `ui ds context` accepts (globals --help/--json handled separately). */
+const KNOWN_FLAGS = ["dir", "include", "strict", "max-bytes", "format", "with-theme"] as const;
+
+/**
+ * Wrap the compiled Tailwind `@theme` block in a labelled, fenced markdown
+ * section so a single `ds context --with-theme` call carries both the context
+ * block AND the token theme the generation prompt pastes into `<style>`.
+ * Appended AFTER truncation, so the theme is never trimmed by `--max-bytes`.
+ */
+function themeSection(theme: string): string {
+  return (
+    "\n## Design tokens — Tailwind v4 @theme\n\n" +
+    "Paste this block verbatim inside a `<style>` tag in the page `<head>`; " +
+    "every token becomes a utility (e.g. `--color-primary` → `bg-primary`).\n\n" +
+    "```css\n" +
+    theme.trimEnd() +
+    "\n```\n"
+  );
+}
+
 export function runContext(parsed: ParsedArgs): CommandResult {
   const useJson = parsed.json;
+
+  // ── Reject unknown flags (loud misconfig beats a silent no-op) ───────────────
+
+  const unknown = findUnknownFlag(parsed.flags, KNOWN_FLAGS);
+  if (unknown !== null) {
+    const msg = unknownFlagMessage(unknown);
+    return useJson ? errJson(CMD, "UNKNOWN_FLAG", msg) : errText(`ui: ${msg}\n`);
+  }
 
   // ── Resolve DS paths ────────────────────────────────────────────────────────
 
@@ -80,15 +110,24 @@ export function runContext(parsed: ParsedArgs): CommandResult {
 
   const opts = { include, strict, maxBytes };
 
+  // The `@theme` block is compiled from the FULL resolved token map (same bytes
+  // as `ui tokens compile … --target tailwind`), so `--with-theme` folds the
+  // context+compile pair into one read-only call. It is intentionally excluded
+  // from the `--max-bytes` budget that truncates the context block.
+  const withTheme = parsed.flags["with-theme"] === true;
+  const theme = withTheme ? emitTailwind(ds.resolved) : undefined;
+
   // ── Format and respond ──────────────────────────────────────────────────────
 
   if (format === "json") {
     const structured = formatStructured(ds, opts);
+    const payload = theme !== undefined ? { ...structured, theme } : structured;
     return useJson
-      ? okJson(CMD, structured)
-      : ok(JSON.stringify(structured, null, 2) + "\n");
+      ? okJson(CMD, payload)
+      : ok(JSON.stringify(payload, null, 2) + "\n");
   }
 
   const md = formatMarkdown(ds, opts);
-  return useJson ? okJson(CMD, md) : ok(md);
+  const out = theme !== undefined ? md + themeSection(theme) : md;
+  return useJson ? okJson(CMD, out) : ok(out);
 }

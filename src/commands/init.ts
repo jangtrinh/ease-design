@@ -27,6 +27,7 @@ import { cwd as processCwd } from "node:process";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJson } from "../core/output.js";
+import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import {
   RUNTIMES,
   buildManifest,
@@ -86,6 +87,7 @@ Notes:
 
 Error codes:
   BAD_ARG         Missing --runtime, unknown runtime, or --runtime + --all together
+  UNKNOWN_FLAG    Unrecognised --flag (rejected, with a did-you-mean hint)
   MANIFEST_EXISTS Target file already exists (use --force to overwrite)
   WRITE_ERROR     File could not be written
 `;
@@ -98,6 +100,14 @@ export const initCommand = {
 
   run(parsed: ParsedArgs): CommandResult {
     const useJson = parsed.json;
+
+    // ── Reject unknown flags (loud misconfig beats a silent no-op) ─────────
+    const unknown = findUnknownFlag(parsed.flags, ["runtime", "all", "cwd", "force"]);
+    if (unknown !== null) {
+      const msg = unknownFlagMessage(unknown);
+      return useJson ? errJson(CMD, "UNKNOWN_FLAG", msg) : errText(`ui: ${msg}\n`);
+    }
+
     const force = parsed.flags["force"] === true;
     const useAll = parsed.flags["all"] === true;
     const runtimeFlag = parsed.flags["runtime"];

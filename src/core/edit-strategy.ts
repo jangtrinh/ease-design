@@ -117,64 +117,15 @@ export function parseLnDiff(diffOutput: string): LnDiffChunk[] {
 
 // ─── LN-diff application ──────────────────────────────────────────────────────
 
-const FUZZY_RANGE = 5;
-
-/**
- * Apply ln-diff chunks to an HTML string.
- *
- * - Chunks are applied bottom-up so earlier line numbers stay valid.
- * - Each chunk first attempts an exact match at `startLine`; if that fails,
- *   searches ±5 lines (fuzzy match).
- * - Returns `null` if any chunk cannot be matched — the caller should fall
- *   back to full regeneration.
- * - Returns `null` immediately if `chunks` is empty.
- */
-export function applyLnDiff(html: string, chunks: LnDiffChunk[]): string | null {
-  if (chunks.length === 0) return null;
-
-  const lines = html.split("\n");
-  // Bottom-up: largest startLine first preserves validity of earlier positions.
-  const sorted = [...chunks].sort((a, b) => b.startLine - a.startLine);
-
-  for (const chunk of sorted) {
-    const start = chunk.startLine - 1; // convert to 0-indexed
-    const end = chunk.endLine;         // exclusive splice end
-
-    // Exact match
-    const slice = lines.slice(start, end);
-    const exactMatch =
-      chunk.oldLines.length > 0 &&
-      chunk.oldLines.every((old, i) => slice[i]?.trim() === old.trim());
-
-    if (exactMatch) {
-      // Splice exactly the verified lines (oldLines.length), NOT the header
-      // range (end - start). Models routinely emit a wide `@@ line a-b @@`
-      // header while quoting fewer old lines; splicing the header width would
-      // silently delete the unverified trailing lines. This mirrors the fuzzy
-      // path below, keeping both branches consistent.
-      lines.splice(start, chunk.oldLines.length, ...chunk.newLines);
-      continue;
-    }
-
-    // Fuzzy match within ±FUZZY_RANGE lines
-    const searchStart = Math.max(0, start - FUZZY_RANGE);
-    const searchEnd = Math.min(lines.length, end + FUZZY_RANGE);
-    let found = false;
-
-    for (let i = searchStart; i < searchEnd; i++) {
-      const candidate = lines.slice(i, i + chunk.oldLines.length);
-      if (
-        chunk.oldLines.length > 0 &&
-        chunk.oldLines.every((old, j) => candidate[j]?.trim() === old.trim())
-      ) {
-        lines.splice(i, chunk.oldLines.length, ...chunk.newLines);
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) return null;
-  }
-
-  return lines.join("\n");
-}
+// The patcher and its no-match diagnostics live in edit-strategy-apply.ts to
+// keep this file focused on selection/numbering/parsing. Re-exported here so the
+// historical import path (`core/edit-strategy.js`) stays stable for callers/tests.
+export {
+  applyLnDiff,
+  applyLnDiffDetailed,
+} from "./edit-strategy-apply.js";
+export type {
+  ApplyResult,
+  UnmatchedChunk,
+  NearestWindow,
+} from "./edit-strategy-apply.js";

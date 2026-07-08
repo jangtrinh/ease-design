@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { cwd } from "node:process";
 
 import { errJson, errText, okJson } from "../core/output.js";
+import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import {
   discoverDesignSystem,
   loadDesignSystem,
@@ -38,6 +39,9 @@ import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
 const CMD = "ds change-token";
+
+/** Long flags `ui ds change-token` accepts (globals --help/--json handled separately). */
+const KNOWN_FLAGS = ["value", "reason", "dir"] as const;
 
 // ─── Value validation ─────────────────────────────────────────────────────────
 
@@ -143,6 +147,14 @@ function validateLiteralValue(
 
 export function runChangeToken(parsed: ParsedArgs): CommandResult {
   const useJson = parsed.json;
+
+  // ── Reject unknown flags (loud misconfig beats a silent no-op) ───────────────
+
+  const unknown = findUnknownFlag(parsed.flags, KNOWN_FLAGS);
+  if (unknown !== null) {
+    const msg = unknownFlagMessage(unknown);
+    return useJson ? errJson(CMD, "UNKNOWN_FLAG", msg) : errText(`ui: ${msg}\n`);
+  }
 
   // ── Validate inputs ─────────────────────────────────────────────────────────
 

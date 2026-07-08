@@ -15,7 +15,7 @@ export const DS_HELP = `ui ds — Design System SSOT (compile + enforce)
 
 Usage:
   ui ds init <name> --persona <slug> --intent "<text>" [options]
-  ui ds context [options]
+  ui ds context [--strict] [--with-theme] [--format markdown|json] [options]
   ui ds change-token <path> --value <v> [options]
   ui ds status   [--dir <project-dir>] [--json]
 
@@ -24,6 +24,17 @@ Subcommands:
   context        Emit the active design system as a context block for the host model
   change-token   Update one token's $value (only sanctioned mutation post-init)
   status         Show the manifest summary (generation, persona, hashes)
+
+'ds context' options:
+  --strict       Prepend the registered-components-only enforcement preamble
+  --with-theme   Also emit the compiled Tailwind v4 @theme block (full token map,
+                 immune to --max-bytes) — folds context + 'tokens compile' into one
+                 read-only call. Markdown: appended as a fenced section; JSON: a
+                 sibling 'theme' string field.
+  --include <s>  Comma-separated sections: tokens,registry,naming,anti-patterns
+  --format <f>   markdown (default) | json
+  --max-bytes <n>  Truncate the context block to fit n bytes (default 4096)
+  --dir <path>   Override the project directory
 
 Project layout (all under <project-dir>/design/):
   design.tokens.json       DTCG two-tier tokens
@@ -65,6 +76,7 @@ Error codes:
   DANGLING_ALIAS     New alias points to a missing token
   TYPE_MISMATCH      New alias crosses incompatible $type
   BAD_ARG            Missing required flag, unknown subcommand, etc.
+  UNKNOWN_FLAG       Unrecognised --flag (rejected, with a did-you-mean hint)
 `;
 
 export const dsCommand = {

@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import { cwd } from "node:process";
 
 import { errJson, errText, okJson } from "../core/output.js";
+import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import { pathsForDir } from "../core/design-system.js";
 import { canonicalStringify, canonicalHash, newManifest, appendChangelog, loadManifest, saveManifest } from "../core/ds-manifest.js";
 import { loadPersonaIndex, findPersona, PersonaError } from "../core/persona-loader.js";
@@ -25,8 +26,19 @@ const CMD = "ds init";
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
 const HEX6_RE = /^#[0-9a-fA-F]{6}$/;
 
+/** Long flags `ui ds init` accepts (globals --help/--json handled separately). */
+const KNOWN_FLAGS = ["persona", "intent", "brand-hex", "dir", "force", "persona-data"] as const;
+
 export function runInit(parsed: ParsedArgs): CommandResult {
   const useJson = parsed.json;
+
+  // ── Reject unknown flags (loud misconfig beats a silent no-op) ───────────────
+
+  const unknown = findUnknownFlag(parsed.flags, KNOWN_FLAGS);
+  if (unknown !== null) {
+    const msg = unknownFlagMessage(unknown);
+    return useJson ? errJson(CMD, "UNKNOWN_FLAG", msg) : errText(`ui: ${msg}\n`);
+  }
 
   // ── Validate inputs ─────────────────────────────────────────────────────────
 

@@ -22,6 +22,7 @@ import type { CommandResult } from "../core/output.js";
 import { okJsonWithExit } from "../core/output.js";
 import { resolvePackageRoots, RUNTIMES, manifestTargetPath } from "../core/init-stub.js";
 import type { Runtime } from "../core/init-stub.js";
+import { lintProjectAdapters } from "../core/adapter-lint.js";
 
 const CMD = "doctor";
 
@@ -41,15 +42,24 @@ Checks:
   knowledge-root     bundled knowledge/ resolves with key files present
   project-manifest   (with --cwd) an adapter manifest exists and is well formed
   project-knowledge  (with --cwd) the manifest's knowledgePath resolves on disk
+  template-drift     (with --cwd) live templates still match the installed hashes
+                     — a mismatch means 'ui init --force' was not re-run after a
+                     templates/ edit, leaving this runtime's wrappers stale
+  adapter-wrappers   (with --cwd) each generated wrapper exists, has frontmatter,
+                     points at a resolvable template, and (Antigravity) marks each
+                     bash block // turbo / (Codex) has one sentinel pair
+
+A '!' mark is a warning (e.g. an old manifest without recorded hashes); warnings
+do not fail the run.
 
 Exit codes:
-  0  All checks passed
+  0  All checks passed (warnings allowed)
   1  One or more checks failed
 `;
 
 // ─── Check model ────────────────────────────────────────────────────────────────
 
-type CheckStatus = "pass" | "fail";
+type CheckStatus = "pass" | "warn" | "fail";
 interface Check {
   id: string;
   status: CheckStatus;
@@ -103,29 +113,45 @@ function findProjectManifest(cwd: string): { runtime: Runtime; path: string } | 
   return null;
 }
 
-function checkProjectManifest(cwd: string): { manifest: Check; knowledge: Check } {
+interface ProjectManifestChecks {
+  manifest: Check;
+  knowledge: Check;
+  /** The parsed manifest object when readable, else null — fed to the adapter lint. */
+  parsed: Record<string, unknown> | null;
+}
+
+function checkProjectManifest(cwd: string): ProjectManifestChecks {
   const found = findProjectManifest(cwd);
   if (found === null) {
     const fail: Check = { id: "project-manifest", status: "fail",
       detail: `no ease-design adapter manifest under ${cwd} — run 'ui init --runtime <r>' there first` };
-    return { manifest: fail, knowledge: { id: "project-knowledge", status: "fail",
+    return { manifest: fail, parsed: null, knowledge: { id: "project-knowledge", status: "fail",
       detail: "skipped — no manifest to read knowledgePath from" } };
   }
 
-  let parsed: { knowledgePath?: unknown; status?: unknown };
+  let raw: unknown;
   try {
-    parsed = JSON.parse(readFileSync(found.path, "utf8")) as typeof parsed;
+    raw = JSON.parse(readFileSync(found.path, "utf8"));
   } catch {
     const fail: Check = { id: "project-manifest", status: "fail",
       detail: `manifest at ${found.path} is not valid JSON` };
-    return { manifest: fail, knowledge: { id: "project-knowledge", status: "fail",
+    return { manifest: fail, parsed: null, knowledge: { id: "project-knowledge", status: "fail",
       detail: "skipped — manifest unreadable" } };
   }
+  // A manifest that parses to `null` or a non-object (e.g. a bare literal) would
+  // crash on the field reads below — treat it as malformed, not internal-error.
+  if (raw === null || typeof raw !== "object") {
+    const fail: Check = { id: "project-manifest", status: "fail",
+      detail: `manifest at ${found.path} is not a JSON object` };
+    return { manifest: fail, parsed: null, knowledge: { id: "project-knowledge", status: "fail",
+      detail: "skipped — manifest is not an object" } };
+  }
+  const parsed = raw as Record<string, unknown>;
 
   const manifest: Check = { id: "project-manifest", status: "pass",
     detail: `${found.runtime} manifest at ${found.path}` };
 
-  const kp = parsed.knowledgePath;
+  const kp = parsed["knowledgePath"];
   let knowledge: Check;
   if (typeof kp !== "string" || kp.length === 0) {
     knowledge = { id: "project-knowledge", status: "fail",
@@ -136,21 +162,26 @@ function checkProjectManifest(cwd: string): { manifest: Check; knowledge: Check 
   } else {
     knowledge = { id: "project-knowledge", status: "pass", detail: kp };
   }
-  return { manifest, knowledge };
+  return { manifest, knowledge, parsed };
 }
 
 // ─── Report formatting ──────────────────────────────────────────────────────────
 
 function formatReport(checks: Check[], failCount: number): string {
+  const warnCount = checks.filter((c) => c.status === "warn").length;
   const lines: string[] = ["ui doctor — ease-design health check", ""];
   for (const c of checks) {
-    const mark = c.status === "pass" ? "✓" : "✗";
+    const mark = c.status === "pass" ? "✓" : c.status === "warn" ? "!" : "✗";
     lines.push(`  ${mark} ${c.id}: ${c.detail}`);
   }
   lines.push("");
-  lines.push(failCount === 0
-    ? "All checks passed — ease-design is ready."
-    : `${failCount} check(s) failed — see above.`);
+  if (failCount > 0) {
+    lines.push(`${failCount} check(s) failed — see above.`);
+  } else if (warnCount > 0) {
+    lines.push(`All checks passed with ${warnCount} warning(s) — ease-design is ready.`);
+  } else {
+    lines.push("All checks passed — ease-design is ready.");
+  }
   return lines.join("\n") + "\n";
 }
 
@@ -174,15 +205,19 @@ export const doctorCommand = {
       checkKnowledgeRoot(knowledgeRoot),
     ];
 
-    // Optional project check.
+    // Optional project check (--cwd <path> or a bare positional path).
     const cwdFlag = parsed.flags["cwd"];
-    if (typeof cwdFlag === "string") {
-      const { manifest, knowledge } = checkProjectManifest(cwdFlag);
-      checks.push(manifest, knowledge);
-    } else if (parsed.positionals[0] !== undefined) {
-      // Allow a bare positional path too: `ui doctor ./my-project`.
-      const { manifest, knowledge } = checkProjectManifest(parsed.positionals[0]);
-      checks.push(manifest, knowledge);
+    const target = typeof cwdFlag === "string" ? cwdFlag : parsed.positionals[0];
+    if (target !== undefined) {
+      const proj = checkProjectManifest(target);
+      checks.push(proj.manifest, proj.knowledge);
+      // Only lint the adapter tree when the manifest parsed — otherwise the
+      // manifest check above already reports the real problem.
+      if (proj.parsed !== null) {
+        checks.push(
+          ...lintProjectAdapters({ cwd: target, templatesRoot, manifest: proj.parsed }),
+        );
+      }
     }
 
     const failCount = checks.filter((c) => c.status === "fail").length;

@@ -11,14 +11,15 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
-import { errJson, errText, okJson } from "../core/output.js";
+import { errJson, errJsonWithData, errText, okJson } from "../core/output.js";
 import { readAllStdin } from "../core/stdin-reader.js";
 import {
   selectEditStrategy,
   addLineNumbers,
   parseLnDiff,
-  applyLnDiff,
+  applyLnDiffDetailed,
 } from "../core/edit-strategy.js";
+import type { UnmatchedChunk } from "../core/edit-strategy.js";
 
 const CMD = "edit-strategy";
 
@@ -52,7 +53,9 @@ Error codes:
   READ_ERROR     File exists but cannot be read
   WRITE_ERROR    --write failed
   BAD_DIFF       Zero chunks parsed from diff input
-  DIFF_NO_MATCH  No chunk matched within ±5 lines; fall back to full regen
+  DIFF_NO_MATCH  A chunk matched no lines within ±5; --json carries a
+                 data.unmatched[] diagnostic (nearest window + rule) so you can
+                 repair the diff once before falling back to full regen
 `;
 
 // ─── File read helper ─────────────────────────────────────────────────────────
@@ -86,6 +89,27 @@ function readSource(
 
 function isCommandResult(v: { content: string } | CommandResult): v is CommandResult {
   return "exitCode" in v;
+}
+
+/**
+ * Human-readable summary for a DIFF_NO_MATCH failure. Names each unmatched
+ * chunk and, when found, the nearest window it should have quoted — enough for
+ * one repair pass before the caller falls back to full regen.
+ */
+function formatNoMatch(unmatched: UnmatchedChunk[]): string {
+  const lines: string[] = [
+    `${unmatched.length} diff chunk(s) did not match — re-quote the exact lines, then retry once before full regen:`,
+  ];
+  for (const u of unmatched) {
+    lines.push(`  @@ line ${u.startLine}-${u.endLine} @@ — ${u.rule}`);
+    if (u.nearest !== null) {
+      lines.push(
+        `    nearest match at line ${u.nearest.startLine} (${u.nearest.matched}/${u.oldLines.length} lines):`,
+      );
+      for (const l of u.nearest.lines) lines.push(`      | ${l}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 // ─── Subcommand: select ───────────────────────────────────────────────────────
@@ -166,11 +190,16 @@ function runApply(parsed: ParsedArgs): CommandResult {
     return useJson ? errJson(sub, "BAD_DIFF", msg) : errText(`ui: ${msg}\n`);
   }
 
-  const patched = applyLnDiff(htmlRead.content, chunks);
-  if (patched === null) {
-    const msg = "no chunk matched within ±5 lines; fall back to full regen";
-    return useJson ? errJson(sub, "DIFF_NO_MATCH", msg) : errText(`ui: ${msg}\n`);
+  const result = applyLnDiffDetailed(htmlRead.content, chunks);
+  if (!result.ok) {
+    // Structured diagnostics let the caller repair the diff ONCE (re-quote the
+    // nearest window) before escalating to the identity-risky full regen.
+    const msg = formatNoMatch(result.unmatched);
+    return useJson
+      ? errJsonWithData(sub, "DIFF_NO_MATCH", msg, { unmatched: result.unmatched })
+      : errText(`ui: ${msg}\n`);
   }
+  const patched = result.html;
 
   let written = false;
   if (doWrite) {

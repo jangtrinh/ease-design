@@ -67,6 +67,27 @@ export function errJson(
   return { exitCode: 1, stdout: JSON.stringify(envelope, null, 2) + "\n" };
 }
 
+/**
+ * Build a user-error CommandResult (exit 1) — JSON envelope mode — that also
+ * carries a structured `data` payload alongside the error. Use when the error
+ * itself is actionable machine-readable state (e.g. DIFF_NO_MATCH diagnostics a
+ * caller feeds back for one repair attempt).
+ */
+export function errJsonWithData(
+  command: string,
+  code: string,
+  message: string,
+  data: unknown,
+): CommandResult {
+  const envelope: JsonEnvelope = {
+    ok: false,
+    command,
+    data,
+    error: { code, message },
+  };
+  return { exitCode: 1, stdout: JSON.stringify(envelope, null, 2) + "\n" };
+}
+
 /** Build a success CommandResult — JSON envelope mode. Exit code is always 0. */
 export function okJson(command: string, data: unknown): CommandResult {
   const envelope: JsonEnvelope = { ok: true, command, data };
