@@ -48,9 +48,11 @@ You also need the onboarded design system (C0) so a design reuses real vocabular
 - **tokens** — the DS token file (`ui ds context --format json` / the project DS).
 - **conventions** — `CONVENTIONS.md` (C7 grammar) when composing a screen.
 
-Read `knowledge/figma-craft/workflow-experience.md` first — it is the interaction + cost brain
-this verb parameterizes. For component scope, read
-`knowledge/figma-craft/component-design.md` (the design brain for one component).
+Read `knowledge/figma-craft/workflow-experience.md` first — the interaction + cost brain this verb
+parameterizes — and `knowledge/figma-craft/facet-model.md` (the **composition brain**: how a design
+decomposes into 7 FACETS + 5 cross-cutting LAYERS each bound to a SOURCE, and the binding-matrix UX
+used in Step 2). For component scope, read `knowledge/figma-craft/component-design.md`. The SEE step
+is gated by the CURATOR (`knowledge/figma-craft/curator.md` — taste + goal/spec).
 
 ## The lifecycle (the uniform F0 shape, parameterized for design)
 
@@ -63,12 +65,15 @@ steps below are its `design` specialization.
 
 Decide the scope from the user's phrasing — the router is a rule, not model guesswork:
 
-- **"a screen / page / view / dashboard / flow"**, a whole-surface objective → **SCREEN**.
 - **"a button / badge / input / card / chip / component"**, "add a variant to <X>" → **COMPONENT**.
+- **"a screen / page / view / dashboard"**, a whole-surface objective → **SCREEN**.
+- **"a flow / journey / onboarding"**, or **"the screens for <user story / feature>"** → **FEATURE/FLOW**
+  — the REQUIREMENTS facet drives a **coverage plan** (Step 2) that fans out to N screens/states; run the
+  SCREEN discipline per screen, then lay them out (`intent-recipes.md` Recipe 19, flow layout).
 
-If genuinely ambiguous, ask **ONE** cheap clarifying question — "Are we designing the whole
-screen, or just the `<X>` component?" — not a wall. State the detected scope back so the user
-can correct it in one word.
+If genuinely ambiguous, ask **ONE** cheap clarifying question — "the whole screen, just the `<X>`
+component, or the flow for `<feature>`?" — not a wall. State the detected scope back so the user can
+correct it in one word.
 
 ### Step 2 — UNDERSTAND (the understand-until-decision-ready loop)
 
@@ -88,6 +93,20 @@ Readiness gates:
 
 Feed any priors first (precedence: explicit brief > references > `ui memory` > knowledge
 floors) so you never ask what the project already knows.
+
+**Build the binding matrix (`facet-model.md`).** Auto-tag each provided input to the FACET it
+supplies — Figma link → STYLE/IA/LAYOUT, image → CONTENT (or STYLE-reference), user-story doc →
+REQUIREMENTS, token set → STYLE, copy doc → CONTENT, data/schema → CONTENT. Bind every facet to its
+highest-precedence source (input > project DS > persona/knowledge > AI judgment); the understand-loop
+asks ONLY for facets that are underbound AND decision-critical. **SHOW the matrix to confirm before
+building** ("STYLE ← your Figma · CONTENT ← the image · IA ← the Figma · motion ← DS default") so the
+user corrects one line, not a wall. Offer **single-facet regenerate** during iterate (redo STYLE
+only, keep CONTENT).
+
+**Coverage plan (FEATURE/FLOW + any acceptance criteria).** When the brief carries a user story /
+acceptance criteria, map each criterion → the screen(s)/state(s) that cover it BEFORE building so
+nothing is missed. Emit a `spec.json` (`{acceptanceCriteria:[{id,text}], successMetrics}`); the
+curator's `ui critique-coverage` checks the built design against it in SEE.
 
 ### Step 3a — SCREEN discipline
 
@@ -158,8 +177,15 @@ Design ONLY the component — never the surrounding screen. Walk
 
 ## Quality gate
 
-The design is not done until: the SEE/critique gate passes (`taste-rubric.md`, capped rounds),
-the result is on-token / on-grid / composed from real instances (screen) or authored as a
-registered SET with the applicable states + surviving edge cases (component), and — for
-component scope — the **registry is updated** (a component the system doesn't know about isn't
-landed). Honest STOP with what remains beats a discounted "done".
+The design is not done until the **CURATOR** (`knowledge/figma-craft/curator.md`) passes BOTH axes:
+- **TASTE** — the `taste-rubric.md` 7 axes via the critique gate (capped rounds); on-token / on-grid /
+  composed from real instances (screen) or a registered SET with the applicable states + surviving edge
+  cases (component).
+- **GOAL/SPEC** — `ui critique-coverage <spec.json> <manifest.json>` reports 100% acceptance-criteria
+  coverage (no uncovered), the design plausibly serves the success metric (judged vs `ux-psychology.md`,
+  incl. **honest persuasion** — no dark patterns), the accessibility gate passes, and an adversarial
+  refuter fails to break "it meets the goal".
+
+And — for component scope — the **registry is updated** (a component the system doesn't know about isn't
+landed). Each curator verdict seeds a learned `insight` (`ui memory record`). Honest STOP with what
+remains beats a discounted "done".
