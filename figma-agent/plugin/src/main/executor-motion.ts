@@ -105,7 +105,9 @@ export function buildMotionTracks(
     }));
     specs.push({
       field: { type: 'PROPERTY', name },
-      track: { baseValue: { type: 'FLOAT', value: points[0]!.value }, keyframes },
+      // Omit baseValue for a NEW track — the Motion API derives it from the node
+      // (per the official figma-use-motion skill; API shape validated live 2026-07-09).
+      track: { keyframes },
     });
   }
   return specs;

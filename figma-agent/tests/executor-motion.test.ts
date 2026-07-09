@@ -45,7 +45,7 @@ describe('buildMotionTracks', () => {
 
     const op = byName.get('OPACITY')!;
     expect(op.field).toEqual({ type: 'PROPERTY', name: 'OPACITY' });
-    expect(op.track.baseValue).toEqual({ type: 'FLOAT', value: 0 });
+    expect(op.track.baseValue).toBeUndefined(); // omitted for new tracks — API derives it
     expect(op.track.keyframes.map((k) => k.timelinePosition)).toEqual([0, 0.6]);
     expect(op.track.keyframes.map((k) => k.value)).toEqual([{ type: 'FLOAT', value: 0 }, { type: 'FLOAT', value: 1 }]);
     expect(op.track.keyframes[0]!.easing).toEqual({
