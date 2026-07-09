@@ -474,6 +474,29 @@ Grounds on BOTH onboarding halves: the registry (C0 vocabulary) for *what* to in
 
 ---
 
+## 19. User flow / journey layout (C3)
+
+Lay N screens on a flow grid — named artboards, captions, connectors — so a journey reads at a glance. Proven live.
+- Container = HORIZONTAL (or wrapped) auto-layout; each column = VERTICAL `[caption + screen frame]`.
+- Connectors: a `→` text glyph (or a line node) between columns; keep gaps consistent.
+- Screens: fixed-size frames (header bar + body); for REAL screens reference/clone the source at grid coords
+  `ref_y + Δ` — never move the originals (resolve-by-NAME, `canvas-operations.md` R2 + clone-safety R5).
+- Caption per screen ("1 · List", "2 · Detail", …); optional thumbnail export.
+- Verify: export-png → Read the whole flow. Pairs with C6 (build each screen from real DS instances, Recipe 18)
+  and captured from-url flows (Track 5).
+
+## 20. Registry reconcile — keep the onboarded DS honest (C4)
+
+As the live file is edited, diff the onboarded `component-registry.json` (C0) against a fresh scan **by NAME**
+(ids drift — R2). Proven: in-sync when unchanged; a rename/removal is caught.
+- Fresh scan: `figma-agent scan-design-system` → classify (C0.1) → the current component NAME set.
+- Diff (deterministic, zero-token): `missing_in_live` (in registry, gone from file) + `extra_in_live` (new in
+  file). A rename shows as one missing (old name) + one extra (new name).
+- Report drift; re-`ingest-figma-ds` to refresh, or register the new/renamed components.
+- Skip generic-named junk (`Frame`, `Component 1`) — the same stoplist the audit uses (C1.1).
+
+---
+
 ## Recipe → lint map (maps to figma-craft.md's construction lints)
 
 | Recipe | Guards against |
