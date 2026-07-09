@@ -454,6 +454,26 @@ embed the board beside the host screen it documents. Pairs with the captured hov
 
 ---
 
+## 18. Build a screen from real DS instances (C6 — J1 core)
+
+Author a NEW screen by composing **real instances** of the onboarded DS components (never flat frames) —
+the discipline that makes "rebuild a screen" a design-system workflow, not a mockup. Proven live.
+
+- **Instantiate:** `const comp = set.type==='COMPONENT_SET' ? set.defaultVariant : set; const i = comp.createInstance();`
+  Look components up by NAME in the onboarded `component-registry.json` (C0); resolve the node id via the
+  registry/scan — ids drift (`canvas-operations.md` R2), names don't.
+- **Set variants:** `i.setProperties({ Variant:'primary', Size:'default' })` — exact axis names + values (from
+  `set.variantGroupProperties`); wrap in try/catch so an unknown value keeps the default and never aborts the build.
+- **Compose in auto-layout;** `i.layoutSizingHorizontal='FILL'` for inputs/rows that should stretch.
+- **Robust:** try/catch each instantiation, collect a `built`/`errs` report — one missing component never kills the screen.
+- **Verify:** export-png → Read → critique (the C5 gate). Set real text/tone per instance for a finished screen
+  (default variant + text is fine for a scaffold).
+
+Grounds on BOTH onboarding halves: the registry (C0 vocabulary) for *what* to instantiate, `CONVENTIONS.md`
+(C7 grammar) for *how* to compose it on-brand. Audit the result with `/ui:audit` (C1) before landing.
+
+---
+
 ## Recipe → lint map (maps to figma-craft.md's construction lints)
 
 | Recipe | Guards against |
