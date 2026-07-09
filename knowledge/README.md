@@ -24,6 +24,7 @@ directly** while designing UI — curated design taste that sets the quality flo
 | `benchmarks/*.dna.json` | SOURCE-grade measured DNA (type ramps, surfaces, shadows, gaps) of 8 ship-grade products — Arc, Figma, Framer, Linear, Notion, Raycast, Stripe, Vercel. Calibration data for the excellence-tier reference duel; see `benchmarks/README.md`. |
 | `figma-craft/workflow-experience.md` | The **interaction + cost brain** above the Figma verbs — the intent router (intent/drop → job → verb, incl. the multi-URL/image reference-drop row), the uniform job lifecycle (REFERENCE→SCOPE→PLAN→BUILD→SEE→ITERATE→LAND), reference intake (subagent-isolated DNA extract → cache in `<project>/references/` → deterministic synth), the "eyes" feedback contract, trust/clone-safety, progressive disclosure, and the zero-token-`ui`-binary cost contract. Read FIRST when routing a plain-language Figma job; every `/ui:*` Figma verb follows it. |
 | `figma-craft/figma-craft.md` | The senior-designer construction brain for **authoring idiomatic Figma** — craft philosophy, a decision ladder, build workflows, and the L1–L19 construction lints. Deep-dives live in `figma-craft/{layout-mastery,components-variables-styles,structure-hygiene,visual-craft,intent-recipes,canvas-operations,code-connect}.md` (`canvas-operations` = operating on an existing/team-owned file: rebuild against a live library, audit + normalize, idempotent re-run). Used by `/ui:to-figma` and `/ui:audit`. |
+| `figma-craft/component-design.md` | The **design brain for a single component** — the four things to decide when designing one from a requirement: ① anatomy (slots) · ② variant axes (size/tone/density/icon/orientation) · ③ states (default→hover→focus→pressed→disabled→loading→selected→error→…→skeleton, consider-each-include-the-applicable) · ④ edge cases (long/empty text, number & count extremes, missing image, i18n/RTL, min/max width, null data, keyboard/touch) · ⑤ create-new-vs-extend-existing (registry-first) + register/update. Used by `/ui:design` (component scope). |
 | `figma-craft/code-connect.md` | Mapping Figma components to code via Code Connect — what it is, that **authoring/publishing `.figma.tsx` templates needs an Org/Enterprise seat** (a hard gap on Figma Free), but the **discovery half — resolving component keys + prop mappings by reading `*.figma.tsx` next to component source — works on any seat**. Read when a repo already ships Code Connect templates or a design↔code mapping is needed. |
 | `figma-agent-hand.md` | How to drive the `figma-agent` CLI (the Figma "hands"). An optional **in-repo** hand — like the `ui` binary it runs over Bash, but it is NOT part of ease-design's deterministic binary; it ships as an npm workspace at `figma-agent/` (build once with `npm run build --workspace=figma-agent`) and needs its Figma plugin loaded. |
 
@@ -57,6 +58,14 @@ Motion axis for grading
 1. `figma-craft/workflow-experience.md` — the intent router (intent/drop → job → verb), the
    uniform lifecycle, reference intake, the "eyes" + trust contracts, and the cost contract
 2. Then the routed verb's own template + the "Author idiomatic Figma from intent" route below
+
+**Design a screen / component from a requirement** (`/ui:design`)
+1. `figma-craft/workflow-experience.md` — the lifecycle + cost contract the flow parameterizes
+2. **Screen scope:** `ux-psychology.md` (only the law(s) the brief triggers) + `mode-constraints.md`
+   (the UI mode) + `persona-index.md` for IA and best-practice, then compose from real DS instances
+   (`figma-craft/intent-recipes.md` Recipe 18) grounded in the project's `CONVENTIONS.md`
+3. **Component scope:** `figma-craft/component-design.md` — anatomy → variants → states → edge cases →
+   create-new-vs-extend-existing (registry-first), then the states board (Recipe 17)
 
 **Author idiomatic Figma from intent** (`/ui:to-figma`)
 1. `figma-agent-hand.md` — confirm the external hand is set up and live
