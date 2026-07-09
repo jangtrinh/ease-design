@@ -682,7 +682,15 @@
   function parseTransform(transform) {
     const out = {};
     const t = (transform || "").trim();
-    if (!t || t === "none") return out;
+    if (!t) return out;
+    if (t === "none") {
+      out.translateX = 0;
+      out.translateY = 0;
+      out.rotate = 0;
+      out.scaleX = 1;
+      out.scaleY = 1;
+      return out;
+    }
     const num = (v) => parseFloat(v);
     let m;
     if (m = t.match(/translate\(\s*([-\d.]+)px\s*,\s*([-\d.]+)px\s*\)/)) {

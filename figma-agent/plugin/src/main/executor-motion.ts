@@ -46,7 +46,10 @@ export interface ParsedTransform {
 export function parseTransform(transform?: string): ParsedTransform {
   const out: ParsedTransform = {};
   const t = (transform || '').trim();
-  if (!t || t === 'none') return out;
+  if (!t) return out; // transform not specified on this keyframe → contribute no fields
+  // `transform: none` is an EXPLICIT neutral (e.g. fadeUp's end state) — emit neutral
+  // values so a track pairs with the animated start keyframe instead of being dropped.
+  if (t === 'none') { out.translateX = 0; out.translateY = 0; out.rotate = 0; out.scaleX = 1; out.scaleY = 1; return out; }
   const num = (v: string): number => parseFloat(v);
   let m: RegExpMatchArray | null;
   if ((m = t.match(/translate\(\s*([-\d.]+)px\s*,\s*([-\d.]+)px\s*\)/))) { out.translateX = num(m[1]!); out.translateY = num(m[2]!); }

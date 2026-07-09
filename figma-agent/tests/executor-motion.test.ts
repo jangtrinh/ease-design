@@ -28,7 +28,23 @@ describe('parseTransform', () => {
     expect(parseTransform('translate(10px, -5px)')).toEqual({ translateX: 10, translateY: -5 });
     expect(parseTransform('rotate(45deg)')).toEqual({ rotate: 45 });
     expect(parseTransform('scale(1.05)')).toEqual({ scaleX: 1.05, scaleY: 1.05 });
-    expect(parseTransform('none')).toEqual({});
+    expect(parseTransform('')).toEqual({}); // absent → contribute no fields
+    // explicit `none` → neutral values so a fadeUp end-state pairs with its animated start
+    expect(parseTransform('none')).toEqual({ translateX: 0, translateY: 0, rotate: 0, scaleX: 1, scaleY: 1 });
+  });
+
+  it('a keyframe ending in transform:none still yields a TRANSLATION_Y track', () => {
+    const specs = buildMotionTracks(
+      [
+        { offset: 0, style: { transform: 'translateY(24px)' } },
+        { offset: 1, style: { transform: 'none' } },
+      ],
+      0.6,
+      'ease-out',
+    );
+    const ty = specs.find((s) => s.field.type === 'PROPERTY' && s.field.name === 'TRANSLATION_Y');
+    expect(ty).toBeDefined();
+    expect(ty!.track.keyframes.map((k) => (k.value as { value: number }).value)).toEqual([24, 0]);
   });
 });
 
