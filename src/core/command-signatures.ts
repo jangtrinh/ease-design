@@ -162,6 +162,19 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
     },
   },
 
+  "critique-coverage": {
+    summary: "Deterministic acceptance-criteria coverage of a produced design (the curator's goal axis)",
+    signature: {
+      summary: "Report uncovered acceptance criteria + coverage %; exit 1 on any gap",
+      positionals: [
+        { name: "<spec.json>", required: true, summary: "Brief: acceptanceCriteria[] + successMetrics?" },
+        { name: "<manifest.json>", required: true, summary: "Produced design: screens[] with coversCriteria" },
+      ],
+      flags: [],
+      errorCodes: [...IO_CODES, "BAD_JSON"],
+    },
+  },
+
   registry: {
     summary: "Component registry store",
     subcommands: {
