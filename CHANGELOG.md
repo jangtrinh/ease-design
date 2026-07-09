@@ -7,6 +7,20 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **`/ui:design` — scope-aware design of something NEW** (a screen or a component) from a
+  requirement, distinct from rebuilding an existing frame (`/ui:to-figma`) or auditing one
+  (`/ui:audit`). Detects **SCREEN vs COMPONENT** scope from the phrasing, runs an
+  **understand-until-decision-ready** loop (rounds of sharp questions, prefer
+  propose-a-default-to-confirm, never a wall), then runs the matching discipline — screen:
+  objective → IA (`ux-psychology.md` + `mode-constraints.md` + persona) → compose from real DS
+  instances (Recipe 18) grounded in `CONVENTIONS.md` → critique → land; component: registry
+  lookup by NAME → create-new (walk the new `component-design.md` → component SET + states
+  board + bind tokens + register) / extend-a-missing-variant / already-covered reuse. It
+  composes existing capabilities and adds **no new `ui` binary command**; conforms the F0
+  lifecycle + cost contract. New knowledge doc **`knowledge/figma-craft/component-design.md`**
+  (the design brain for one component: anatomy → variant axes → states → edge cases →
+  create-new-vs-extend). Wired into `workflow-experience.md` (two router rows), `ui guide`, and
+  the knowledge index.
 - **Behavioral web-clone (Track 5)** — rebuild a live site's *animation, interaction, and
   state*, not just its pixels. Five parts land in the `figma-agent` workspace:
   - **Converter core fills** — CSS `background-image` now paints as a real Figma IMAGE fill

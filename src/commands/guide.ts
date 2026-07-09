@@ -75,6 +75,11 @@ const WORKFLOW: GuideStep[] = [
     detail: "Builds real, idiomatic Figma on the canvas (Figma Free) — needs the external figma-agent hand set up.",
   },
   {
+    want: "Design something new — a screen or a component",
+    command: "/ui:design <describe the screen or component>",
+    detail: "e.g. /ui:design a settings screen, or /ui:design a new status badge — it detects whether you mean a whole screen or a single component, asks a few sharp questions until it's decision-ready, then runs the matching discipline (screen: IA + real DS instances; component: anatomy, variants, states, edge cases → a registered component set).",
+  },
+  {
     want: "Build a slide deck",
     command: "/ui:slides <topic>",
     detail: "Generates a full, on-brand presentation, one slide at a time.",

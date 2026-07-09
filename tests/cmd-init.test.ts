@@ -196,6 +196,17 @@ describe("ui init --runtime claude adapter tree", () => {
     expect(paths.some((p) => p.endsWith(".claude/commands/ui/generate.md") || p.includes("commands/ui/generate.md"))).toBe(true);
   });
 
+  it("a fresh init makes the /ui:design verb discoverable (slash-command + on disk)", () => {
+    const cwd = makeTmpDir();
+    const { out } = captureRun(["init", "--runtime", "claude", "--cwd", cwd, "--json"]);
+    const json = JSON.parse(out) as {
+      data: { adapters: { runtime: string; paths: string[] }[] };
+    };
+    const paths = json.data.adapters[0]?.paths ?? [];
+    expect(paths.some((p) => p.includes("commands/ui/design.md"))).toBe(true);
+    expect(existsSync(join(cwd, ".claude", "commands", "ui", "design.md"))).toBe(true);
+  });
+
   it("on-disk manifest has status 'ready' with adapters and templateHashes", () => {
     const cwd = makeTmpDir();
     captureRun(["init", "--runtime", "claude", "--cwd", cwd]);
