@@ -650,22 +650,154 @@
     return "FILL";
   }
 
+  // plugin/src/main/executor-motion.ts
+  function mapCssEasingToMotion(css) {
+    const c = (css || "").trim().toLowerCase();
+    const bez = c.match(/cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/);
+    if (bez) {
+      return {
+        type: "CUSTOM_CUBIC_BEZIER",
+        easingFunctionCubicBezier: {
+          x1: parseFloat(bez[1]),
+          y1: parseFloat(bez[2]),
+          x2: parseFloat(bez[3]),
+          y2: parseFloat(bez[4])
+        }
+      };
+    }
+    switch (c) {
+      case "linear":
+        return { type: "LINEAR" };
+      case "ease-in":
+        return { type: "EASE_IN" };
+      case "ease-out":
+        return { type: "EASE_OUT" };
+      case "ease-in-out":
+        return { type: "EASE_IN_AND_OUT" };
+      case "ease":
+      default:
+        return { type: "EASE_IN_AND_OUT" };
+    }
+  }
+  function parseTransform(transform) {
+    const out = {};
+    const t = (transform || "").trim();
+    if (!t || t === "none") return out;
+    const num = (v) => parseFloat(v);
+    let m;
+    if (m = t.match(/translate\(\s*([-\d.]+)px\s*,\s*([-\d.]+)px\s*\)/)) {
+      out.translateX = num(m[1]);
+      out.translateY = num(m[2]);
+    }
+    if (m = t.match(/translate\(\s*([-\d.]+)px\s*\)/)) out.translateX = num(m[1]);
+    if (m = t.match(/translateX\(\s*([-\d.]+)px\s*\)/)) out.translateX = num(m[1]);
+    if (m = t.match(/translateY\(\s*([-\d.]+)px\s*\)/)) out.translateY = num(m[1]);
+    if (m = t.match(/rotate\(\s*([-\d.]+)deg\s*\)/)) out.rotate = num(m[1]);
+    if (m = t.match(/scale\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/)) {
+      out.scaleX = num(m[1]);
+      out.scaleY = num(m[2]);
+    } else if (m = t.match(/scale\(\s*([-\d.]+)\s*\)/)) {
+      out.scaleX = num(m[1]);
+      out.scaleY = num(m[1]);
+    }
+    if (m = t.match(/scaleX\(\s*([-\d.]+)\s*\)/)) out.scaleX = num(m[1]);
+    if (m = t.match(/scaleY\(\s*([-\d.]+)\s*\)/)) out.scaleY = num(m[1]);
+    return out;
+  }
+  var FIELD_EXTRACTORS = [
+    { name: "OPACITY", get: (s) => s.opacity !== void 0 && s.opacity !== "" ? parseFloat(s.opacity) : void 0 },
+    { name: "TRANSLATION_X", get: (s) => parseTransform(s.transform).translateX },
+    { name: "TRANSLATION_Y", get: (s) => parseTransform(s.transform).translateY },
+    { name: "ROTATION", get: (s) => parseTransform(s.transform).rotate },
+    { name: "SCALE_X", get: (s) => parseTransform(s.transform).scaleX },
+    { name: "SCALE_Y", get: (s) => parseTransform(s.transform).scaleY }
+  ];
+  function buildMotionTracks(steps, durationSec, cssEasing) {
+    if (!steps.length || durationSec <= 0) return [];
+    const sorted = [...steps].sort((a, b) => a.offset - b.offset);
+    const easing = mapCssEasingToMotion(cssEasing);
+    const specs = [];
+    for (const { name, get } of FIELD_EXTRACTORS) {
+      const points = [];
+      for (const step of sorted) {
+        const v = get(step.style);
+        if (v !== void 0 && !Number.isNaN(v)) points.push({ offset: step.offset, value: v });
+      }
+      if (points.length < 2) continue;
+      const distinct = new Set(points.map((p) => p.value));
+      if (distinct.size < 2) continue;
+      const keyframes = points.map((p) => ({
+        timelinePosition: Math.round(p.offset * durationSec * 1e3) / 1e3,
+        value: { type: "FLOAT", value: p.value },
+        easing
+      }));
+      specs.push({
+        field: { type: "PROPERTY", name },
+        // Omit baseValue for a NEW track — the Motion API derives it from the node
+        // (per the official figma-use-motion skill; API shape validated live 2026-07-09).
+        track: { keyframes }
+      });
+    }
+    return specs;
+  }
+  var motionProbe = null;
+  function isMotionSupported(node) {
+    if (motionProbe !== null) return motionProbe;
+    try {
+      const n = node;
+      const api = figma.motion;
+      motionProbe = typeof n.applyManualKeyframeTrack === "function" && typeof api?.figmaAnimationStyles === "function";
+    } catch {
+      motionProbe = false;
+    }
+    return motionProbe;
+  }
+  function applyMotionTracks(node, steps, durationSec, cssEasing) {
+    if (!isMotionSupported(node)) {
+      pushImportWarning("Figma Motion API unavailable (metronome) \u2014 falling back to Smart-Animate variants");
+      return { applied: false, reason: "unsupported", trackCount: 0 };
+    }
+    const specs = buildMotionTracks(steps, durationSec, cssEasing);
+    if (!specs.length) return { applied: false, reason: "no-animatable-fields", trackCount: 0 };
+    const n = node;
+    for (const { field, track } of specs) {
+      try {
+        n.applyManualKeyframeTrack(field, track);
+      } catch (err) {
+        pushImportWarning(`Motion track ${JSON.stringify(field)} failed: ${String(err)}`);
+      }
+    }
+    try {
+      const tl = n.timelines?.[0];
+      if (tl) n.setTimelineDuration(tl.id, durationSec);
+    } catch {
+    }
+    return { applied: true, trackCount: specs.length };
+  }
+
   // plugin/src/main/executor-frame.ts
   async function createFigmaNode(exportNode, colorStyles, tokenVars) {
+    let node;
     switch (exportNode.type) {
       case "TEXT":
-        return await createTextNode(exportNode, tokenVars);
+        node = await createTextNode(exportNode, tokenVars);
+        break;
       case "IMAGE":
-        if (exportNode.svgContent) return createSvgNode(exportNode);
-        if (exportNode.imageUrl) return await createImageNodeWithFetch(exportNode);
-        return createImageNode(exportNode);
+        node = exportNode.svgContent ? createSvgNode(exportNode) : exportNode.imageUrl ? await createImageNodeWithFetch(exportNode) : createImageNode(exportNode);
+        break;
       case "RECTANGLE":
-        return await createRectangleNode(exportNode, colorStyles, tokenVars);
+        node = await createRectangleNode(exportNode, colorStyles, tokenVars);
+        break;
       case "FRAME":
       case "GROUP":
       default:
-        return await createFrameNode(exportNode, colorStyles, tokenVars);
+        node = await createFrameNode(exportNode, colorStyles, tokenVars);
+        break;
     }
+    if (node && exportNode.motion && exportNode.motion.steps && exportNode.motion.steps.length >= 2) {
+      applyMotionTracks(node, exportNode.motion.steps, exportNode.motion.durationSec, exportNode.motion.easing);
+    }
+    return node;
   }
   function applyGridLayout(frame, spec, applied) {
     const f = frame;

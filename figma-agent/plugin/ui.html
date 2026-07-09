@@ -996,7 +996,7 @@
           opacity: isPlaceholder ? 0.4 : 1
         }];
       }
-      return node;
+      return attachMotion(el, node);
     }
     if (isRenderedTextNode(el, win)) {
       const textNode = buildTextNode(el, cs, win);
@@ -1012,9 +1012,19 @@
           textNode.y = el.offsetTop;
         }
       }
-      return textNode;
+      return attachMotion(el, textNode);
     }
-    return buildFrameNode(el, cs, win, depth);
+    return attachMotion(el, buildFrameNode(el, cs, win, depth));
+  }
+  function attachMotion(el, node) {
+    const raw = el.getAttribute("data-fa-motion");
+    if (raw) {
+      try {
+        node.motion = JSON.parse(raw);
+      } catch {
+      }
+    }
+    return node;
   }
   function isRenderedTextNode(el, win) {
     const tag = el.tagName;
@@ -1053,6 +1063,79 @@
     if ((parseFloat(ccs.borderTopWidth) || 0) > 0 && (parseCssColor(ccs.borderTopColor)?.a || 0) > 0) return true;
     if ((ccs.display === "inline-flex" || ccs.display === "inline-block") && ((parseFloat(ccs.paddingLeft) || 0) > 0 || (parseFloat(ccs.paddingTop) || 0) > 0)) return true;
     return false;
+  }
+
+  // plugin/src/ui/converter/extract-motion.ts
+  function parseKeyframeOffset(keyText) {
+    const first = (keyText || "").split(",")[0].trim().toLowerCase();
+    let n;
+    if (first === "from") n = 0;
+    else if (first === "to") n = 1;
+    else n = parseFloat(first) / 100;
+    if (!Number.isFinite(n)) n = 0;
+    return Math.max(0, Math.min(1, n));
+  }
+  function parseAnimDurationSec(s) {
+    const first = (s || "").split(",")[0].trim().toLowerCase();
+    if (!first) return 0;
+    const v = parseFloat(first);
+    if (!Number.isFinite(v)) return 0;
+    return first.endsWith("ms") ? v / 1e3 : v;
+  }
+  function buildMotionSpec(steps, durationSec, easing) {
+    const clean = (steps || []).filter((s) => s && s.style && (s.style.opacity !== void 0 || s.style.transform !== void 0)).slice().sort((a, b) => a.offset - b.offset);
+    if (clean.length < 2 || !(durationSec > 0)) return void 0;
+    const spec = { steps: clean, durationSec };
+    if (easing && easing !== "none") spec.easing = easing.split(",")[0].trim();
+    return spec;
+  }
+  function resolveKeyframeSteps(name, sheets) {
+    const CSS_KEYFRAMES_RULE = 7;
+    for (let i = 0; i < sheets.length; i++) {
+      let rules;
+      try {
+        rules = sheets[i].cssRules;
+      } catch {
+        continue;
+      }
+      if (!rules) continue;
+      for (let j = 0; j < rules.length; j++) {
+        const r = rules[j];
+        const isKeyframes = r.type === CSS_KEYFRAMES_RULE || r.name !== void 0 && r.cssRules !== void 0;
+        if (!isKeyframes || r.name !== name || !r.cssRules) continue;
+        const steps = [];
+        for (let k = 0; k < r.cssRules.length; k++) {
+          const kf = r.cssRules[k];
+          steps.push({
+            offset: parseKeyframeOffset(kf.keyText),
+            style: { opacity: kf.style.opacity || void 0, transform: kf.style.transform || void 0 }
+          });
+        }
+        return steps;
+      }
+    }
+    return [];
+  }
+  function captureMotionOntoElements(doc, win) {
+    let count = 0;
+    const els = doc.querySelectorAll("*");
+    for (let i = 0; i < els.length; i++) {
+      const el = els[i];
+      try {
+        const cs = win.getComputedStyle(el);
+        const name = cs.animationName;
+        if (!name || name === "none") continue;
+        const firstName = name.split(",")[0].trim();
+        const steps = resolveKeyframeSteps(firstName, doc.styleSheets);
+        const motion = buildMotionSpec(steps, parseAnimDurationSec(cs.animationDuration), cs.animationTimingFunction);
+        if (motion) {
+          el.setAttribute("data-fa-motion", JSON.stringify(motion));
+          count++;
+        }
+      } catch {
+      }
+    }
+    return count;
   }
 
   // plugin/src/ui/converter/tokens.ts
@@ -1192,6 +1275,10 @@
   function prepareDocForExtraction(doc) {
     const win = doc.defaultView;
     if (!win) return;
+    try {
+      captureMotionOntoElements(doc, win);
+    } catch {
+    }
     const killMotion = doc.createElement("style");
     killMotion.textContent = `
     *, *::before, *::after {

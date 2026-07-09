@@ -6,6 +6,7 @@
 import type { FigmaExportNode, FigmaExportPayload } from '../../../../shared/figma-payload-types';
 import { parseCssColor } from './color-utils';
 import { computedElementToNode } from './computed-walk';
+import { captureMotionOntoElements } from './extract-motion';
 import { annotateTokenRefs, extractFigmaTokens } from './tokens';
 
 /**
@@ -71,6 +72,11 @@ export function waitForStylesReady(iframe: HTMLIFrameElement): Promise<void> {
 export function prepareDocForExtraction(doc: Document): void {
   const win = doc.defaultView;
   if (!win) return;
+
+  // 0. MOTION PRODUCER: capture each element's @keyframes animation and stash it
+  //    as data-fa-motion BEFORE the kill below — build-frame reads it into
+  //    node.motion so animations flow into Figma Motion end-to-end.
+  try { captureMotionOntoElements(doc, win); } catch { /* non-fatal */ }
 
   // 1. KILL all CSS transitions/animations so state changes are instant —
   //    otherwise reveal animations leak opacity:0 into the payload.

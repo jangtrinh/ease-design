@@ -180,7 +180,7 @@ export function computedElementToNode(el: HTMLElement, win: Window, depth: numbe
         opacity: isPlaceholder ? 0.4 : 1,
       }];
     }
-    return node;
+    return attachMotion(el, node);
   }
 
   // ─── Text leaf vs container dispatch
@@ -201,11 +201,20 @@ export function computedElementToNode(el: HTMLElement, win: Window, depth: numbe
         textNode.y = el.offsetTop;
       }
     }
-    return textNode;
+    return attachMotion(el, textNode);
   }
 
   // ─── Container (FRAME)
-  return buildFrameNode(el, cs, win, depth);
+  return attachMotion(el, buildFrameNode(el, cs, win, depth));
+}
+
+/** Attach stashed data-fa-motion (motion producer, extract-motion.ts) onto the export node. */
+function attachMotion(el: HTMLElement, node: FigmaExportNode): FigmaExportNode {
+  const raw = el.getAttribute('data-fa-motion');
+  if (raw) {
+    try { node.motion = JSON.parse(raw) as FigmaExportNode['motion']; } catch { /* ignore malformed */ }
+  }
+  return node;
 }
 
 /**
