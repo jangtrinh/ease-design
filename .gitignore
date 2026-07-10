@@ -5,6 +5,12 @@ coverage/
 *.log
 .DS_Store
 
+# recall workspace: the vector index is a rebuildable cache over the JSONL ledger,
+# never a source of truth — `recall index` regenerates it from scratch.
+*.vec.db
+*.vec.db-journal
+*.vec.db-wal
+
 # figma-agent workspace: probe/ scratch output (recon-site.mjs, network-capture.mjs, etc.)
 RECON/
 CLONE_AUDIT.md

@@ -7,6 +7,21 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **`recall/` — semantic memory over the design ledger (Track 9 · P3b + P3c)** — a new
+  optional in-repo npm workspace (Node ≥ 22; never published, never imported by the binary).
+  `recall index` pulls `ui memory export-corpus`, embeds it **locally** with
+  `all-MiniLM-L6-v2` (ONNX — nothing leaves the machine) and upserts it into a rebuildable
+  `sqlite-vec` index (vec0 KNN + FTS5 in one file), incrementally via a per-project cursor
+  pinned in the index header alongside the model id and dimensions. Point it at `knowledge/`
+  and the knowledge core is embedded into the same index, so one query surfaces a relevant
+  persona rule *and* a past project insight. `recall query "<text>" --out ids.json` ranks by
+  **RRF (dense KNN + BM25) × the memory graph's 30-day half-life decay × bi-temporal
+  validity** — a token rationale superseded by a later change is demoted, never deleted, so it
+  is only served when nothing current matches — and emits a rank file that feeds straight into
+  `ui memory context --rank-file`. Two indexes: per-project `design/memory.vec.db` and
+  cross-project `~/.ease-design/taste.vec.db`. A root test fails the build if anything under
+  `src/` mentions the vector store, the embedder, or `node:sqlite`, so the `ui` binary stays
+  zero-dependency / no-network / no-LLM. Driving doc: `knowledge/recall-mind.md`.
 - **Recall seams on `ui memory` (Track 9 · P3a)** — two pure, deterministic subcommand
   surfaces that let an optional semantic-recall layer sit on top of the design memory without
   adding a single runtime dependency to the binary. `ui memory export-corpus [--since

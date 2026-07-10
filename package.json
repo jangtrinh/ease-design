@@ -30,7 +30,8 @@
     "templates"
   ],
   "workspaces": [
-    "figma-agent"
+    "figma-agent",
+    "recall"
   ],
   "engines": {
     "node": ">=20"

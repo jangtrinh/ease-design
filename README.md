@@ -221,6 +221,21 @@ embed, and `ui memory context --rank-file <ids.json>` splices a recall-ranked se
 into the prior. The ledger stays the sole source of truth — any vector index is a rebuildable
 view — and a rank file is never spliced into `--for critique`.
 
+### Semantic recall (`recall/`) — optional
+
+Where `figma-agent` is the **hands**, **`recall`** is the **mind**: an optional in-repo workspace
+(Node ≥ 22) that makes the design memory searchable *by meaning*. `recall index` embeds the ledger
+corpus — and, if you point it at `knowledge/`, the knowledge core too — into a rebuildable
+`*.vec.db` (per-project, plus a cross-project index under `~/.ease-design/`). `recall query
+"<question>" --out ids.json` then hybrid-ranks it — **RRF over dense KNN + BM25, × the same 30-day
+half-life decay the memory graph uses, × bi-temporal validity** so a superseded token rationale is
+demoted rather than deleted — and hands the ranked ids straight to `ui memory context --rank-file`.
+
+Embeddings are **local** (`all-MiniLM-L6-v2`, ONNX); nothing leaves the machine. The `ui` binary
+never imports any of it — a test fails the build if `src/` so much as mentions the vector store or
+the embedder — so the binary stays zero-dependency, no-network and no-LLM. See
+`knowledge/recall-mind.md`.
+
 ---
 
 ## How it works

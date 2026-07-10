@@ -1,0 +1,28 @@
+{
+  "name": "recall",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Semantic recall over ease-design's design memory — the optional, non-deterministic 'mind'. Embeds the ledger corpus locally (ONNX) into a rebuildable sqlite-vec index and ranks it; the deterministic `ui` binary never imports this workspace.",
+  "bin": {
+    "recall": "cli/dist/recall.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p cli --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "sqlite-vec": "^0.1.9"
+  }
+}

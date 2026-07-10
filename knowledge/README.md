@@ -29,6 +29,7 @@ directly** while designing UI — curated design taste that sets the quality flo
 | `figma-craft/facet-model.md` | The **composition brain** — how ANY design job decomposes into 7 FACETS (intent/goal · requirements · IA/flow · layout · style · content · behavior) + 5 cross-cutting LAYERS (audience · tone · constraints · accessibility · states) each BOUND to a SOURCE (provided input tagged by role > project DS > persona/knowledge > data > AI judgment), with the binding-matrix + show-to-confirm + single-facet-regenerate UX and cheap per-facet extraction. Read when a designer designs something new from mixed inputs (Figma link=style, image=content, user-story=requirements). Used by `/ui:design`. |
 | `figma-craft/curator.md` | The **two-axis quality gate** every design passes in SEE — TASTE (`critique.md` + `taste-rubric.md` 7 axes) + GOAL/SPEC (acceptance-criteria coverage via `ui critique-coverage`, goal-plausibility vs `ux-psychology.md` incl. honest-persuasion, accessibility gate, adversarial refuter). Honest verdict → iterate the worst finding; each verdict seeds a learned `insight`. |
 | `figma-agent-hand.md` | How to drive the `figma-agent` CLI (the Figma "hands"). An optional **in-repo** hand — like the `ui` binary it runs over Bash, but it is NOT part of ease-design's deterministic binary; it ships as an npm workspace at `figma-agent/` (build once with `npm run build --workspace=figma-agent`) and needs its Figma plugin loaded. |
+| `recall-mind.md` | How to drive the `recall` CLI (the semantic **"mind"** over the design memory). Another optional in-repo workspace (`recall/`, Node ≥ 22, local ONNX embeddings): `recall index` embeds the ledger corpus (+ this knowledge core) into a rebuildable `*.vec.db`; `recall query … --out ids.json` hybrid-ranks it (RRF × half-life decay × supersession) and feeds `ui memory context --rank-file`. The ledger stays truth; the `ui` binary never imports any of it. |
 
 ## Task → files
 
@@ -79,6 +80,10 @@ Motion axis for grading
 flow, which draws on `token-taxonomy.md` + `color-science.md`
 
 **Ask why a decision was made** — `/ui:why` (reads the design memory; no knowledge file needed).
+
+**Recall the most relevant past knowledge before designing** — `recall-mind.md`: `recall query`
+the project (or cross-project) index, then prime the prior with
+`ui memory context --rank-file ids.json`. Optional; the binary works without it.
 
 ## Relationship to the `ui` binary
 

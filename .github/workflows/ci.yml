@@ -34,3 +34,21 @@ jobs:
       - run: npm ci
       - run: npm run typecheck --workspace=figma-agent
       - run: npm run build --workspace=figma-agent
+
+  # recall is the optional semantic-memory workspace (the "mind"). It needs Node 22
+  # because it reads the ledger index through the built-in `node:sqlite`; the `ui`
+  # binary itself keeps its Node 20 floor and never imports any of this.
+  # The embed-integration tests download a model, so they stay opt-in via RECALL_E2E=1;
+  # the pure ranking suite always runs.
+  recall:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --workspace=recall
+      - run: npm run build --workspace=recall
+      - run: npx vitest run --config recall/vitest.config.ts
