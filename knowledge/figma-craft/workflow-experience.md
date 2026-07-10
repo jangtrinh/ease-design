@@ -97,6 +97,45 @@ How the BUILD step is *sequenced* across calls is itself make-or-break:
   immediately, and — with the disk state ledger (E2) — makes a long build resumable. Batch
   ops *within* a section; do not batch multiple whole sections into one blind mega-call.
 
+### 2d. The recall loop (memory in at the START, lesson out at the LAND)
+
+Two bookends make a job's learning compound instead of resetting. Both are **optional** — the
+`recall` workspace may not be installed, and every step below is cold-start-safe.
+
+**START (prime the prior, before PLAN).** Build one query from the brief — the objective plus the
+nouns that matter ("admin data table, dense, sticky header") — then:
+
+```bash
+recall query "<brief-derived query>" --project . --k 6 --out ids.json
+ui memory context --for generate --rank-file ids.json
+```
+
+The recalled items enter the prior as `[RECALLED CONTEXT]`, ranked by relevance × recency ×
+validity. Precedence is unchanged: **brief > project memory > taste profile > `knowledge/` floors**.
+If `recall` is absent or the ledger is cold, `ui memory context` alone still works (`memory: empty`)
+— never block a job on it. **Never** pass a rank file to `--for critique`: the taste gate stays
+craft-only.
+
+**LAND (fold the job back in).** After tagging and the one-line summary:
+
+```bash
+recall index --project .                    # ORGANIZE — embed this job's new events
+recall reflect job-events.json --project .  # REFLECT — assemble the packet
+```
+
+`recall reflect` retrieves the job's own events plus what memory already knew, and prints the
+Reflexion instruction + the exact write-back. **You** — the model that just ran the job, with the
+brief, the curator verdict and the iterate rounds still in context — distil **one durable lesson**
+("dense tables need a sticky header + zebra rows or scannability tanks"), never a restatement of an
+event. Then run the printed command:
+
+```bash
+ui memory record insight --data '{"text":"<lesson>"}' --refs <the job's event ids> --dir .
+```
+
+Provenance is mandatory; an insight without `--refs` is rejected. If the job taught nothing durable,
+record nothing — a ledger of noise is worse than a short one.
+
 ### 3. Session context (set once, never re-ask)
 
 Project · Figma file key · design-system / registry · **seat** — captured once into a project

@@ -231,6 +231,11 @@ corpus — and, if you point it at `knowledge/`, the knowledge core too — into
 half-life decay the memory graph uses, × bi-temporal validity** so a superseded token rationale is
 demoted rather than deleted — and hands the ranked ids straight to `ui memory context --rank-file`.
 
+`recall reflect` closes the loop: it gathers a finished job's events plus what memory already knew,
+and prints the exact `ui memory record insight --refs …` write-back. It **never calls a model** —
+the host model that just ran the job distils the one durable lesson, so each job's learning
+compounds instead of resetting. A design job therefore starts by recalling and ends by reflecting.
+
 Embeddings are **local** (`all-MiniLM-L6-v2`, ONNX); nothing leaves the machine. The `ui` binary
 never imports any of it — a test fails the build if `src/` so much as mentions the vector store or
 the embedder — so the binary stays zero-dependency, no-network and no-LLM. See

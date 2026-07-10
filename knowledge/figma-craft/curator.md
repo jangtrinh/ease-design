@@ -41,3 +41,17 @@ Every curator verdict is a learning signal: extract the durable lesson (Reflexio
 was said": e.g. *"dense tables need a sticky header + zebra rows or scannability tanks"*) and record it via
 `ui memory record insight --refs <the job's event ids>`. On the next job, the recalled insight primes the design
 prior — so the curator's standards compound instead of resetting per job.
+
+**The verdict is the prime reflect input.** A failing axis, an uncovered criterion, or what the adversarial
+refuter found is exactly the kind of thing that generalises. Record the verdict itself as a `taste_verdict` event
+during ITERATE, then at LAND run the loop (`workflow-experience.md` §2d):
+
+```bash
+recall index --project .                    # embed this job's events
+recall reflect job-events.json --project .  # packet: this job + what memory already knew
+```
+
+`recall reflect` never calls a model — **you** distil the one lesson (you hold the brief, the verdict and the
+rounds), then run the write-back it prints. Two rules: the lesson must generalise beyond this job, and if the job
+taught nothing durable, **record nothing**. Memory the curator can trust is the point; a ledger of restated
+events makes the next prior worse, not better.

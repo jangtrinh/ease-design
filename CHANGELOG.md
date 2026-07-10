@@ -7,6 +7,16 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **The recall loop closes (Track 9 · P4)** — `recall reflect <job-events.json>` assembles a job's
+  own events plus the semantic neighbours memory already held, prints the Reflexion instruction
+  ("extract ONE durable lesson — what was LEARNED, not what was said") and the exact
+  `ui memory record insight --refs <job ids>` write-back. **recall never calls a model**: the host
+  model that ran the job — the one still holding the brief, the curator verdict and the iterate
+  rounds — is the reflector, and the lesson re-enters the ledger only through that provenance-checked
+  command. The loop is wired into the job choreography (`knowledge/figma-craft/workflow-experience.md`
+  §2d): START primes the generation prior with `recall query` → `ui memory context --rank-file`,
+  LAND folds the job back in with `recall index` + `recall reflect`. Every step is optional and
+  cold-start-safe, and a rank file is still never spliced into `--for critique`.
 - **`recall/` — semantic memory over the design ledger (Track 9 · P3b + P3c)** — a new
   optional in-repo npm workspace (Node ≥ 22; never published, never imported by the binary).
   `recall index` pulls `ui memory export-corpus`, embeds it **locally** with

@@ -71,12 +71,41 @@ against the ledger. Knowledge chunks (`k:…`) and cross-project hits (`p:…`) 
 to resolve to, so they surface through `--text` instead. Retrieval is deliberately wider than the
 splice.
 
+## Reflect (REFLECT → the ledger)
+
+```bash
+$RC index --project .                      # ORGANIZE first — the job's events must be embedded
+$RC reflect job-events.json --project .    # then REFLECT
+```
+
+`job-events.json` is just the ids this job produced: `["e12","e13"]` (or `{"events":[…]}`).
+
+**recall never calls a model.** `reflect` assembles the material and prints the write-back:
+
+- this job's own events,
+- what memory already knew that is relevant (top-k neighbours, the job's own events excluded),
+- the Reflexion instruction, and
+- the exact `ui memory record insight --data '{"text":"…"}' --refs <job ids> --dir .` command.
+
+**You** — the host model that just ran the job, still holding the brief, the curator verdict and
+the iterate rounds — distil **one durable lesson** and run that command. The lesson must generalise
+beyond the job ("dense tables need a sticky header + zebra rows or scannability tanks"), never
+restate an event ("changed color.primary"). If the job taught nothing durable, **record nothing** —
+a ledger of noise makes the next prior worse, not better. Provenance is mandatory: an `insight`
+without `--refs` is rejected by the binary.
+
 ## In a design job
 
-1. **Start** — build a query from the brief, `recall query … --out ids.json`, then
-   `ui memory context --for generate --rank-file ids.json` to prime the generation prior.
-2. **End** — `recall index` to fold the job's new events in (ORGANIZE).
+1. **START** — build a query from the brief, `recall query … --out ids.json`, then
+   `ui memory context --for generate --rank-file ids.json` to prime the generation prior (FEEDBACK).
+2. **LAND** — `recall index` (ORGANIZE), then `recall reflect` → run the write-back (REFLECT).
 3. Never splice recall into `--for critique`: the taste gate stays craft-only.
+
+Every step is optional and cold-start-safe: with no `recall` installed, or an empty ledger,
+`ui memory context` still returns `memory: empty` and the job proceeds. Never block on memory.
+
+See `figma-craft/workflow-experience.md` §2d for the same loop stated as job choreography, and
+`figma-craft/curator.md` for why the verdict is the prime reflect input.
 
 ## Gotchas
 

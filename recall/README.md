@@ -38,9 +38,10 @@ node recall/cli/dist/recall.js --help
 
 | Path | Purpose |
 |---|---|
-| `cli/src/recall.ts` | entry point — `index` \| `query` |
+| `cli/src/recall.ts` | entry point — `index` \| `query` \| `reflect` |
 | `cli/src/cmd-index.ts` | ORGANIZE: pull corpus → embed → upsert → supersede |
 | `cli/src/cmd-query.ts` | RETRIEVE: embed → KNN + BM25 → fuse → rank file |
+| `cli/src/cmd-reflect.ts` | REFLECT: job events + neighbours → packet + write-back (no LLM here) |
 | `cli/src/rank.ts` | **pure**: RRF × decay × validity (no I/O, no deps) |
 | `cli/src/decay.ts` | **pure**: 30-day half-life weight |
 | `cli/src/store.ts` | `node:sqlite` + vec0 + FTS5 + pinned index header |
@@ -64,6 +65,7 @@ suites on every push.
 
 1. `dist/cli.js` never imports this workspace or its dependencies.
 2. `*.vec.db` is a **rebuildable cache** over the ledger — delete it and `recall index` restores it.
-3. Learned knowledge returns to the ledger only via `ui memory record insight --refs …`.
+3. Learned knowledge returns to the ledger only via `ui memory record insight --refs …`. `recall
+   reflect` prints that command; it never runs a model and never writes the ledger itself.
 4. Embeddings are local by default; there is deliberately no API-embedder path.
 5. `recall/` is optional and never published with `ease-design`.

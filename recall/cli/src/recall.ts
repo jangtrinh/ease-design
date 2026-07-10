@@ -11,6 +11,7 @@
  */
 import { runIndex, formatIndexReport } from "./cmd-index.ts";
 import { runQuery, emit } from "./cmd-query.ts";
+import { runReflect, formatReflect } from "./cmd-reflect.ts";
 import { MODEL_ID } from "./embed.ts";
 
 const HELP = `recall — semantic recall over ease-design's design memory (optional, local-only)
@@ -18,18 +19,22 @@ const HELP = `recall — semantic recall over ease-design's design memory (optio
 Usage:
   recall index [--project <dir>] [--home] [--knowledge <dir>] [--json]
   recall query "<text>" [--k <n>] [--project <dir>] [--home] [--out <file>] [--text] [--json]
+  recall reflect <job-events.json> [--project <dir>] [--k <n>] [--json]
 
 Commands:
-  index   Embed new ledger events (and optionally the knowledge core) into the index.
-          Incremental: only events after the stored cursor are embedded.
-  query   Embed the question, fuse dense KNN + BM25 (RRF), weight by half-life decay,
-          demote superseded knowledge, and emit the ranked ids.
+  index    Embed new ledger events (and optionally the knowledge core) into the index.
+           Incremental: only events after the stored cursor are embedded.
+  query    Embed the question, fuse dense KNN + BM25 (RRF), weight by half-life decay,
+           demote superseded knowledge, and emit the ranked ids.
+  reflect  Assemble a job's events + their semantic neighbours into a packet for the
+           HOST MODEL to distil ONE durable lesson from, plus the write-back command.
+           recall never calls an LLM. Run 'recall index' first.
 
 Options:
   --project <dir>   Project whose design/memory.vec.db to use (default: cwd)
   --home            Use the cross-project index (~/.ease-design/taste.vec.db)
   --knowledge <dir> index only: also embed this knowledge/ root into the same index
-  --k <n>           query only: how many hits to return (default 8)
+  --k <n>           query/reflect only: how many hits to return (default 8)
   --out <file>      query only: write the rank file here instead of stdout
   --text            query only: print the recalled items for a human
   --json            Emit a JSON envelope
@@ -38,6 +43,10 @@ Options:
 Feeding the binary:
   recall query "why is the brand colour warm?" --out ids.json
   ui memory context --rank-file ids.json
+
+Closing the loop after a job:
+  recall index --project .                       # ORGANIZE
+  recall reflect job-events.json --project .     # REFLECT → run the write-back it prints
 
 Notes:
   Embeddings are LOCAL (${MODEL_ID}); nothing is sent over the network.
@@ -110,6 +119,18 @@ async function main(): Promise<void> {
     const opts = { home, json, k, text: flags["text"] === true, ...(project !== undefined ? { project } : {}), ...(out !== undefined ? { out } : {}) };
     const result = await runQuery(text, opts);
     process.stdout.write(emit(result, opts));
+    return;
+  }
+
+  if (command === "reflect") {
+    if (home) fail("reflect writes back into one project's ledger — --home is not supported");
+    const jobEvents = positionals[0];
+    if (jobEvents === undefined) fail("reflect requires a <job-events.json> path");
+    const kRaw = flags["k"];
+    const k = typeof kRaw === "string" ? Number.parseInt(kRaw, 10) : 8;
+    if (!Number.isSafeInteger(k) || k <= 0) fail(`--k must be a positive integer, got '${String(kRaw)}'`);
+    const packet = await runReflect(jobEvents, { k, json, ...(project !== undefined ? { project } : {}) });
+    process.stdout.write(json ? JSON.stringify(packet, null, 2) + "\n" : formatReflect(packet));
     return;
   }
 
