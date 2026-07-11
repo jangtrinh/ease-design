@@ -10,6 +10,7 @@ import { runA11y } from "./ds-a11y-impl.js";
 import { runChangeToken } from "./ds-change-token-impl.js";
 import { runStatus } from "./ds-status-impl.js";
 import { runImport } from "./ds-import-impl.js";
+import { runSpecimen } from "./ds-specimen-impl.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -35,6 +36,7 @@ Subcommands:
   diff           Compare two DS states (dirs with design.tokens.json) → semver + visual-breaking classification
   docs           Regenerate component reference docs from the registry (decay-proof)
   a11y           Token-pair contrast audit (text×surface ≥ AA); exit 1 on a fail. Declared pairs only — not a conformance claim.
+  specimen       Report each component's variant×state matrix + applicable-state gaps (missing disabled/empty)
 
 'ds a11y' options:
   --dir <path>       Project directory holding design/ (default: cwd)
@@ -67,6 +69,14 @@ Subcommands:
   $type per value (color/dimension/number/fontFamily/fontWeight/duration). Nested
   groups are hoisted to <cat>-<sub>. Un-typeable values (box-shadow strings,
   bezier easings) are SKIPPED and reported — never emitted with a bad type.
+
+'ds specimen' options:
+  --dir <path>       Project directory holding design/ (default: cwd)
+  --strict           Exit 1 if any completeness gap is found (default: informational, exit 0)
+  Reads component-registry.json and reports each component's variant dimensions + declared
+  states. Flags only reliably-modelled gaps: missing 'disabled' on an interactive control,
+  missing 'empty' on a data-family component. 'focus' is intentionally NOT required (it is
+  usually a runtime :focus-visible, not a Figma variant, so requiring it would over-fire).
 
 'ds change-token' options:
   --value <v>        New $value for the token (required)
@@ -127,6 +137,7 @@ Error codes:
   EXISTS             'ds import' target design.tokens.json exists (use --force)
   EMPTY_IMPORT       'ds import' found no typeable tokens
   WRITE_ERROR        'ds import' could not write the DS store
+  DS_NOT_FOUND       'ds specimen' found no component-registry.json
   BAD_VALUE          'change-token' --value fails type/format check
   ALIAS_CYCLE        New alias graph has a cycle
   DANGLING_ALIAS     New alias points to a missing token
@@ -158,6 +169,7 @@ export const dsCommand = {
       case "diff":         return runDiff(parsed);
       case "docs":         return runDocs(parsed);
       case "a11y":         return runA11y(parsed);
+      case "specimen":     return runSpecimen(parsed);
       case undefined: {
         const msg = "ui ds requires a subcommand. Run 'ui ds --help'.";
         return parsed.json

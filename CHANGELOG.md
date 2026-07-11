@@ -6,6 +6,18 @@ All notable changes to ease-design are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **`ui ds specimen` — the component-registry state/variant completeness contract (learn-from-shadcn Phase 3).**
+  A shadcn component page draws every variant×size×state as a specimen grid; `ui ingest-figma-ds` captures it
+  as `variants: ["State=Hover", …]`. `ui ds specimen` reads that back and reports each component's variant
+  dimensions + declared states, flagging only *reliably-modelled* gaps: a form **control** that models an
+  interaction state but no `disabled`, and a **data container** (table/list/select/combobox/…) with no
+  `empty`. Role is read from the **leaf** component name so a Button nested under a DatePicker is judged a
+  button, not data (the over-pairing lesson applied). `focus` is intentionally never required (usually a
+  runtime `:focus-visible`, not a Figma variant). Informational by default; `--strict` gates. On the real
+  718-component shadcn-standard registry it surfaces 6 credible gaps (Combobox/Select missing empty;
+  MenuItem/Button missing disabled). New pure module `src/core/specimen-check.ts`.
+
 ### Fixed
 - **`ui ingest-figma-ds` no longer emits self-referential aliases (dogfood F1).** When two distinct Figma
   variables collapse to the same DTCG path and one aliases the other, the ingest used to emit

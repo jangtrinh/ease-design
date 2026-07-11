@@ -468,6 +468,15 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         ],
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "BAD_NAME", "BAD_INTENT", "BAD_BRAND_HEX", "PERSONA_NOT_FOUND", "BAD_TOKEN", "DS_EXISTS", "WRITE_ERROR"],
       },
+      specimen: {
+        summary: "Report each component's variant×state matrix + applicable-state gaps",
+        positionals: [],
+        flags: [
+          { name: "dir", type: "string", summary: "Project directory holding design/ (default cwd)" },
+          { name: "strict", type: "boolean", summary: "Exit 1 if any completeness gap is found" },
+        ],
+        errorCodes: ["UNKNOWN_FLAG", "DS_NOT_FOUND", "BAD_JSON"],
+      },
       import: {
         summary: "Onboard an existing flat tokens.json into the DTCG store",
         positionals: [{ name: "<tokens.json>", required: true, summary: "Flat token file { category: { name: value } }" }],

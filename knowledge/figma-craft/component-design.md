@@ -132,6 +132,22 @@ LAND step: the component is only "done" when the system knows about it.
 
 ---
 
+## The specimen contract — `ui ds specimen`
+
+A shadcn component page lays out every variant × size × state as a visible **specimen grid**; that
+grid is the machine-readable answer to "does this component cover its applicable states?".
+`ui ingest-figma-ds` captures it as `variants: ["State=Hover", "Size=lg", …]`, and `ui ds specimen`
+reads it back: it reports each component's variant dimensions + declared states, and flags the
+*reliably-modelled* gaps only — a form **control** (button/input/select/…) that models an
+interaction state but no `disabled`, and a **data container** (table/list/select/combobox/…) with
+no `empty`. Role is read from the component's **leaf name** (the last `/` segment), so a `Button`
+nested under a `DatePicker` is judged a button, not a data component.
+
+Deliberately NOT required: `focus` — it is almost always a runtime `:focus-visible`, not a Figma
+variant, so demanding it would over-fire (the same discipline as the taste/a11y linters: precision
+over recall — flag only what is unambiguous). Informational by default; `--strict` gates a release.
+This makes the states-board discipline above **checkable**, not just aspirational.
+
 ## Companions
 
 `components-variables-styles.md` (the construction mechanics — combineAsVariants, props,
