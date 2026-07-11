@@ -7,6 +7,16 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **`ui vr` — deterministic visual-regression tooling (DESIGN-OS T5).** Catches rendered-output changes a
+  code diff can't (a token tweak that moved every button, a silently-deleted shadow). Three subcommands:
+  `vr diff <base.png> <head.png>` (one comparison), `vr gate <baseline-dir> <current-dir>` (diff every
+  baseline against the same-named fresh render — exit 1 on any regression; a baseline with no current is a
+  regression, a current with no baseline is a not-yet-accepted `new`), and `vr accept` (deliberately promote
+  current → baseline; the gate never auto-updates). The engine is a **zero-dependency vendored PNG codec**
+  (`node:zlib` builtin for inflate/deflate) + a **pixelmatch port** (YIQ perceptual delta + anti-aliasing
+  detection), with `--mask "x,y,w,h;…"` for dynamic regions, `--threshold`/`--max-ratio` tolerances, and
+  `--out`/`--out-dir` diff images. Constitutional split: the binary only *compares*; the host (figma-agent /
+  preview) *renders*. Authoring brain `knowledge/visual-regression.md` (the render-environment flake rule).
 - **`ui content-lint` — deterministic content / UX-writing floor (DESIGN-OS T4).** Static, precision-first,
   low-false-positive-only checks on UI microcopy: **errors** — lorem-ipsum, placeholder-copy (unfinished
   copy); **warnings** — click-here-link (WCAG 2.4.4), error-code-alone (a bare code with no human

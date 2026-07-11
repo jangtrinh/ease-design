@@ -170,6 +170,50 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
     },
   },
 
+  vr: {
+    summary: "Deterministic visual-regression diff/gate for rendered screenshots",
+    subcommands: {
+      diff: {
+        summary: "Compare two PNGs; exit 1 if the changed-pixel ratio exceeds --max-ratio",
+        positionals: [
+          { name: "<base.png>", required: true, summary: "Baseline screenshot" },
+          { name: "<head.png>", required: true, summary: "Current screenshot" },
+        ],
+        flags: [
+          { name: "threshold", type: "string", summary: "Per-pixel matching tolerance, 0–1 (default 0.1)" },
+          { name: "max-ratio", type: "string", summary: "Max changed-pixel ratio, 0–1, that still passes (default 0)" },
+          { name: "include-aa", type: "boolean", summary: "Count anti-aliased pixels as real differences" },
+          { name: "mask", type: "string", summary: 'Rectangles to ignore: "x,y,w,h" separated by ";"' },
+          { name: "out", type: "string", summary: "Write the diff PNG to this file" },
+        ],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "FILE_NOT_FOUND", "READ_ERROR", "BAD_PNG", "BAD_MASK"],
+      },
+      gate: {
+        summary: "Diff every baseline PNG against the same-named current render; exit 1 on any regression",
+        positionals: [
+          { name: "<baseline-dir>", required: true, summary: "Directory of committed baseline PNGs" },
+          { name: "<current-dir>", required: true, summary: "Directory of freshly-rendered PNGs" },
+        ],
+        flags: [
+          { name: "threshold", type: "string", summary: "Per-pixel matching tolerance, 0–1 (default 0.1)" },
+          { name: "max-ratio", type: "string", summary: "Max changed-pixel ratio, 0–1, that still passes (default 0)" },
+          { name: "include-aa", type: "boolean", summary: "Count anti-aliased pixels as real differences" },
+          { name: "out-dir", type: "string", summary: "Write per-file diff PNGs into this directory" },
+        ],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "FILE_NOT_FOUND", "READ_ERROR", "BAD_PNG"],
+      },
+      accept: {
+        summary: "Promote current renders to baselines (copies *.png current → baseline)",
+        positionals: [
+          { name: "<current-dir>", required: true, summary: "Directory of freshly-rendered PNGs" },
+          { name: "<baseline-dir>", required: true, summary: "Destination baseline directory" },
+        ],
+        flags: [],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "FILE_NOT_FOUND", "READ_ERROR"],
+      },
+    },
+  },
+
   "taste-lint": {
     summary: "Deterministic taste-rubric floor for generated HTML",
     signature: {

@@ -193,6 +193,7 @@ envelope.
 | `ui taste-lint` | Deterministic taste-rubric floor for generated HTML (6 machine-checkable axes) |
 | `ui flow` | Lint a multi-screen flow's IA graph — unreachable screens, dead ends, missing error/empty states, dangling refs (`flow lint`) |
 | `ui a11y-lint` | Static-HTML accessibility linter — Tier-1 WCAG checks (alt, lang, title, tabindex, zoom, unnamed icon/emoji controls, heading order). Not a conformance claim. |
+| `ui vr` | Deterministic visual-regression — diff two screenshots or gate a baseline dir against fresh renders (zero-dep PNG codec + pixelmatch, anti-aliasing detection, masks). The binary compares; the host renders. (`diff`/`gate`/`accept`) |
 | `ui content-lint` | Deterministic content / UX-writing floor — low-FP static checks (lorem-ipsum, placeholder copy, click-here links, bare error codes, `item(s)`, insensitive terms, text-in-image, all-caps). Voice/tone fit stays a model judgment. |
 | `ui validate-layout` | Static HTML structural/overflow linter (10 heuristic checks) |
 | `ui autofix` | Apply 5 deterministic HTML fix rules (viewport, imgs, Lucide, CDN, dup-ids) |
