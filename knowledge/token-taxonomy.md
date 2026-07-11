@@ -228,6 +228,28 @@ This is the same distinction the Consistency axis in `taste-rubric.md` enforces 
 generation side: a generation must consume the **canonical, stable token names** and must
 not invent new raw values that should have resolved through an existing semantic token.
 
+## The paired semantic convention — `{role}` + `{role}-foreground` (Design-OS standard)
+
+The Design-OS standard for the **semantic tier** is the shadcn model: every surface role ships with
+its paired text colour — `background`/`foreground`, `card`/`card-foreground`, `popover`/`…`,
+`primary`/`primary-foreground`, `secondary`/`…`, `muted`/`muted-foreground`, `accent`/`…`,
+plus the unpaired `destructive`, `border`, `input`, `ring`, the `sidebar-*` set, `radius`, and
+`chart-1…5`. A bare `foreground` pairs with `background` (the app default).
+
+**Why the pairing is load-bearing, not cosmetic:** because a `-foreground` token names its ONE
+intended background, **contrast becomes deterministic**. `ui ds a11y` checks `{role}-foreground`
+against `{role}` — the *declared* pairs — instead of guessing every text×surface combination. That
+guessing (the legacy "inferred" mode) mis-paired a light-surface text token against dark panels (the
+VSF dogfood over-pairing). Adopt the pairing and the a11y audit is exact:
+
+- **Name foregrounds by convention** (`X-foreground`) so `ui ds a11y` runs in `paired` mode.
+- Legacy cartesian inference stays only as a fallback for un-paired DSs, and the report says so —
+  it nudges you to add `-foreground` names or pin `--pairs`.
+- `ui ds import` preserves `-foreground` names, so an imported DS inherits deterministic a11y.
+
+This is the same discipline the whole taxonomy teaches: **encode intent in the name** so a
+deterministic tool can act on it. A paired name is an interface contract a checker can trust.
+
 ## Onboarding an existing token file — `ui ds import`
 
 Most real projects already have a flat token file (a Figma-reconciled `tokens.json`,

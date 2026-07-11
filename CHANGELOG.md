@@ -7,6 +7,15 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Changed
+- **`ui ds a11y` adopts the paired-token model — deterministic contrast, no over-pairing (shadcn standard).**
+  When a DS follows the `{role}` / `{role}-foreground` convention (background/foreground,
+  primary/primary-foreground, muted/muted-foreground, …), `ds a11y` now checks each foreground against its
+  ONE intended surface — the declared pairs — instead of the text×surface cartesian product. This fixes the
+  VSF-dogfood "L3" over-pairing (a light-surface text token was wrongly paired against dark panels). The
+  result reports `mode: "explicit" | "paired" | "inferred"`; the legacy cartesian inference remains only as a
+  fallback for un-paired DSs and the report nudges toward `-foreground` naming or `--pairs`. New pure module
+  `src/core/token-pairs.ts` (`inferForegroundPairs`). The paired convention is now the documented Design-OS
+  semantic-tier standard (`knowledge/token-taxonomy.md`).
 - **taste-lint `tiny-body-text` is now role-aware (dogfood L2).** The 16px body-text floor was firing on
   legitimate UI chrome (badges, nav, labels, table meta, code, eyebrow headings). It now reads the role from
   the `<style>` selector (exempt a ≤13px size when the selector names a chrome/label/heading/secondary role,

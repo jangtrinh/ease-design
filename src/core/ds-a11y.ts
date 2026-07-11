@@ -13,6 +13,7 @@
  */
 import { contrastRatio, classifyContrast } from "./color-scale.js";
 import type { ResolvedToken } from "./token-model.js";
+import { inferForegroundPairs } from "./token-pairs.js";
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const TEXT_RE = /(?:^|[.\-_/])(text|fg|foreground|ink|label|body|heading|title|caption|muted|secondary|placeholder|link|content)(?:[.\-_/]|$)/i;
@@ -32,7 +33,10 @@ export interface ContrastPair {
 }
 export interface A11yTokenResult {
   checkedPairs: number;
+  /** True when pairs came from the cartesian name-role inference (legacy fallback). */
   inferred: boolean;
+  /** How the pairs were determined: explicit --pairs, the {role}/{role}-foreground convention, or legacy inference. */
+  mode: "explicit" | "paired" | "inferred";
   pairs: ContrastPair[];
   failures: ContrastPair[];
   /** Tokens that look like text but carry no hex value → couldn't be checked. */
@@ -80,10 +84,26 @@ export function checkTokenContrast(
     }
     pairs.sort((a, b) => a.ratio - b.ratio || a.text.localeCompare(b.text));
     const failures = pairs.filter((p) => !p.passesNormalText);
-    return { checkedPairs: pairs.length, inferred: false, pairs, failures, unresolved: unresolved.sort() };
+    return { checkedPairs: pairs.length, inferred: false, mode: "explicit", pairs, failures, unresolved: unresolved.sort() };
   }
 
-  // Inference path: every text-role token × every surface-role token.
+  // Paired path (shadcn standard): check {role}-foreground on its {role} surface — the intended
+  // pairs only, never the text×surface cartesian. Preferred whenever the DS carries -foreground tokens.
+  const fgPairs = inferForegroundPairs(tokens.map((t) => t.path));
+  if (fgPairs.length > 0) {
+    for (const [fp, sp] of fgPairs) {
+      const tt = byPath.get(fp), st = byPath.get(sp);
+      const tv = tt !== undefined ? hexOf(tt) : null;
+      const sv = st !== undefined ? hexOf(st) : null;
+      if (tv === null || sv === null) { unresolved.push(`${fp}:${sp}`); continue; }
+      pairs.push(pairFor(fp, tv, sp, sv));
+    }
+    pairs.sort((a, b) => a.ratio - b.ratio || a.text.localeCompare(b.text));
+    const failures = pairs.filter((p) => !p.passesNormalText);
+    return { checkedPairs: pairs.length, inferred: false, mode: "paired", pairs, failures, unresolved: unresolved.sort() };
+  }
+
+  // Legacy inference fallback (no paired tokens): every text-role token × every surface-role token.
   const texts = tokens.filter((t) => TEXT_RE.test(t.path) && !EXEMPT_RE.test(t.path));
   const surfaces = tokens.filter((t) => SURFACE_RE.test(t.path) && !EXEMPT_RE.test(t.path));
   for (const tt of texts) {
@@ -98,7 +118,7 @@ export function checkTokenContrast(
   }
   pairs.sort((a, b) => a.ratio - b.ratio || a.text.localeCompare(b.text) || a.surface.localeCompare(b.surface));
   const failures = pairs.filter((p) => !p.passesNormalText);
-  return { checkedPairs: pairs.length, inferred: true, pairs, failures, unresolved: [...new Set(unresolved)].sort() };
+  return { checkedPairs: pairs.length, inferred: true, mode: "inferred", pairs, failures, unresolved: [...new Set(unresolved)].sort() };
 }
 
 export function renderA11yReport(r: A11yTokenResult): string {
@@ -107,7 +127,8 @@ export function renderA11yReport(r: A11yTokenResult): string {
     lines.push("ds a11y: no text×surface token pairs to check (name roles: text*/fg*/… vs bg*/surface*/…, or use --pairs).");
     return lines.join("\n") + "\n";
   }
-  lines.push(`ds a11y: ${r.checkedPairs} text×surface pair(s) checked${r.inferred ? " (roles inferred from token names)" : ""}, ${r.failures.length} below AA (4.5:1).`);
+  const modeNote = r.mode === "paired" ? " ({role}/{role}-foreground pairs)" : r.mode === "inferred" ? " (roles inferred from token names — cartesian; prefer -foreground pairing or --pairs)" : "";
+  lines.push(`ds a11y: ${r.checkedPairs} text×surface pair(s) checked${modeNote}, ${r.failures.length} below AA (4.5:1).`);
   for (const p of r.failures) {
     lines.push(`  ✗ ${p.text} on ${p.surface} — ${p.ratio}:1 (${p.level}); fails normal-text AA`);
   }
