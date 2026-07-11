@@ -148,6 +148,16 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
     },
   },
 
+  "content-lint": {
+    summary: "Deterministic content / UX-writing floor (low-FP static checks)",
+    signature: {
+      summary: "Lint an HTML file for content defects; exit 1 on error-severity findings",
+      positionals: [htmlFile("HTML file to lint")],
+      flags: [],
+      errorCodes: [...IO_CODES],
+    },
+  },
+
   flow: {
     summary: "Lint a multi-screen flow (IA graph) deterministically",
     subcommands: {

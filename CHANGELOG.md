@@ -7,6 +7,14 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **`ui content-lint` — deterministic content / UX-writing floor (DESIGN-OS T4).** Static, precision-first,
+  low-false-positive-only checks on UI microcopy: **errors** — lorem-ipsum, placeholder-copy (unfinished
+  copy); **warnings** — click-here-link (WCAG 2.4.4), error-code-alone (a bare code with no human
+  explanation), exclamation-overload, insensitive-terms (whitelist/blacklist/master-slave only),
+  plural-s-hack (`item(s)` → use ICU MessageFormat), text-in-image, all-caps-shout. Prose linters
+  (write-good/proselint/alex/Flesch–Kincaid) are deliberately excluded — they misfire on short imperative
+  copy. Voice, tone and brand fit stay a curator (model) judgment against the tone-by-situation matrix in
+  `knowledge/content-design.md`. Exit 1 on error-severity; `--json` envelope.
 - **`ui flow lint` — deterministic IA linting for multi-screen flows (DESIGN-OS T3).** A `flow.json`
   models screens (each with its data-lifecycle states), transitions and entry points; `ui flow lint`
   runs 12 pure graph checks nobody else does deterministically: **errors** — dangling-ref,
