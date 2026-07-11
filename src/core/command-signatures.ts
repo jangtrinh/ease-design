@@ -402,6 +402,15 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         ],
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "REGISTRY_NOT_FOUND", "BAD_REGISTRY", "WRITE_ERROR"],
       },
+      a11y: {
+        summary: "Token-pair contrast audit (text×surface ≥ AA); declared pairs only",
+        positionals: [],
+        flags: [
+          { name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd)" },
+          { name: "pairs", type: "string", summary: "Pin explicit text:surface token pairs (skips name-role inference)" },
+        ],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "DS_NOT_FOUND", "BAD_JSON"],
+      },
     },
   },
 

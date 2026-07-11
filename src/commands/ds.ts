@@ -6,6 +6,7 @@ import { runInit } from "./ds-init-impl.js";
 import { runContext } from "./ds-context-impl.js";
 import { runDiff } from "./ds-diff-impl.js";
 import { runDocs } from "./ds-docs-impl.js";
+import { runA11y } from "./ds-a11y-impl.js";
 import { runChangeToken } from "./ds-change-token-impl.js";
 import { runStatus } from "./ds-status-impl.js";
 import type { ParsedArgs } from "../core/cli-args.js";
@@ -22,6 +23,7 @@ Usage:
   ui ds status   [--dir <project-dir>] [--json]
   ui ds diff <base-dir> <head-dir> [--format markdown|json|pr-comment] [--base-version <v>]
   ui ds docs [--dir <project>] [--out <file>] [--format markdown|json]
+  ui ds a11y [--dir <project>] [--pairs "text:surface,..."] [--json]
 
 Subcommands:
   init           Compile a project-scoped design system from a persona + intent
@@ -30,6 +32,11 @@ Subcommands:
   status         Show the manifest summary (generation, persona, hashes)
   diff           Compare two DS states (dirs with design.tokens.json) → semver + visual-breaking classification
   docs           Regenerate component reference docs from the registry (decay-proof)
+  a11y           Token-pair contrast audit (text×surface ≥ AA); exit 1 on a fail. Declared pairs only — not a conformance claim.
+
+'ds a11y' options:
+  --dir <path>       Project directory holding design/ (default: cwd)
+  --pairs "t:s,..."  Pin explicit text:surface token pairs (skips name-role inference)
 
 'ds docs' options:
   --dir <path>       Project directory holding design/ (default: cwd)
@@ -115,6 +122,7 @@ Error codes:
   REGISTRY_NOT_FOUND 'ds docs' found no component-registry.json
   BAD_REGISTRY       'ds docs' registry file is malformed
 `;
+// 'ds a11y' error codes (DS_NOT_FOUND / BAD_ARG / BAD_JSON / UNKNOWN_FLAG) are shared with the above.
 
 export const dsCommand = {
   name: CMD,
@@ -130,6 +138,7 @@ export const dsCommand = {
       case "status":       return runStatus(parsed);
       case "diff":         return runDiff(parsed);
       case "docs":         return runDocs(parsed);
+      case "a11y":         return runA11y(parsed);
       case undefined: {
         const msg = "ui ds requires a subcommand. Run 'ui ds --help'.";
         return parsed.json

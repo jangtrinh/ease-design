@@ -7,6 +7,13 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **`ui ds a11y` — token-pair contrast audit (DESIGN-OS T2).** For every text-role token × surface-role
+  token (roles inferred from names, or pinned with `--pairs "text.muted:bg.default,..."`), computes the WCAG
+  contrast ratio and flags any pair below AA (4.5:1), exiting 1. This catches the recurring secondary-text
+  trap — muted/secondary text ~#8A-lightness on white ≈ 3.2:1 — at the *design-system* level, before a screen
+  exists. Disabled/inactive roles are exempt (per SC 1.4.3). Honest by construction: it verifies **declared
+  token pairs only** — not rendered contrast, not that a screen uses these pairs — and never emits the word
+  "accessible"/"WCAG AA compliant" from a static run.
 - **`ui changelog` — a readable design changelog (DESIGN-OS T1).** Folds the DS manifest's `changelog[]`
   (init / change-token / register) and the memory ledger's recorded `insight` decisions into a
   Keep-a-Changelog-style history — Added / Changed / Decisions, newest first, each line provenance-tagged
