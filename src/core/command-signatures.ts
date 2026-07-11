@@ -170,7 +170,9 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         { name: "<spec.json>", required: true, summary: "Brief: acceptanceCriteria[] + successMetrics?" },
         { name: "<manifest.json>", required: true, summary: "Produced design: screens[] with coversCriteria" },
       ],
-      flags: [],
+      flags: [
+        { name: "require-evidence", type: "boolean", summary: "Treat criteria with no evidence provenance as assumptions, not real coverage" },
+      ],
       errorCodes: [...IO_CODES, "BAD_JSON"],
     },
   },

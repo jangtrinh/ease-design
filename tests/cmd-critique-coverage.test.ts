@@ -112,3 +112,63 @@ describe("critique-coverage — error paths (code in --json envelope)", () => {
     expect(code(["critique-coverage", spec, manifest])).toBe("BAD_JSON");
   });
 });
+
+describe("critique-coverage — evidence provenance (--require-evidence)", () => {
+  const EV_SPEC = {
+    acceptanceCriteria: [
+      { id: "c1", text: "reset password", evidence: ["r12"] },
+      { id: "c2", text: "fast dashboard" }, // no evidence → assumption
+    ],
+  };
+  const FULL_MANIFEST = { screens: [{ name: "reset", coversCriteria: ["c1"] }, { name: "dash", coversCriteria: ["c2"] }] };
+
+  it("assumptions are always surfaced in --json, even without the flag", () => {
+    const spec = write("spec.json", EV_SPEC);
+    const manifest = write("m.json", FULL_MANIFEST);
+    const r = capture(["critique-coverage", spec, manifest, "--json"]);
+    expect(r.code).toBe(0); // without the flag, coverage is still 100%
+    const d = JSON.parse(r.out).data as { assumptions: string[]; coveragePct: number };
+    expect(d.assumptions).toEqual(["c2"]);
+    expect(d.coveragePct).toBe(100);
+  });
+
+  it("--require-evidence: an unevidenced (but 'covered') criterion fails the gate", () => {
+    const spec = write("spec.json", EV_SPEC);
+    const manifest = write("m.json", FULL_MANIFEST);
+    const r = capture(["critique-coverage", spec, manifest, "--require-evidence", "--json"]);
+    expect(r.code).toBe(1);
+    const d = JSON.parse(r.out).data as { assumptions: string[]; evidencedCoveragePct: number; coveragePct: number };
+    expect(d.coveragePct).toBe(100);
+    expect(d.evidencedCoveragePct).toBe(50); // only c1 is evidence-backed
+    expect(d.assumptions).toEqual(["c2"]);
+  });
+
+  it("--require-evidence with every criterion evidenced → exit 0", () => {
+    const spec = write("spec.json", {
+      acceptanceCriteria: [{ id: "c1", evidence: ["r1"] }, { id: "c2", evidence: ["r2", "r3"] }],
+    });
+    const manifest = write("m.json", { screens: [{ name: "s", coversCriteria: ["c1", "c2"] }] });
+    const r = capture(["critique-coverage", spec, manifest, "--require-evidence", "--json"]);
+    expect(r.code).toBe(0);
+    const d = JSON.parse(r.out).data as { evidencedCoveragePct: number; assumptions: string[] };
+    expect(d.evidencedCoveragePct).toBe(100);
+    expect(d.assumptions).toEqual([]);
+  });
+
+  it("text mode flags assumptions and the evidence-backed number under the flag", () => {
+    const spec = write("spec.json", EV_SPEC);
+    const manifest = write("m.json", FULL_MANIFEST);
+    const r = capture(["critique-coverage", spec, manifest, "--require-evidence"]);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("ASSUMPTIONS");
+    expect(r.out).toContain("evidence-backed coverage: 50%");
+  });
+
+  it("an unknown flag is still rejected (central flag guard)", () => {
+    const spec = write("spec.json", EV_SPEC);
+    const manifest = write("m.json", FULL_MANIFEST);
+    const r = capture(["critique-coverage", spec, manifest, "--require-evidencee", "--json"]);
+    expect(r.code).toBe(1);
+    expect(JSON.parse(r.out).error.code).toBe("UNKNOWN_FLAG");
+  });
+});

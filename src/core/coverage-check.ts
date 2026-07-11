@@ -8,10 +8,23 @@
 export interface AcceptanceCriterion {
   id: string;
   text?: string;
+  /**
+   * Provenance: evidence/event ids this criterion is drawn from (e.g. a research
+   * ledger requirement, or a recorded insight). A criterion with no evidence is an
+   * ASSUMPTION — a plausible-sounding requirement nobody sourced — and must never be
+   * silently counted as satisfied by `--require-evidence`. Same discipline as an
+   * `insight` memory event requiring `--refs`.
+   */
+  evidence?: string[];
 }
 export interface CoverageSpec {
   acceptanceCriteria: AcceptanceCriterion[];
   successMetrics?: string[];
+}
+
+export interface CoverageOptions {
+  /** Treat criteria without evidence as unmet debt (assumptions), not real coverage. */
+  requireEvidence?: boolean;
 }
 export interface DesignScreen {
   name: string;
@@ -27,8 +40,14 @@ export interface CoverageResult {
   screenCount: number;
   covered: string[];
   uncovered: string[];
-  perCriterion: { id: string; text?: string; coveredBy: string[] }[];
+  perCriterion: { id: string; text?: string; coveredBy: string[]; evidenced: boolean }[];
   unknownRefs: string[]; // criteria ids referenced by a screen but absent from the spec
+  /** Criteria with no evidence provenance — sourced from nothing (always computed). */
+  assumptions: string[];
+  /** Coverage counting ONLY covered-AND-evidenced criteria (present under requireEvidence). */
+  evidencedCoveragePct?: number;
+  /** True when the run demanded evidence provenance. */
+  requireEvidence: boolean;
 }
 
 /** Thrown on a malformed spec/manifest — the command maps it to BAD_JSON. */
@@ -51,7 +70,14 @@ export function parseSpec(json: unknown, path: string): CoverageSpec {
     if (!isObj(c) || typeof c["id"] !== "string" || c["id"] === "") {
       throw new CoverageError("BAD_JSON", `each acceptanceCriteria entry in '${path}' needs a non-empty string id`);
     }
-    criteria.push({ id: c["id"], text: typeof c["text"] === "string" ? c["text"] : undefined });
+    const evidence = Array.isArray(c["evidence"])
+      ? (c["evidence"] as unknown[]).filter((x): x is string => typeof x === "string")
+      : undefined;
+    criteria.push({
+      id: c["id"],
+      text: typeof c["text"] === "string" ? c["text"] : undefined,
+      ...(evidence !== undefined ? { evidence } : {}),
+    });
   }
   const metrics = Array.isArray(json["successMetrics"]) ? (json["successMetrics"] as unknown[]).filter((m): m is string => typeof m === "string") : undefined;
   return { acceptanceCriteria: criteria, successMetrics: metrics };
@@ -73,18 +99,26 @@ export function parseManifest(json: unknown, path: string): DesignManifest {
   return { screens };
 }
 
-export function checkCoverage(spec: CoverageSpec, manifest: DesignManifest): CoverageResult {
+export function checkCoverage(
+  spec: CoverageSpec,
+  manifest: DesignManifest,
+  opts: CoverageOptions = {},
+): CoverageResult {
   const criteria = spec.acceptanceCriteria;
   const screens = manifest.screens;
   const validIds = new Set(criteria.map((c) => c.id));
+  const requireEvidence = opts.requireEvidence === true;
 
   const perCriterion = criteria.map((c) => ({
     id: c.id,
     text: c.text,
     coveredBy: screens.filter((s) => (s.coversCriteria ?? []).includes(c.id)).map((s) => s.name),
+    evidenced: (c.evidence ?? []).length > 0,
   }));
   const covered = perCriterion.filter((p) => p.coveredBy.length > 0).map((p) => p.id);
   const uncovered = perCriterion.filter((p) => p.coveredBy.length === 0).map((p) => p.id);
+  // A criterion sourced from nothing — a plausible requirement nobody grounded.
+  const assumptions = perCriterion.filter((p) => !p.evidenced).map((p) => p.id);
 
   // Referenced-but-undefined ids (a screen claims to cover a criterion the spec doesn't list) — a real drift signal.
   const unknownRefs = [
@@ -92,5 +126,14 @@ export function checkCoverage(spec: CoverageSpec, manifest: DesignManifest): Cov
   ].sort();
 
   const coveragePct = criteria.length === 0 ? 100 : Math.round((100 * covered.length) / criteria.length);
-  return { coveragePct, criterionCount: criteria.length, screenCount: screens.length, covered, uncovered, perCriterion, unknownRefs };
+  const result: CoverageResult = {
+    coveragePct, criterionCount: criteria.length, screenCount: screens.length,
+    covered, uncovered, perCriterion, unknownRefs, assumptions, requireEvidence,
+  };
+  if (requireEvidence) {
+    // Real coverage = covered AND evidenced. An assumption is never real coverage.
+    const evidencedCovered = perCriterion.filter((p) => p.coveredBy.length > 0 && p.evidenced).length;
+    result.evidencedCoveragePct = criteria.length === 0 ? 100 : Math.round((100 * evidencedCovered) / criteria.length);
+  }
+  return result;
 }

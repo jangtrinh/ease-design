@@ -13,16 +13,34 @@ ship-grade briefs, the Excellence tier (adversarial judge + reference duel). Cor
 ## Axis 2 — GOAL / SPEC (does it do the job it was built for?)  ← the added axis
 A beautiful screen that misses the story is a FAIL. Check three things:
 1. **Acceptance-criteria coverage (deterministic).** Run `ui critique-coverage <spec.json> <manifest.json>`:
-   - `spec.json` = the brief's `{ acceptanceCriteria:[{id,text}], successMetrics?:[...] }`.
+   - `spec.json` = the brief's `{ acceptanceCriteria:[{id,text,evidence?:[ids]}], successMetrics?:[...] }`.
    - `manifest.json` = the produced design's `{ screens:[{ name, coversCriteria:[ids], states:[...] }] }`.
    - It reports `uncovered[]` + `coveragePct` and exits 1 if any criterion is uncovered. **Zero-token, zero-LLM.**
    Every acceptance criterion MUST map to a covering screen/state — no silent gaps. Uncovered = fix before ship.
+   - **Coverage accounts a self-report; it does not prove the design meets the brief.** Both the criteria and the
+     `coversCriteria` claims are authored by the model — a design can score 100% against criteria it invented. So:
+     - Criteria drawn from a brief/requirement carry `evidence:[ids]`. Run with **`--require-evidence`**: any
+       criterion with no evidence is an **ASSUMPTION**, reported as debt and **never counted as real coverage**
+       (`evidencedCoveragePct`). This is the same discipline as an `insight` needing `--refs`.
+     - Present the honest number: *"N% covered, of which M% evidence-backed; the rest are stated assumptions."*
+       Never report assumption coverage as if the brief were satisfied.
 2. **Goal plausibility (judgment).** Does the design plausibly move the INTENT's success metric? Judge against
    `ux-psychology.md` (the laws the brief triggers) — e.g. an activation flow must minimize per-step friction; a
    pricing page's persuasion must be **honest** (no dark patterns / fake scarcity — ux-psychology's ethical
    persuasion rules are a HARD gate, not a nicety).
-3. **Accessibility gate (deterministic).** WCAG contrast (`ui color contrast`), focus order / keyboard reachability,
-   ARIA-able structure. A contrast fail is a fail, not a nit.
+3. **Accessibility gate (deterministic — a HARD FLOOR, above aesthetic fidelity).** WCAG contrast
+   (`ui color contrast`), focus order / keyboard reachability, ARIA-able structure. A contrast fail is a fail, not
+   a nit. Two rules that override everything else on this axis:
+   - **A11y beats the style source.** When a persona/style DNA supplies a token or literal (`bg-[#8A909C]`) that
+     fails contrast, the a11y floor **wins** — re-run the pair through `ui color contrast`; fix the token, do not
+     honor the aesthetic. (Secondary/muted text ~#8A-lightness on white ≈ 3.2:1 fails AA — a recurring trap.)
+     Interactive icons must be real glyphs/SVG with an accessible name — **never** an emoji or text character
+     (× ▶ ☰ → ‹ ›) as a control.
+   - **Never claim what a static check cannot prove.** Contrast math and structural checks verify *declared token
+     pairs and markup* — not rendered contrast over gradients/images, not focus visibility, not whether the focus
+     order is meaningful. So the verdict says *"N deterministic a11y checks passed; these criteria (list) need
+     human/assistive-tech judgment and were not evaluated"* — it must **never** state "accessible" or
+     "WCAG AA compliant" from a static/token-only run.
 
 ## Adversarial pass (excellence, reused from taste-rubric §Excellence)
 A FRESH judge context (never the maker grading its own work — a subagent where the runtime has them) tries to

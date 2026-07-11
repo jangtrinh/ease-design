@@ -18,23 +18,29 @@ const CMD = "critique-coverage";
 export const CRITIQUE_COVERAGE_HELP = `ui critique-coverage — acceptance-criteria coverage of a produced design
 
 Usage:
-  ui critique-coverage <spec.json> <manifest.json> [--json]
+  ui critique-coverage <spec.json> <manifest.json> [--require-evidence] [--json]
 
 Inputs:
-  <spec.json>      The brief: { acceptanceCriteria: [{ id, text? }], successMetrics?: [...] }
+  <spec.json>      The brief: { acceptanceCriteria: [{ id, text?, evidence?: [ids] }], successMetrics?: [...] }
   <manifest.json>  The produced design: { screens: [{ name, coversCriteria?: [ids], states?: [...] }] }
 
 Options:
-  --json           Emit a JSON envelope (coveragePct, covered, uncovered, perCriterion, unknownRefs)
-  -h, --help       Show this help
+  --require-evidence  Treat any acceptance criterion with no 'evidence' provenance as an
+                      ASSUMPTION — not real coverage. A design can otherwise score 100% against
+                      criteria the model invented; this gates that. Exit 1 if any assumption remains.
+  --json              Emit a JSON envelope (coveragePct, covered, uncovered, assumptions,
+                      evidencedCoveragePct, perCriterion, unknownRefs)
+  -h, --help          Show this help
 
-Reports every acceptance criterion that no screen/state covers, plus the coverage %
-and any unknownRefs (a screen claiming a criterion the spec doesn't list). The taste
-and goal-plausibility judgment stay host-model (see knowledge/figma-craft/curator.md).
+Reports every acceptance criterion that no screen/state covers, the coverage %, any
+assumptions (criteria sourced from no evidence), and unknownRefs (a screen claiming a
+criterion the spec doesn't list). The taste and goal-plausibility judgment stay host-model
+(see knowledge/figma-craft/curator.md). This accounts a self-report deterministically; it does
+NOT prove the design meets the brief — only that claimed criteria are covered and (optionally) sourced.
 
 Exit codes:
-  0  100% coverage (every acceptance criterion is covered)
-  1  One or more uncovered criteria, or a user/file error
+  0  100% coverage (and, with --require-evidence, every covered criterion is evidenced)
+  1  One or more uncovered criteria or unevidenced assumptions, or a user/file error
 
 Error codes:
   BAD_ARG        Missing <spec.json> or <manifest.json>, or unexpected extra positionals
@@ -80,6 +86,13 @@ function formatReport(result: ReturnType<typeof checkCoverage>): string {
   if (result.unknownRefs.length > 0) {
     lines.push(`  unknownRefs (screens claim criteria not in the spec): ${result.unknownRefs.join(", ")}`);
   }
+  if (result.assumptions.length > 0) {
+    const tag = result.requireEvidence ? "ASSUMPTIONS (no evidence — NOT counted as real coverage)" : "assumptions (no evidence provenance)";
+    lines.push(`  ${tag}: ${result.assumptions.join(", ")}`);
+    if (result.requireEvidence && result.evidencedCoveragePct !== undefined) {
+      lines.push(`  evidence-backed coverage: ${result.evidencedCoveragePct}% (assumptions excluded)`);
+    }
+  }
   return lines.join("\n") + "\n";
 }
 
@@ -103,11 +116,12 @@ export const critiqueCoverageCommand = {
       return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
     }
 
+    const requireEvidence = parsed.flags["require-evidence"] === true;
     let result: ReturnType<typeof checkCoverage>;
     try {
       const spec = parseSpec(readJson(specPath), specPath);
       const manifest = parseManifest(readJson(manifestPath), manifestPath);
-      result = checkCoverage(spec, manifest);
+      result = checkCoverage(spec, manifest, { requireEvidence });
     } catch (e) {
       if (e instanceof InputError || e instanceof CoverageError) {
         return useJson ? errJson(CMD, e.code, e.message) : errText(`ui: ${e.message}\n`);
@@ -115,7 +129,9 @@ export const critiqueCoverageCommand = {
       throw e;
     }
 
-    const exitCode = result.uncovered.length > 0 ? 1 : 0;
+    // With --require-evidence an unsourced criterion is debt, not coverage → it fails the gate.
+    const exitCode =
+      result.uncovered.length > 0 || (requireEvidence && result.assumptions.length > 0) ? 1 : 0;
     if (useJson) {
       return okJsonWithExit(CMD, result, exitCode);
     }
