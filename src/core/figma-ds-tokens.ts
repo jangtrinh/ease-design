@@ -218,7 +218,7 @@ export function buildTokensTree(variables: DsVariable[]): TokenBuildResult {
     if (type === null || path === undefined) { skipped++; continue; }
     const dotted = `${path.category}.${path.token}`;
     if (seenPaths.has(dotted)) { skipped++; continue; } // first mapping wins
-    const leaf = buildLeaf(v, type, pathById);
+    const leaf = buildLeaf(v, type, pathById, dotted);
     if (leaf === null) { skipped++; continue; }
     seenPaths.add(dotted);
     (tree[path.category] ??= {})[path.token] = leaf;
@@ -234,11 +234,18 @@ function buildLeaf(
   v: DsVariable,
   type: DtcgType,
   pathById: Map<string, { category: string; token: string }>,
+  selfDotted: string,
 ): DtcgLeaf | null {
   const toValue = (raw: unknown): string | number | null => {
     if (isAliasValue(raw)) {
       const tp = pathById.get(raw.id);
-      return tp !== undefined ? `{${tp.category}.${tp.token}}` : null;
+      if (tp === undefined) return null; // dangling alias → unusable
+      const target = `${tp.category}.${tp.token}`;
+      // A self-referential alias (own id, or a distinct Figma var that collapsed to the same
+      // DTCG path) has no resolvable value and would make the whole token file unresolvable
+      // ("alias cycle detected"). Drop it rather than emit `{self}`.
+      if (target === selfDotted) return null;
+      return `{${target}}`;
     }
     return literalValue(type, raw);
   };

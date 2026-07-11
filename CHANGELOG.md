@@ -6,6 +6,14 @@ All notable changes to ease-design are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **`ui ingest-figma-ds` no longer emits self-referential aliases (dogfood F1).** When two distinct Figma
+  variables collapse to the same DTCG path and one aliases the other, the ingest used to emit
+  `$value: "{self}"`, which made the whole tokens.json unresolvable (`alias cycle detected`) for every
+  downstream `ui tokens`/`ds` command. It now detects an alias whose target is the token's own path and
+  drops it, keeping the literal sibling instead. Surfaced live-ingesting the real "shadcn - standard"
+  Figma DS (2188 components / 802 variables), where `breakpoint.2xl` self-aliased.
+
 ### Changed
 - **`ui ds a11y` adopts the paired-token model — deterministic contrast, no over-pairing (shadcn standard).**
   When a DS follows the `{role}` / `{role}-foreground` convention (background/foreground,
