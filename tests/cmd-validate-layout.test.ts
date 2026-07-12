@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { writeFileSync, mkdtempSync } from "node:fs";
 import { run } from "../src/cli.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -103,6 +105,24 @@ describe("ui validate-layout — smells fixture", () => {
     const { out } = captureRun(["validate-layout", fix("layout-smells.html"), "--json"]);
     const json = JSON.parse(out) as { data: { findings: { checkId: string }[] } };
     expect(json.data.findings.some((f) => f.checkId === "img-no-dimensions")).toBe(true);
+  });
+});
+
+// ─── Redirect-stub fixture — L4 exemption ────────────────────────────────────
+
+describe("ui validate-layout — redirect-stub fixture (L4)", () => {
+  it("a one-line meta-refresh stub exits 0 with 0 findings", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ease-vl-"));
+    const p = join(dir, "redirect.html");
+    writeFileSync(p, '<!doctype html><meta http-equiv="refresh" content="0; url=overview.html">');
+    const { code, out } = captureRun(["validate-layout", p, "--json"]);
+    expect(code).toBe(0);
+    const json = JSON.parse(out) as {
+      data: { errorCount: number; warningCount: number; findings: unknown[] };
+    };
+    expect(json.data.errorCount).toBe(0);
+    expect(json.data.warningCount).toBe(0);
+    expect(json.data.findings).toHaveLength(0);
   });
 });
 

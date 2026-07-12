@@ -24,6 +24,7 @@ import {
   checkImgNoDimensions,
   checkEmptyFlexGrid,
 } from "./layout-checks.js";
+import { isRedirectStub } from "./redirect-stub.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,12 @@ function stripCommentsPreservingOffsets(html: string): string {
 
 /** Run all 10 checks and return findings sorted errors-first, then warnings. */
 export function lintLayout(html: string): LayoutLintResult {
+  // L4 dogfood: a redirect stub intentionally has no <html>/<body>, so every structural
+  // check below is noise on it — short-circuit before running any of the 10 checks.
+  if (isRedirectStub(html)) {
+    return { findings: [], errorCount: 0, warningCount: 0 };
+  }
+
   // Strip HTML comments once. All checks receive the comment-free string so
   // commented-out markup never triggers false positives. Offsets are preserved
   // (spaces replace comment bodies) so line-number reporting stays accurate.

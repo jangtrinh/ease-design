@@ -5,6 +5,10 @@
  */
 import { lineAt } from "./a11y-lint.js";
 import type { A11yFinding } from "./a11y-lint.js";
+import { isRedirectStub } from "./redirect-stub.js";
+// Re-exported so existing importers of isRedirectStub from a11y-checks keep working —
+// the detector itself now lives in redirect-stub.ts, shared with validate-layout (L4).
+export { isRedirectStub } from "./redirect-stub.js";
 
 function attr(tag: string, name: string): string | null {
   const m = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i").exec(tag);
@@ -13,18 +17,6 @@ function attr(tag: string, name: string): string | null {
 }
 function hasAttr(tag: string, name: string): boolean {
   return new RegExp(`\\b${name}(\\s*=|\\s|>|/)`, "i").test(tag);
-}
-
-/**
- * A redirect-only stub: `<meta http-equiv="refresh" content="…url=…">` with effectively no
- * visible body. Such a document has no page to title and no content to voice, so gating it for
- * <title>/<html lang> is noise (dogfood L1: VSF-PCP index.html is a 1-line meta-refresh stub).
- */
-const REFRESH_RE = /<meta\b[^>]*\bhttp-equiv\s*=\s*["']?refresh["']?[^>]*\bcontent\s*=\s*["'][^"']*url=/i;
-export function isRedirectStub(html: string): boolean {
-  if (!REFRESH_RE.test(html)) return false;
-  const bodyText = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  return bodyText.length < 40; // just the redirect target, no real page copy
 }
 
 // ── 1.1.1 Non-text content: every <img> needs an alt attribute (empty=decorative ok) ──

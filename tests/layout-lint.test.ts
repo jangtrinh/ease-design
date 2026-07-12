@@ -253,6 +253,34 @@ describe("lintLayout — HTML comments do not trigger findings", () => {
   });
 });
 
+// ─── Redirect-stub exemption (L4) ─────────────────────────────────────────────
+
+describe("lintLayout — redirect-stub exemption (L4)", () => {
+  it("a one-line meta-refresh stub produces 0 findings (no structural noise)", () => {
+    const html = '<!doctype html><meta http-equiv="refresh" content="0; url=overview.html">';
+    const { findings, errorCount, warningCount } = lintLayout(html);
+    expect(findings).toHaveLength(0);
+    expect(errorCount).toBe(0);
+    expect(warningCount).toBe(0);
+  });
+
+  it("does NOT skip a document with meta-refresh but real body copy (>40 chars)", () => {
+    const html = [
+      '<meta http-equiv="refresh" content="0; url=overview.html">',
+      "<p>This page has substantial body copy describing the product in detail, not a stub.</p>",
+    ].join("");
+    const { findings } = lintLayout(html);
+    expect(findings.some((f) => f.checkId === "missing-html-root")).toBe(true);
+    expect(findings.some((f) => f.checkId === "missing-body")).toBe(true);
+  });
+
+  it("REGRESSION: no meta-refresh, no <body> still fires missing-body (skip stays narrow)", () => {
+    const html = "<!doctype html><html><head><title>Real page</title></head></html>";
+    const { findings } = lintLayout(html);
+    expect(findings.some((f) => f.checkId === "missing-body")).toBe(true);
+  });
+});
+
 // ─── Ordering and counts ──────────────────────────────────────────────────────
 
 describe("lintLayout — findings ordering and counts", () => {
