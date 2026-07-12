@@ -70,3 +70,27 @@ def test_doctor_optional_hand_reports_present(runner: CliRunner, fake_bin) -> No
     assert fa["found"] is True
     assert fa["required"] is False
     assert fa["version"] is None  # T0: optional versions stay null
+
+
+# Stub that answers `--version` like a real optional hand would; anything else is irrelevant.
+_VERSIONED_STUB_BODY = 'if [ "$1" = "--version" ]; then\n  echo "1.2.3"\n  exit 0\nfi\necho "irrelevant"\nexit 0\n'
+
+
+def test_doctor_versions_flag_probes_optional_hand_version(runner: CliRunner, fake_bin) -> None:
+    # T1: `--versions` opts into probing each FOUND optional hand's `--version`.
+    fake_bin.make_stub("figma-agent", _VERSIONED_STUB_BODY)
+    res = runner.invoke(app, ["doctor", "--versions", "--json"])
+    assert res.exit_code == 0
+    fa = next(c for c in json.loads(res.stdout)["data"]["checks"] if c["name"] == "figma-agent")
+    assert fa["found"] is True
+    assert fa["version"] == "1.2.3"
+
+
+def test_doctor_without_versions_flag_stays_null(runner: CliRunner, fake_bin) -> None:
+    # Same stub, but WITHOUT --versions → behavior stays byte-identical to today: null.
+    fake_bin.make_stub("figma-agent", _VERSIONED_STUB_BODY)
+    res = runner.invoke(app, ["doctor", "--json"])
+    assert res.exit_code == 0
+    fa = next(c for c in json.loads(res.stdout)["data"]["checks"] if c["name"] == "figma-agent")
+    assert fa["found"] is True
+    assert fa["version"] is None

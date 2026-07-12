@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from typing import Any
+from typing import Annotated, Any
+
+import typer
 
 from design_os.envelope import JsonFlag, emit, ok_env
 from design_os.kernel import resolve_ui, run_ui
@@ -61,15 +63,16 @@ def _check_node() -> dict[str, Any]:
     }
 
 
-def _check_optional(name: str) -> dict[str, Any]:
+def _check_optional(name: str, probe: bool) -> dict[str, Any]:
     path = shutil.which(name)
-    # T0: optional hands report presence only; version stays null.
-    # TODO(T1+): a `--versions` flag can probe optional-hand versions on demand.
+    # T0: optional hands report presence only by default. T1: `--versions` opts into probing
+    # each found hand's `--version` (degrades to None on any failure — see _probe_version).
+    version = _probe_version([path, "--version"]) if (path is not None and probe) else None
     return {
         "name": name,
         "required": False,
         "found": path is not None,
-        "version": None,
+        "version": version,
         "path": path,
     }
 
@@ -89,14 +92,19 @@ def _render_text(checks: list[dict[str, Any]], ok: bool) -> str:
     return "\n".join(lines) + "\n"
 
 
-def doctor(json_: JsonFlag = False) -> None:
+def doctor(
+    versions: Annotated[
+        bool, typer.Option("--versions", help="Probe optional hands' versions too")
+    ] = False,
+    json_: JsonFlag = False,
+) -> None:
     """Verify the design-os runtime: the `ui` kernel, node, and optional hands."""
     checks: list[dict[str, Any]] = [
         _check_ui(),
         _check_node(),
-        _check_optional("figma-agent"),
-        _check_optional("recall"),
-        _check_optional("pixelshot"),
+        _check_optional("figma-agent", versions),
+        _check_optional("recall", versions),
+        _check_optional("pixelshot", versions),
     ]
     ok = all(c["found"] for c in checks if c["required"])
     data = {"checks": checks, "ok": ok}
