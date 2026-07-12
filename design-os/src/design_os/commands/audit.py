@@ -106,6 +106,12 @@ def _count(envelope: dict[str, Any] | None) -> tuple[int, int]:
     if isinstance(findings, list):
         errors = sum(1 for f in findings if isinstance(f, dict) and f.get("severity") == "error")
         return (errors, len(findings) - errors)
+    # ds a11y shape (dogfood L6): {pairs, failures, unresolved} — no count keys, no findings.
+    # Each contrast failure is an error (it is what gates the kernel's exit); `unresolved`
+    # is a couldn't-check report, not a violation → count nothing for it.
+    failures = data.get("failures")
+    if isinstance(failures, list):
+        return (len(failures), 0)
     return (0, 0)
 
 

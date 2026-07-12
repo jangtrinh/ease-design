@@ -243,3 +243,39 @@ def test_audit_real_ui_clean_file_exit_0(runner: CliRunner) -> None:
     data = json.loads(res.stdout)["data"]
     assert data["summary"]["errors"] == 0
     assert data["summary"]["toolsFailed"] == 0
+
+
+# ── Case: ds a11y failures-shape counting (dogfood L6). The kernel's `ds a11y` data has
+# no errorCount/findings — {pairs, failures, unresolved} — so the summary printed
+# "0 error(s)" for a section that gated the whole audit. Failures count as errors;
+# `unresolved` is a couldn't-check report and must NOT be counted. ──
+_DS_A11Y_FAIL_STUB = (
+    'if [ "$1" = "ds" ] && [ "$2" = "a11y" ]; then\n'
+    "  echo '"
+    '{"ok":true,"command":"ds a11y","data":{"mode":"inferred","pairs":[],'
+    '"failures":[{"text":"colors.a","surface":"colors.b","ratio":1.0},'
+    '{"text":"colors.c","surface":"colors.d","ratio":1.1}],"unresolved":["typography-sizes.text-2xl"]}}'
+    "'\n"
+    "  exit 1\nfi\n"
+    "echo '"
+    '{"ok":true,"command":"stub","data":{"errorCount":0,"warningCount":0,"findings":[]}}'
+    "'\nexit 0\n"
+)
+
+
+def test_audit_counts_ds_a11y_failures_shape(runner: CliRunner, fake_bin, tmp_path: Path) -> None:
+    fake_bin.make_stub("ui", _DS_A11Y_FAIL_STUB)
+    (tmp_path / "design").mkdir()
+    (tmp_path / "design" / "component-registry.json").write_text("{}")
+    (tmp_path / "design" / "ds.manifest.json").write_text("{}")
+
+    res = runner.invoke(app, ["audit", str(tmp_path), "--json"])
+    assert res.exit_code == 1  # the ds a11y section gated
+    data = json.loads(res.stdout)["data"]
+    assert data["summary"]["errors"] == 2  # 2 failures counted; unresolved NOT counted
+    sec = next(s for s in data["sections"] if s["tool"] == "ds a11y")
+    assert sec["exitCode"] == 1
+
+    res_text = runner.invoke(app, ["audit", str(tmp_path)])
+    assert "[ds a11y]" in res_text.stdout
+    assert "2 error(s)" in res_text.stdout
