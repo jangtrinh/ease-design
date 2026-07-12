@@ -52,3 +52,24 @@ jobs:
       - run: npm run typecheck --workspace=recall
       - run: npm run build --workspace=recall
       - run: npx vitest run --config recall/vitest.config.ts
+
+  # design-os is the Python umbrella CLI (the "conductor") over the deterministic `ui` kernel.
+  # It shells out to the linked binary, so `npm run build` + `npm link` must put `ui` on PATH
+  # before the uv-managed pytest suite runs (pixelshot-backed integration tests self-skip when
+  # that hand is absent). The four `ui` gates in `check` above are left exactly as they were.
+  design-os:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm link
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+        working-directory: design-os
+      - run: uv run pytest -q
+        working-directory: design-os
