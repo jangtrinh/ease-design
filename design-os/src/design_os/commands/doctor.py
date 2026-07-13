@@ -2,7 +2,7 @@
 
 Deterministic composition check (no model/network): locates the ``ui`` kernel and
 ``node`` (required) plus the optional Node/Python hands (figma-agent, recall, pixelshot,
-a11y-audit).
+a11y-audit, page-shot).
 The envelope always carries the full ``checks`` list; the top-level ``ok`` and the exit
 code both mirror health (0 healthy / 1 a required dependency is missing).
 """
@@ -107,6 +107,7 @@ def doctor(
         _check_optional("recall", versions),
         _check_optional("pixelshot", versions),
         _check_optional("a11y-audit", versions),
+        _check_optional("page-shot", versions),
     ]
     ok = all(c["found"] for c in checks if c["required"])
     data = {"checks": checks, "ok": ok}

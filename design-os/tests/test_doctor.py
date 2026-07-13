@@ -23,9 +23,11 @@ def test_doctor_healthy_json(runner: CliRunner, fake_bin) -> None:
     assert checks[0]["name"] == "ui"
     assert checks[0]["found"] is True
     assert checks[0]["version"] == "0.9.9"  # from the stub `ui --version`
-    # Optional hands (figma-agent/recall/pixelshot/a11y-audit) are absent but must not fail health.
+    # Optional hands (figma-agent/recall/pixelshot/a11y-audit/page-shot) are absent but must not fail health.
     assert env["data"]["ok"] is True
-    assert {c["name"] for c in checks} == {"ui", "node", "figma-agent", "recall", "pixelshot", "a11y-audit"}
+    assert {c["name"] for c in checks} == {
+        "ui", "node", "figma-agent", "recall", "pixelshot", "a11y-audit", "page-shot",
+    }
 
 
 def test_doctor_missing_required_node_exits_1(runner: CliRunner, fake_bin) -> None:

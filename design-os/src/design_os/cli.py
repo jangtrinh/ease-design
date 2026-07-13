@@ -19,6 +19,7 @@ from design_os import plugins
 from design_os.commands import audit as audit_cmd
 from design_os.commands import doctor as doctor_cmd
 from design_os.commands import ui_passthrough
+from design_os.commands import vr_matrix as vr_matrix_cmd
 from design_os.commands.reference import reference_app
 from design_os.envelope import err_env
 
@@ -64,6 +65,7 @@ def root() -> None:
 # raw args / unknown options reach ``ctx.args`` untouched.
 app.command(name="audit")(audit_cmd.audit)
 app.command(name="doctor")(doctor_cmd.doctor)
+app.command(name="vr-matrix")(vr_matrix_cmd.vr_matrix)
 app.command(
     name="ui",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
