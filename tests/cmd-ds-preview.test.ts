@@ -22,17 +22,17 @@ import {
 
 const PERSONA_DATA = new URL("../knowledge/personas/personas.json", import.meta.url).pathname;
 
-/** The 21 kit component names a fresh `ds init` registers (P2 + wave C). */
+/** The 27 kit component names a fresh `ds init` registers (P2 + wave C + wave D). */
 const KIT_NAMES = [
-  "Control/Button", "Control/Checkbox", "Control/Input", "Control/Radio",
-  "Control/Select", "Control/Switch", "Control/Textarea",
+  "Control/Button", "Control/Checkbox", "Control/Combobox", "Control/Input",
+  "Control/Radio", "Control/Select", "Control/Switch", "Control/Textarea",
   "Data/Table",
   "Display/Alert", "Display/Avatar", "Display/Badge", "Display/Card",
   "Display/Kbd", "Display/Progress", "Display/Separator", "Display/Skeleton",
   "Display/Toast",
   "Form/Field",
-  "Overlay/Dialog", "Overlay/Tooltip",
-  "Structure/Tabs",
+  "Overlay/Dialog", "Overlay/DropdownMenu", "Overlay/Popover", "Overlay/Tooltip",
+  "Structure/Accordion", "Structure/Breadcrumb", "Structure/Pagination", "Structure/Tabs",
 ];
 
 function capture(args: string[]): { code: number; out: string } {
@@ -79,7 +79,7 @@ describe("ui ds preview", () => {
     expect(r.code).toBe(0);
     const data = JSON.parse(r.out).data as { out: string; components: number; pairs: number; bytes: number };
     expect(data.out).toBe(join(dir, "design", "preview", "specimen.html"));
-    expect(data.components).toBe(21);
+    expect(data.components).toBe(27);
     expect(data.pairs).toBeGreaterThan(0);
     expect(data.bytes).toBeGreaterThan(0);
     expect(readFileSync(data.out).length).toBe(data.bytes); // Buffer.length = UTF-8 byte count

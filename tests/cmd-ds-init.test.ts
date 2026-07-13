@@ -220,20 +220,20 @@ describe("ui ds init — ships the component kit (P2a + P2b)", () => {
     return (JSON.parse(raw).components ?? []) as { name: string; status?: string }[];
   }
 
-  it("a fresh init registers the 21 kit components (all stable)", () => {
+  it("a fresh init registers the 27 kit components (all stable)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-init-kit-"));
     initKit(tmp);
     const comps = readComponents(tmp);
     expect(comps.map((c) => c.name)).toEqual([
-      "Control/Button", "Control/Checkbox", "Control/Input", "Control/Radio",
-      "Control/Select", "Control/Switch", "Control/Textarea",
+      "Control/Button", "Control/Checkbox", "Control/Combobox", "Control/Input",
+      "Control/Radio", "Control/Select", "Control/Switch", "Control/Textarea",
       "Data/Table",
       "Display/Alert", "Display/Avatar", "Display/Badge", "Display/Card",
       "Display/Kbd", "Display/Progress", "Display/Separator", "Display/Skeleton",
       "Display/Toast",
       "Form/Field",
-      "Overlay/Dialog", "Overlay/Tooltip",
-      "Structure/Tabs",
+      "Overlay/Dialog", "Overlay/DropdownMenu", "Overlay/Popover", "Overlay/Tooltip",
+      "Structure/Accordion", "Structure/Breadcrumb", "Structure/Pagination", "Structure/Tabs",
     ]);
     expect(comps.every((c) => c.status === "stable")).toBe(true);
   });
@@ -264,8 +264,8 @@ describe("ui ds init — ships the component kit (P2a + P2b)", () => {
     const data = JSON.parse(r.stdout).data as { errorCount: number; warningCount: number; stateful: number };
     expect(data.errorCount).toBe(0);
     expect(data.warningCount).toBe(0);
-    // 18 of the 21 declare >=1 normalized state; Avatar/Separator/Kbd are static primitives
-    // (State=Static → no normalized state) so they do not join the specimen state contract.
-    expect(data.stateful).toBe(18);
+    // 23 of the 27 declare >=1 normalized state; Avatar/Separator/Kbd/Breadcrumb are static
+    // primitives (State=Static → no normalized state) so they do not join the state contract.
+    expect(data.stateful).toBe(23);
   });
 });
