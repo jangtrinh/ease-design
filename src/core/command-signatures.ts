@@ -550,6 +550,15 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         ],
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "DS_NOT_FOUND", "BAD_JSON"],
       },
+      preview: {
+        summary: "Generate a self-contained specimen.html from the compiled tokens + registry",
+        positionals: [],
+        flags: [
+          { name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd, else discovered)" },
+          { name: "out", type: "string", summary: "Output HTML path (default: <project>/design/preview/specimen.html)" },
+        ],
+        errorCodes: ["UNKNOWN_FLAG", "DS_NOT_FOUND", "DS_TAMPERED", "BAD_MANIFEST", "WRITE_ERROR"],
+      },
     },
   },
 

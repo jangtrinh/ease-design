@@ -11,6 +11,7 @@ import { runChangeToken } from "./ds-change-token-impl.js";
 import { runStatus } from "./ds-status-impl.js";
 import { runImport } from "./ds-import-impl.js";
 import { runSpecimen } from "./ds-specimen-impl.js";
+import { runPreview } from "./ds-preview-impl.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -26,6 +27,7 @@ Usage:
   ui ds diff <base-dir> <head-dir> [--format markdown|json|pr-comment] [--base-version <v>]
   ui ds docs [--dir <project>] [--out <file>] [--format markdown|json]
   ui ds a11y [--dir <project>] [--pairs "text:surface,..."] [--json]
+  ui ds preview [--dir <project>] [--out <file>] [--json]
 
 Subcommands:
   init           Compile a project-scoped design system from a persona + intent
@@ -37,6 +39,7 @@ Subcommands:
   docs           Regenerate component reference docs from the registry (decay-proof)
   a11y           Token-pair contrast audit (text×surface ≥ AA); exit 1 on a fail. Declared pairs only — not a conformance claim.
   specimen       Report each component's variant×state matrix + applicable-state gaps (missing disabled/empty)
+  preview        Generate a self-contained specimen.html from the compiled tokens + registry
 
 'ds a11y' options:
   --dir <path>       Project directory holding design/ (default: cwd)
@@ -78,6 +81,14 @@ Subcommands:
   states. Flags only reliably-modelled gaps: missing 'disabled' on an interactive control,
   missing 'empty' on a data-family component. 'focus' is intentionally NOT required (it is
   usually a runtime :focus-visible, not a Figma variant, so requiring it would over-fire).
+
+'ds preview' options:
+  --dir <path>       Project directory holding design/ (default: cwd, else discovered)
+  --out <file>       Output HTML path (default: <project>/design/preview/specimen.html)
+  Renders the compiled design system as ONE self-contained page: :root tokens, colour
+  paired roles (each swatch renders its own declared foreground), the type ramp,
+  radius/elevation/duration chips, and one block per registered component (markup comes
+  from the registry — the only component source). Deterministic: same DS → byte-identical.
 
 'ds change-token' options:
   --value <v>        New $value for the token (required)
@@ -171,6 +182,7 @@ export const dsCommand = {
       case "docs":         return runDocs(parsed);
       case "a11y":         return runA11y(parsed);
       case "specimen":     return runSpecimen(parsed);
+      case "preview":      return runPreview(parsed);
       case undefined: {
         const msg = "ui ds requires a subcommand. Run 'ui ds --help'.";
         return parsed.json
