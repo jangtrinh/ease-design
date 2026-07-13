@@ -175,7 +175,7 @@ describe("ui init argument validation", () => {
 // ── Adapter tree integration tests ────────────────────────────────────────────
 
 describe("ui init --runtime claude adapter tree", () => {
-  it("JSON envelope data.adapters[0].paths has 23 entries", () => {
+  it("JSON envelope data.adapters[0].paths has 24 entries", () => {
     const cwd = makeTmpDir();
     const { code, out } = captureRun(["init", "--runtime", "claude", "--cwd", cwd, "--json"]);
     expect(code).toBe(0);
@@ -183,7 +183,7 @@ describe("ui init --runtime claude adapter tree", () => {
       data: { adapters: { runtime: string; paths: string[] }[] };
     };
     expect(json.data.adapters).toHaveLength(1);
-    expect(json.data.adapters[0]?.paths.length).toBe(23);
+    expect(json.data.adapters[0]?.paths.length).toBe(24);
   });
 
   it("JSON envelope data.adapters[0].paths includes the generate slash-command path", () => {

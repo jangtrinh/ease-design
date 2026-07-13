@@ -41,6 +41,41 @@ different files with the same name collide loudly rather than silently overwriti
 - `ui evidence verify` — re-check every quote against its stored source; **exit 1** on any
   fabricated or drifted quote. This is the integrity gate to run in CI.
 
+## Intake — transcript → findings (host-model flow)
+Turning a raw transcript, interview, or notes file into ledger findings is the **host model's**
+job — it already is a model, so no new binary command exists (or is needed) for the extraction.
+The `/ui:evidence <transcript-file>` workflow drives it. Per source file:
+
+1. **Read the source** and extract a *proposed list* of findings. Each is `{ kind:
+   quote|metric|observation, the exact text (a quote copied VERBATIM from the source — never
+   paraphrased or tidied), the source ref, and an optional acceptance-criterion id it grounds }`.
+2. **Show the list to the owner to confirm** before writing anything — recording a finding is a
+   claim a human stands behind (see the anti-fabrication gate above). Drop or fix any they reject.
+3. **Record each confirmed finding** with the real binary — one `add` per finding:
+   `ui evidence add --finding "…" --kind quote --quote "<verbatim>" --source <file> [--medium
+   interview] [--locator "line 42"] [--tags <criteria-id>]`.
+
+**Why this flow is fabrication-safe:** the model does not get to *assert* a quote is real. `ui
+evidence add` re-reads the ingested source and **rejects any `quote` that is not a verbatim
+substring** of it (whitespace-normalised, never lower-cased, at least `MIN_QUOTE_CHARS` = 8). An
+invented or "rounded" quote fails `add` (and later `verify`) deterministically — the ledger cannot
+launder a hallucination even if the model tries. That rejection is the whole reason to do intake
+*through* the binary instead of hand-writing JSONL.
+
+**Honesty rules for the extractor:**
+- Copy quotes byte-for-byte. If you cannot reproduce it exactly, it is not a `quote` — downgrade
+  it to an `observation`, never a "close enough" paraphrase.
+- Never derive or estimate a `metric`. Record the figure the source actually states, with its
+  `--source` (and `--metric`/`--unit`/`--n`) — cite the export, not your arithmetic.
+- An `observation` with no source is accepted but auto-flagged **`unsupported`** — context, never
+  grounding. Promote it once a real quote/metric arrives.
+
+**Loop closure with coverage (T0):** tag each finding with the criterion id it grounds
+(`--tags <criteria-id>`) so you can find it, then cite its assigned ledger id (`ev1`, `ev2`, …) in
+that criterion's `evidence: [...]`. `ui critique-coverage <spec> <manifest> --evidence-dir design
+--require-evidence` then counts the criterion as *evidenced* only when a cited id exists **and**
+verifies — closing the spine **finding → criterion evidence[] → coverage evidenced** (see below).
+
 ## Closing the loop with coverage (T0)
 `ui critique-coverage <spec> <manifest> --evidence-dir design` resolves each acceptance
 criterion's `evidence: ["ev1", …]` as **ledger ids**. A criterion counts as *evidenced* only if a

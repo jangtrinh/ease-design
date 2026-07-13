@@ -36,6 +36,7 @@ export const WORKFLOW_VERBS = [
   "audit",
   "design",
   "slides",
+  "evidence",
   "init",
 ] as const satisfies readonly string[];
 
