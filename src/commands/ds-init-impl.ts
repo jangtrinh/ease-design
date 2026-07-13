@@ -17,7 +17,8 @@ import { loadPersonaIndex, findPersona, PersonaError } from "../core/persona-loa
 import { expandPersona, ExpandError } from "../core/persona-expand.js";
 import { parseTokenFile } from "../core/token-model.js";
 import { resolveTokens } from "../core/token-resolve.js";
-import { saveRegistry } from "../core/registry-store.js";
+import { saveRegistry, registerComponent, validateComponentRecord } from "../core/registry-store.js";
+import { COMPONENT_KIT } from "../core/component-kit/index.js";
 import { countTokens } from "../core/design-system.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
@@ -27,7 +28,7 @@ const NAME_RE = /^[a-z][a-z0-9-]*$/;
 const HEX6_RE = /^#[0-9a-fA-F]{6}$/;
 
 /** Long flags `ui ds init` accepts (globals --help/--json handled separately). */
-const KNOWN_FLAGS = ["persona", "intent", "brand-hex", "dir", "force", "persona-data"] as const;
+const KNOWN_FLAGS = ["persona", "intent", "brand-hex", "dir", "force", "persona-data", "bare"] as const;
 
 export function runInit(parsed: ParsedArgs): CommandResult {
   const useJson = parsed.json;
@@ -78,6 +79,9 @@ export function runInit(parsed: ParsedArgs): CommandResult {
   const dirFlag = parsed.flags["dir"];
   const baseDir = typeof dirFlag === "string" ? resolve(dirFlag) : cwd();
   const force = parsed.flags["force"] === true;
+  // --bare keeps the registry empty (legacy behaviour). By default `ds init` ships the
+  // mature component kit so every fresh DS starts with a real, specimen-complete registry.
+  const bare = parsed.flags["bare"] === true;
 
   const personaDataFlag = parsed.flags["persona-data"];
   const personaDataPath = typeof personaDataFlag === "string" ? personaDataFlag : undefined;
@@ -137,6 +141,20 @@ export function runInit(parsed: ParsedArgs): CommandResult {
 
   const { tokens, registry } = expandResult;
 
+  // ── Register the mature component kit (unless --bare) ────────────────────────
+  //
+  // expandPersona always returns an empty registry; `ds init` is where the registry is
+  // finalised, so kit registration lives here. Each record passes real validation
+  // (validateComponentRecord) before registerComponent adds it — a malformed kit component
+  // fails loudly at init rather than silently shipping a broken DS. The manifest
+  // registryHash below is computed over this fully-populated registry.
+  let finalRegistry = registry;
+  if (!bare) {
+    for (const comp of COMPONENT_KIT) {
+      finalRegistry = registerComponent(finalRegistry, validateComponentRecord(comp), false).registry;
+    }
+  }
+
   // Safety validation: parse + resolve the generated token tree
   try {
     parseTokenFile(tokens as unknown);
@@ -163,7 +181,7 @@ export function runInit(parsed: ParsedArgs): CommandResult {
   }
 
   try {
-    saveRegistry(paths.registry, registry);
+    saveRegistry(paths.registry, finalRegistry);
   } catch (e) {
     const msg = `cannot write registry file '${paths.registry}': ${e instanceof Error ? e.message : String(e)}`;
     return useJson ? errJson(CMD, "WRITE_ERROR", msg) : errText(`ui: ${msg}\n`);
@@ -175,8 +193,8 @@ export function runInit(parsed: ParsedArgs): CommandResult {
 
   // Hash the registry as it will be saved on disk (sorted by saveRegistry)
   const sortedRegistry = {
-    version: registry.version,
-    components: [...registry.components].sort((a, b) => a.name.localeCompare(b.name)),
+    version: finalRegistry.version,
+    components: [...finalRegistry.components].sort((a, b) => a.name.localeCompare(b.name)),
   };
   const registryHash = canonicalHash(sortedRegistry);
 

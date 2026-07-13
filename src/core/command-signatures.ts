@@ -464,6 +464,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
           { name: "brand-hex", type: "string", summary: "Brand seed color (#RRGGBB)" },
           { name: "dir", type: "string", summary: "Override the project directory" },
           { name: "force", type: "boolean", summary: "Overwrite an existing DS (preserves changelog)" },
+          { name: "bare", type: "boolean", summary: "Skip the default component kit (start with an empty registry)" },
           { name: "persona-data", type: "string", summary: "Override the personas.json path (test support)" },
         ],
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "BAD_NAME", "BAD_INTENT", "BAD_BRAND_HEX", "PERSONA_NOT_FOUND", "BAD_TOKEN", "DS_EXISTS", "WRITE_ERROR"],

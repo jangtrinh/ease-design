@@ -58,6 +58,7 @@ Subcommands:
   --intent "<text>"  Plain-language design intent, max 512 chars (required)
   --brand-hex <hex>  Brand seed color (#RRGGBB)
   --force            Overwrite an existing DS (preserves changelog history)
+  --bare             Skip the default component kit (start with an empty registry)
   --persona-data <f> Override the personas.json path (test support)
   --dir <path>       Override the project directory
 

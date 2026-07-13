@@ -30,13 +30,14 @@ function capture(args: string[]): { exitCode: number; stdout: string; stderr: st
   return { exitCode, stdout, stderr };
 }
 
-function initDs(tmp: string) {
+function initDs(tmp: string, bare = false) {
   capture([
     "ds", "init", "acme",
     "--persona", "liquid-glass",
     "--intent", "test",
     "--dir", tmp,
     "--persona-data", PERSONA_DATA,
+    ...(bare ? ["--bare"] : []),
   ]);
 }
 
@@ -45,7 +46,7 @@ function initDs(tmp: string) {
 describe("ui ds status", () => {
   it("returns name, generation, persona, and token/component counts", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-status-"));
-    initDs(tmp);
+    initDs(tmp, true); // --bare: assert the empty-registry count mechanism
     const r = capture(["ds", "status", "--dir", tmp, "--json"]);
     expect(r.exitCode).toBe(0);
     const data = JSON.parse(r.stdout).data;
@@ -68,7 +69,7 @@ describe("ui ds status", () => {
 
   it("statusBreakdown is all-zero and text has no status suffix on an empty registry", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-status-empty-breakdown-"));
-    initDs(tmp);
+    initDs(tmp, true); // --bare: empty registry
     const rJson = capture(["ds", "status", "--dir", tmp, "--json"]);
     const data = JSON.parse(rJson.stdout).data;
     expect(data.statusBreakdown).toEqual({ stable: 0, beta: 0, draft: 0, unset: 0 });

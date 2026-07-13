@@ -203,3 +203,60 @@ describe("ui ds init", () => {
     expect(envelope.error.code).toBe("BAD_INTENT");
   });
 });
+
+// ─── ds init — ships the mature component kit (P2a) ────────────────────────────
+
+describe("ui ds init — ships the component kit (P2a)", () => {
+  function initKit(tmp: string, bare = false): void {
+    capture([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "test",
+      "--dir", tmp, "--persona-data", PERSONA_DATA,
+      ...(bare ? ["--bare"] : []),
+    ]);
+  }
+  function readComponents(tmp: string): { name: string; status?: string }[] {
+    const raw = readFileSync(join(tmp, "design", "component-registry.json"), "utf8");
+    return (JSON.parse(raw).components ?? []) as { name: string; status?: string }[];
+  }
+
+  it("a fresh init registers the 7 Control components (all stable)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-init-kit-"));
+    initKit(tmp);
+    const comps = readComponents(tmp);
+    expect(comps.map((c) => c.name)).toEqual([
+      "Control/Button", "Control/Checkbox", "Control/Input", "Control/Radio",
+      "Control/Select", "Control/Switch", "Control/Textarea",
+    ]);
+    expect(comps.every((c) => c.status === "stable")).toBe(true);
+  });
+
+  it("--bare keeps the registry empty (legacy behaviour)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-init-bare-"));
+    initKit(tmp, true);
+    expect(readComponents(tmp)).toHaveLength(0);
+  });
+
+  it("manifest registryHash reflects the kit-populated registry on disk", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-init-kithash-"));
+    const r = capture([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "test",
+      "--dir", tmp, "--persona-data", PERSONA_DATA, "--json",
+    ]);
+    const data = JSON.parse(r.stdout).data;
+    const regRaw = readFileSync(join(tmp, "design", "component-registry.json"), "utf8");
+    expect(data.registryHash).toBe(canonicalHash(JSON.parse(regRaw)));
+  });
+
+  it("a freshly compiled DS passes 'ds specimen --strict' with 0 errors and 0 warnings", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-init-spec-"));
+    initKit(tmp);
+    const r = capture(["ds", "specimen", "--dir", tmp, "--strict", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout).data as { errorCount: number; warningCount: number; stateful: number };
+    expect(data.errorCount).toBe(0);
+    expect(data.warningCount).toBe(0);
+    expect(data.stateful).toBe(7);
+  });
+});

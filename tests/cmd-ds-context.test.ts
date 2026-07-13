@@ -29,13 +29,14 @@ function capture(args: string[]): { exitCode: number; stdout: string; stderr: st
   return { exitCode, stdout, stderr };
 }
 
-function initDs(tmp: string) {
+function initDs(tmp: string, bare = false) {
   capture([
     "ds", "init", "acme",
     "--persona", "liquid-glass",
     "--intent", "landing for a gym",
     "--dir", tmp,
     "--persona-data", PERSONA_DATA,
+    ...(bare ? ["--bare"] : []),
   ]);
 }
 
@@ -53,7 +54,7 @@ describe("ui ds context", () => {
 
   it("--format json returns structured object with semantic tokens", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-"));
-    initDs(tmp);
+    initDs(tmp, true); // --bare: keep the registry empty so this test stays focused on tokens
     const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
     expect(r.exitCode).toBe(0);
     const ctx = JSON.parse(r.stdout).data;

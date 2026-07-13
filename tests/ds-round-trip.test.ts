@@ -35,13 +35,14 @@ describe("DS round-trip", () => {
   it("init → context → registry add → DS_TAMPERED (registry hash mismatch)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-rt-"));
 
-    // 1. init
+    // 1. init (--bare: this test asserts an empty registry, then registers one component)
     let r = capture([
       "ds", "init", "acme",
       "--persona", "liquid-glass",
       "--intent", "landing for a gym",
       "--dir", tmp,
       "--persona-data", PERSONA_DATA,
+      "--bare",
       "--json",
     ]);
     expect(r.exitCode).toBe(0);
