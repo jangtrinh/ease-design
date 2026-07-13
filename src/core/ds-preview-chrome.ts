@@ -64,6 +64,9 @@ section { margin-top: 64px; }
 }
 .ui-specimen__frame { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-card); padding: var(--space-6); }
 
+/* Motion floor (taste-rubric): every animated fragment stops under reduced-motion. */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
 /* Footer */
 .foot { margin-top: 72px; border-top: 1px solid var(--color-border); padding-top: 16px; }
 .foot code { font-family: ui-monospace, Menlo, monospace; }

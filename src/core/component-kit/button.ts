@@ -38,6 +38,8 @@ const markup = `<div class="ui-kit ui-btn">
       animation: ui-btn-spin var(--duration-slow) linear infinite;
     }
     @keyframes ui-btn-spin { to { transform: rotate(360deg); } }
+    /* Motion floor: the spinner is decorative — it must stop for reduced-motion users. */
+    @media (prefers-reduced-motion: reduce) { .ui-btn__spin { animation: none; } }
   </style>
   <div class="ui-btn__row">
     <span class="ui-btn__cap">Primary</span>

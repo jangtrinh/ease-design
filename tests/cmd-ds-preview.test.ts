@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { run } from "../src/cli.js";
 import { lintLayout } from "../src/core/layout-lint.js";
 import { lintA11y } from "../src/core/a11y-lint.js";
+import { lintTaste } from "../src/core/taste-lint.js";
 import {
   checkLoremIpsum, checkPlaceholderCopy, checkClickHereLink, checkErrorCodeAlone,
   checkExclamationOverload, checkInsensitiveTerms, checkPluralSHack, checkTextInImage, checkAllCapsShout,
@@ -95,6 +96,9 @@ describe("ui ds preview", () => {
     expect(lintLayout(html).errorCount, "layout errors").toBe(0);
     expect(lintA11y(html).errorCount, "a11y errors").toBe(0);
     expect(contentErrors(html), "content errors").toBe(0);
+    // Dogfood: the first real-DS preview shipped an unguarded spinner animation — taste-lint
+    // (animation-no-reduced-motion) is part of the generated page's own gate from now on.
+    expect(lintTaste(html).errorCount, "taste errors").toBe(0);
   });
 
   it("is deterministic: two runs of the same DS are byte-identical", () => {
