@@ -30,6 +30,7 @@
     "templates"
   ],
   "workspaces": [
+    "a11y",
     "figma-agent",
     "recall"
   ],

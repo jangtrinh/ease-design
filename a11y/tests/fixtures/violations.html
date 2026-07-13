@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Violations fixture</title>
+</head>
+<body>
+  <main>
+    <h1>Rendered-only violations</h1>
+    <!-- image-alt (wcag2a): an informative image with no alt text. -->
+    <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">
+    <!-- color-contrast (wcag2aa): light grey text on white computes to ~1.6:1, below AA. -->
+    <p style="color:#bbbbbb;background-color:#ffffff;">
+      This paragraph has insufficient colour contrast for WCAG AA and can only be caught
+      once the page is actually rendered and its computed styles resolved.
+    </p>
+  </main>
+</body>
+</html>

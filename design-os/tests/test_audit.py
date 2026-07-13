@@ -70,6 +70,23 @@ case "$1" in
 esac
 """
 
+# ── Axe hand stub: the tier-2 `a11y-audit` binary. Invoked as `a11y-audit <file> --json`; emits
+# the VERBATIM axe envelope ({pages:[{violationCount,…}], totals}) and exits 1 (a violation gates). ──
+_AXE_STUB = (
+    "printf '%s\\n' '"
+    '{"ok":true,"command":"a11y-audit","data":{"pages":[{"target":"f",'
+    '"violations":[{"id":"color-contrast","impact":"serious",'
+    '"help":"Elements must meet minimum color contrast ratio thresholds",'
+    '"helpUrl":"https://x/color-contrast","nodes":2,"sample":"p"}],'
+    '"violationCount":1,"passCount":6,"incompleteCount":0}],'
+    '"totals":{"violations":1,"pages":1},"axeVersion":"4.12.1"}}'
+    "'\nexit 1\n"
+)
+
+# Axe timeout stub: hangs so a test can force the degrade path. `/bin/sleep` by ABSOLUTE path
+# because the fake_bin PATH sandbox holds only the stubs (a bare `sleep` would be unresolved).
+_AXE_TIMEOUT_STUB = "/bin/sleep 5\n"
+
 _MINIMAL_HTML = "<!doctype html><html lang=en><head><title>t</title></head><body><p>hi</p></body></html>\n"
 
 
@@ -279,3 +296,61 @@ def test_audit_counts_ds_a11y_failures_shape(runner: CliRunner, fake_bin, tmp_pa
     res_text = runner.invoke(app, ["audit", str(tmp_path)])
     assert "[ds a11y]" in res_text.stdout
     assert "2 error(s)" in res_text.stdout
+
+
+# ── Axe tier-2 (a11y-audit hand): present → one `axe` section per file, envelope verbatim,
+# violationCount folds into the summary as errors. ──
+def test_audit_includes_axe_section_when_hand_present(runner: CliRunner, fake_bin, tmp_path: Path) -> None:
+    fake_bin.make_stub("ui", _AUDIT_UI_STUB)
+    fake_bin.make_stub("a11y-audit", _AXE_STUB)
+    page = _write_html(tmp_path / "page.html")
+
+    res = runner.invoke(app, ["audit", str(page), "--json"])
+    assert res.exit_code == 1
+    data = json.loads(res.stdout)["data"]
+    # The axe section comes AFTER the four per-file linters, for the one file.
+    assert [s["tool"] for s in data["sections"]] == [*audit_mod.PER_FILE_LINTERS, "axe"]
+    axe = next(s for s in data["sections"] if s["tool"] == "axe")
+    assert axe["exitCode"] == 1
+    # Envelope carried VERBATIM (contract §1: not re-normalised).
+    assert axe["envelope"]["command"] == "a11y-audit"
+    assert axe["envelope"]["data"]["pages"][0]["violations"][0]["id"] == "color-contrast"
+    assert axe["envelope"]["data"]["totals"]["violations"] == 1
+    # 1 a11y-lint error (from the ui stub) + 1 axe violation → summary errors == 2, 5 tool-runs.
+    assert data["summary"] == {"toolsRun": 5, "toolsFailed": 0, "errors": 2, "warnings": 0}
+
+    res_text = runner.invoke(app, ["audit", str(page)])
+    assert any(line.startswith("[axe]") and "1 error(s)" in line for line in res_text.stdout.splitlines())
+
+
+# ── Absent hand → no axe section; the existing report is byte-for-byte unaffected. ──
+def test_audit_no_axe_section_when_hand_absent(runner: CliRunner, fake_bin, tmp_path: Path) -> None:
+    fake_bin.make_stub("ui", _AUDIT_UI_STUB)
+    fake_bin.remove("a11y-audit")  # PATH sandbox no longer resolves it; env override is unset
+    page = _write_html(tmp_path / "page.html")
+
+    res = runner.invoke(app, ["audit", str(page), "--json"])
+    tools = [s["tool"] for s in json.loads(res.stdout)["data"]["sections"]]
+    assert "axe" not in tools
+    assert tools == list(audit_mod.PER_FILE_LINTERS)
+
+
+# ── A hanging axe hand degrades to a TIMEOUT section (exitCode -1) and the audit continues. ──
+def test_audit_axe_section_timeout_degrades(
+    runner: CliRunner, fake_bin, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_bin.make_stub("ui", _AUDIT_UI_STUB)
+    fake_bin.make_stub("a11y-audit", _AXE_TIMEOUT_STUB)
+    monkeypatch.setattr(audit_mod, "AUDIT_TIMEOUT", 1.0)  # fast linters finish; the axe sleep(5) times out
+    page = _write_html(tmp_path / "page.html")
+
+    res = runner.invoke(app, ["audit", str(page), "--json"])
+    assert res.exit_code == 1
+    data = json.loads(res.stdout)["data"]
+    axe = next(s for s in data["sections"] if s["tool"] == "axe")
+    assert axe["exitCode"] == -1
+    assert axe["envelope"]["ok"] is False
+    assert axe["envelope"]["error"]["code"] == "TIMEOUT"
+    assert data["summary"]["toolsFailed"] >= 1
+    # The static linters still ran either side of the timed-out hand.
+    assert any(s["tool"] == "a11y-lint" and s["exitCode"] == 1 for s in data["sections"])

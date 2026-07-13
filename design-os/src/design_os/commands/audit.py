@@ -1,8 +1,9 @@
 """``design-os audit <target> [--json] [--dir <project>]`` — compose the `ui` linter chain.
 
 T1 / dogfood round 2 (proposal.md §Phasing). ``audit`` resolves ``target`` to a set of HTML
-files, runs the four per-file ``ui`` linters over each, adds the DS + flow checks when a
-project design surface is present, and MERGES every kernel envelope into one report.
+files, runs the four per-file ``ui`` linters over each, adds an optional tier-2 rendered
+``axe`` section per file when the ``a11y-audit`` hand is present, adds the DS + flow checks
+when a project design surface is present, and MERGES every kernel envelope into one report.
 
 Contract §1 (proposal.md): audit NEVER reimplements a check — each section carries the
 kernel's own envelope VERBATIM; audit only shells out and tallies. The exit code trusts the
@@ -12,6 +13,7 @@ True — the command RAN; ``ok:false`` is reserved for audit itself failing).
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -20,7 +22,7 @@ from typing import Annotated, Any
 import typer
 
 from design_os.envelope import JsonFlag, emit, err_env, ok_env
-from design_os.kernel import KernelNotFound, resolve_ui, run_ui
+from design_os.kernel import KernelNotFound, resolve_bin, resolve_ui, run_ui
 
 _COMMAND = "audit"
 
@@ -87,6 +89,37 @@ def _section(tool: str, target_display: str, args: list[str]) -> dict[str, Any]:
     }
 
 
+def _axe_section(axe_bin: str, path: Path, target_display: str) -> dict[str, Any]:
+    """Shell out to the ``a11y-audit`` hand for one file; wrap its VERBATIM envelope as a section.
+
+    Same degrade contract as :func:`_section`: a timeout becomes a synthetic ``TIMEOUT`` error
+    envelope with ``exitCode -1`` so the audit keeps going. The hand's envelope is carried
+    verbatim (contract §1) — audit only shells out and tallies, never re-normalises. The binary
+    is a DIFFERENT hand than ``ui`` (rendered tier, needs a browser), so it is shelled directly
+    rather than through :func:`run_ui`.
+    """
+    try:
+        proc = subprocess.run(  # noqa: S603 - axe_bin is a resolved path; path is caller-controlled
+            [axe_bin, str(path), "--json"],
+            capture_output=True,
+            text=True,
+            timeout=AUDIT_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "tool": "axe",
+            "target": target_display,
+            "exitCode": -1,
+            "envelope": err_env("axe", "TIMEOUT", f"`a11y-audit` exceeded {AUDIT_TIMEOUT}s"),
+        }
+    try:
+        parsed: Any = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        parsed = None
+    envelope = parsed if isinstance(parsed, dict) else None
+    return {"tool": "axe", "target": target_display, "exitCode": proc.returncode, "envelope": envelope}
+
+
 def _count(envelope: dict[str, Any] | None) -> tuple[int, int]:
     """Return ``(errors, warnings)`` for one kernel envelope.
 
@@ -112,6 +145,12 @@ def _count(envelope: dict[str, Any] | None) -> tuple[int, int]:
     failures = data.get("failures")
     if isinstance(failures, list):
         return (len(failures), 0)
+    # axe shape (a11y-audit): {pages:[{violationCount, ...}], totals} — no count keys, no
+    # findings. Each violation is an error (it is what gates the hand's exit); `incompleteCount`
+    # is axe's couldn't-decide bucket, not a violation → count nothing for it (mirrors L6).
+    pages = data.get("pages")
+    if isinstance(pages, list):
+        return (sum(int(p.get("violationCount", 0)) for p in pages if isinstance(p, dict)), 0)
     return (0, 0)
 
 
@@ -159,11 +198,16 @@ def _build_audit(target: Path, dir_: Path | None) -> tuple[list[dict[str, Any]],
     if resolve_ui() is None:
         raise KernelNotFound(_KERNEL_MISSING_MSG)
     files = _html_files(target)
+    # Tier-2 rendered a11y hand (axe-core over a browser) — OPTIONAL. Resolved once; when absent
+    # no `axe` section is emitted at all (silent degrade), leaving the existing report untouched.
+    axe_bin = resolve_bin("a11y-audit", "DESIGN_OS_A11Y_AUDIT_BIN")
     sections: list[dict[str, Any]] = []
     for f in files:
         disp = _display(f)
         for tool in PER_FILE_LINTERS:
             sections.append(_section(tool, disp, [tool, str(f)]))
+        if axe_bin is not None:
+            sections.append(_axe_section(axe_bin, f, disp))
     dsdir = _ds_dir(target, dir_)
     if dsdir is not None:
         sections.extend(_ds_and_flow_sections(dsdir))

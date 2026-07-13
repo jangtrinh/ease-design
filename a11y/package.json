@@ -1,0 +1,28 @@
+{
+  "name": "a11y",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tier-2 RENDERED accessibility audit — runs axe-core over live pages via Playwright (system Chrome via channel:chrome, no browser download). The optional a11y 'hands'; the deterministic `ui` binary never imports this workspace and stays browser-free. A clean run is NOT a conformance claim — manual criteria always remain.",
+  "bin": {
+    "a11y-audit": "cli/dist/a11y-audit.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p cli --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "playwright": "^1.61.1"
+  }
+}
