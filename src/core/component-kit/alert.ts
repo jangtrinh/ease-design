@@ -50,7 +50,7 @@ const markup = `<div class="ui-kit ui-alert">
     <span class="ui-alert__dot" aria-hidden="true"></span>
     <div class="ui-alert__text">
       <p class="ui-alert__title">Design system compiled</p>
-      <p class="ui-alert__body">14 components registered and specimen-checked.</p>
+      <p class="ui-alert__body">21 components registered and specimen-checked.</p>
     </div>
     <button type="button" class="ui-alert__action">Details</button>
   </div>

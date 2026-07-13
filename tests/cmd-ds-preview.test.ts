@@ -22,12 +22,17 @@ import {
 
 const PERSONA_DATA = new URL("../knowledge/personas/personas.json", import.meta.url).pathname;
 
-/** The 14 kit component names a fresh `ds init` registers (P2). */
+/** The 21 kit component names a fresh `ds init` registers (P2 + wave C). */
 const KIT_NAMES = [
   "Control/Button", "Control/Checkbox", "Control/Input", "Control/Radio",
   "Control/Select", "Control/Switch", "Control/Textarea",
-  "Data/Table", "Display/Alert", "Display/Badge", "Display/Card",
-  "Form/Field", "Overlay/Dialog", "Structure/Tabs",
+  "Data/Table",
+  "Display/Alert", "Display/Avatar", "Display/Badge", "Display/Card",
+  "Display/Kbd", "Display/Progress", "Display/Separator", "Display/Skeleton",
+  "Display/Toast",
+  "Form/Field",
+  "Overlay/Dialog", "Overlay/Tooltip",
+  "Structure/Tabs",
 ];
 
 function capture(args: string[]): { code: number; out: string } {
@@ -74,7 +79,7 @@ describe("ui ds preview", () => {
     expect(r.code).toBe(0);
     const data = JSON.parse(r.out).data as { out: string; components: number; pairs: number; bytes: number };
     expect(data.out).toBe(join(dir, "design", "preview", "specimen.html"));
-    expect(data.components).toBe(14);
+    expect(data.components).toBe(21);
     expect(data.pairs).toBeGreaterThan(0);
     expect(data.bytes).toBeGreaterThan(0);
     expect(readFileSync(data.out).length).toBe(data.bytes); // Buffer.length = UTF-8 byte count

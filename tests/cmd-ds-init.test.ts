@@ -220,15 +220,20 @@ describe("ui ds init — ships the component kit (P2a + P2b)", () => {
     return (JSON.parse(raw).components ?? []) as { name: string; status?: string }[];
   }
 
-  it("a fresh init registers the 14 kit components (all stable)", () => {
+  it("a fresh init registers the 21 kit components (all stable)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-init-kit-"));
     initKit(tmp);
     const comps = readComponents(tmp);
     expect(comps.map((c) => c.name)).toEqual([
       "Control/Button", "Control/Checkbox", "Control/Input", "Control/Radio",
       "Control/Select", "Control/Switch", "Control/Textarea",
-      "Data/Table", "Display/Alert", "Display/Badge", "Display/Card",
-      "Form/Field", "Overlay/Dialog", "Structure/Tabs",
+      "Data/Table",
+      "Display/Alert", "Display/Avatar", "Display/Badge", "Display/Card",
+      "Display/Kbd", "Display/Progress", "Display/Separator", "Display/Skeleton",
+      "Display/Toast",
+      "Form/Field",
+      "Overlay/Dialog", "Overlay/Tooltip",
+      "Structure/Tabs",
     ]);
     expect(comps.every((c) => c.status === "stable")).toBe(true);
   });
@@ -259,6 +264,8 @@ describe("ui ds init — ships the component kit (P2a + P2b)", () => {
     const data = JSON.parse(r.stdout).data as { errorCount: number; warningCount: number; stateful: number };
     expect(data.errorCount).toBe(0);
     expect(data.warningCount).toBe(0);
-    expect(data.stateful).toBe(14);
+    // 18 of the 21 declare >=1 normalized state; Avatar/Separator/Kbd are static primitives
+    // (State=Static → no normalized state) so they do not join the specimen state contract.
+    expect(data.stateful).toBe(18);
   });
 });

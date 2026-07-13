@@ -1,6 +1,6 @@
 /**
- * Component-kit (P2a wave A + P2b wave B) — the 14 components `ds init` registers into every
- * fresh design system. Verifies the kit's structural contract (validity, shape), markup
+ * Component-kit (P2a wave A + P2b wave B + P2c wave C) — the 21 components `ds init` registers
+ * into every fresh design system. Verifies the kit's structural contract (validity, shape), markup
  * hygiene (semantic vars only, every var real, tokensUsed correlated), and the a11y
  * wrap-lint. The specimen 0/0 contract + the `ds init` count are E2E'd in cmd-ds-init.
  */
@@ -40,15 +40,20 @@ function varsUsed(markup: string): Set<string> {
 // ─── Structural contract ───────────────────────────────────────────────────────
 
 describe("component-kit — records", () => {
-  it("ships exactly 14 kit components, name-sorted, all stable", () => {
-    expect(COMPONENT_KIT).toHaveLength(14);
+  it("ships exactly 21 kit components, name-sorted, all stable", () => {
+    expect(COMPONENT_KIT).toHaveLength(21);
     const names = COMPONENT_KIT.map((c) => c.name);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
     expect(names).toEqual([
       "Control/Button", "Control/Checkbox", "Control/Input", "Control/Radio",
       "Control/Select", "Control/Switch", "Control/Textarea",
-      "Data/Table", "Display/Alert", "Display/Badge", "Display/Card",
-      "Form/Field", "Overlay/Dialog", "Structure/Tabs",
+      "Data/Table",
+      "Display/Alert", "Display/Avatar", "Display/Badge", "Display/Card",
+      "Display/Kbd", "Display/Progress", "Display/Separator", "Display/Skeleton",
+      "Display/Toast",
+      "Form/Field",
+      "Overlay/Dialog", "Overlay/Tooltip",
+      "Structure/Tabs",
     ]);
     for (const c of COMPONENT_KIT) expect(c.status, c.name).toBe("stable");
   });
