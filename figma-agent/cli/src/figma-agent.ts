@@ -2,6 +2,7 @@
 // Hidden subcommand `__broker` runs the persistent relay daemon in-process.
 // Every visible command prints exactly ONE JSON object and exits 0/1.
 import { runBrokerDaemon } from './transport/broker-daemon.ts';
+import { parseArgs, type CommandArgs } from './arg-parse.ts';
 import { CliError } from './transport/protocol-helpers.ts';
 import { printErrorJson, printJson } from './util/json-out.ts';
 import * as batch from './commands/batch.ts';
@@ -23,54 +24,8 @@ import * as setText from './commands/set-text.ts';
 import * as setVariant from './commands/set-variant.ts';
 import * as status from './commands/status.ts';
 
-/** Parsed argv handed to every command (type-only import from command files). */
-export interface CommandArgs {
-  positionals: string[];
-  str(name: string): string | undefined;
-  req(name: string): string;
-  num(name: string): number | undefined;
-  bool(name: string): boolean;
-}
-
-export function parseArgs(argv: string[]): CommandArgs {
-  const flags: Record<string, string | true> = {};
-  const positionals: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (!arg.startsWith('--')) {
-      positionals.push(arg);
-      continue;
-    }
-    const body = arg.slice(2);
-    const eq = body.indexOf('=');
-    if (eq >= 0) flags[body.slice(0, eq)] = body.slice(eq + 1);
-    else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) flags[body] = argv[++i];
-    else flags[body] = true;
-  }
-  const str = (name: string): string | undefined => {
-    const value = flags[name];
-    return value === undefined || value === true ? undefined : value;
-  };
-  return {
-    positionals,
-    str,
-    req(name) {
-      const value = str(name);
-      if (value === undefined) throw new CliError('E_INVALID_ARGS', `missing required --${name}`);
-      return value;
-    },
-    num(name) {
-      const value = str(name);
-      if (value === undefined) return undefined;
-      const parsed = Number(value);
-      if (Number.isNaN(parsed)) throw new CliError('E_INVALID_ARGS', `--${name} must be a number, got "${value}"`);
-      return parsed;
-    },
-    bool(name) {
-      return flags[name] !== undefined && flags[name] !== 'false';
-    },
-  };
-}
+// Re-exported so command files keep `import type { CommandArgs } from '../figma-agent.ts'`.
+export type { CommandArgs } from './arg-parse.ts';
 
 const COMMAND_MODULES: Record<string, { run(args: CommandArgs): Promise<unknown> }> = {
   status,
@@ -101,8 +56,8 @@ Commands:
   status               Broker + plugin connection info
   seat                 Probe seat → {seat, bridge, reason} [--seat free|paid skips the probe]
   get-selection        Serialize the current selection [--depth 1]
-  scan-design-system   Components/variables/styles registry [--out file.json]
-  scan-conventions     Convention-DNA walk over sections → usage-dna.json [<sectionId...> --out file.json --budget 14000]
+  scan-design-system   Components/variables/styles registry [--out file.json --timeout ms]
+  scan-conventions     Convention-DNA walk over sections → usage-dna.json [<sectionId...> --out file.json --budget 14000 --timeout ms]
   create-frame         --name n --w 400 --h 300 [--parent id --x 0 --y 0]
   create-instance      --component <key|id> [--parent id]
   set-variant          --node id --props k=v,k2=v2

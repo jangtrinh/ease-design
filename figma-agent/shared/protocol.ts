@@ -64,8 +64,12 @@ export interface ReplyErr {
 export type ReplyMsg = ReplyOk | ReplyErr;
 
 // Unsolicited broadcasts (no `id`).
+// PING/PONG are the APPLICATION-level heartbeat: the plugin iframe runs a browser
+// WebSocket, whose API does NOT expose protocol-level ping() to JS — so the plugin
+// cannot detect a half-open socket via WS control frames. It sends {type:'PING'}
+// JSON frames and the broker answers {type:'PONG'}; a missed PONG ⇒ socket dead.
 export interface EventMsg {
-  type: 'BROKER_HELLO' | 'PLUGIN_HELLO' | 'FILE_INFO' | 'PLUGIN_GONE';
+  type: 'BROKER_HELLO' | 'PLUGIN_HELLO' | 'FILE_INFO' | 'PLUGIN_GONE' | 'PING' | 'PONG';
   data: Record<string, unknown>;
 }
 
@@ -103,10 +107,110 @@ export const COMMAND_TIMEOUTS: Partial<Record<CommandName, number>> = {
 export const EXEC_JS_MAX_TIMEOUT_MS = 120_000;
 
 // Broker lifecycle
-export const HEARTBEAT_INTERVAL_MS = 30_000;
+export const HEARTBEAT_INTERVAL_MS = 30_000; // broker WS-ping + advertisement refresh
 export const HEARTBEAT_STALE_MS = 90_000;
-export const BROKER_IDLE_SHUTDOWN_MS = 30 * 60_000; // no plugin AND no CLI
+export const BROKER_IDLE_SHUTDOWN_MS = 30 * 60_000; // no plugin AND no CLI (env-overridable in broker)
+
+// ── Application-level heartbeat (plugin ⇄ broker) ───────────────────
+// The plugin sends a PING every INTERVAL; if no PONG arrives within TIMEOUT the
+// plugin treats the socket as dead and re-enters its reconnect loop. TIMEOUT is
+// ~2.5 missed pings so one dropped frame never triggers a false reconnect.
+export const PLUGIN_HEARTBEAT_INTERVAL_MS = 10_000;
+export const PLUGIN_PONG_TIMEOUT_MS = 25_000;
+
+// ── Plugin reconnect backoff (plugin side, exponential + jitter) ────
+export const RECONNECT_BACKOFF_MIN_MS = 500;
+export const RECONNECT_BACKOFF_MAX_MS = 8_000;
+export const RECONNECT_JITTER = 0.25;
+
+// Broker holds a request for a not-yet-connected plugin up to this long before
+// answering E_NO_PLUGIN. Closes the respawn↔reconnect race: a CLI call that just
+// spawned a fresh broker waits (bounded) for the plugin's reconnect loop to land,
+// instead of failing instantly. Kept below DEFAULT_TIMEOUT_MS so the CLI's own
+// timeout never fires first. STATUS is exempt (it must report "disconnected" fast).
+export const PLUGIN_WAIT_MS = 12_000;
 
 export function makeRequestId(counter: number): string {
   return `c_${counter}_${Date.now()}`;
+}
+
+// ── Connection state machine (single source of truth) ───────────────
+// The plugin drives this: disconnected → probing → handshake → connected, and
+// back to disconnected on any socket loss. The plugin posts each transition to
+// its own UI as a ConnectionStatePayload (see makeStatePayload) — the P2 panel
+// redesign consumes exactly that shape via the `figma-agent:conn-state`
+// CustomEvent, so this interface is the contract between the relay and the UI.
+export type ConnectionState = 'disconnected' | 'probing' | 'handshake' | 'connected';
+
+export type ConnectionEvent = 'PROBE' | 'FOUND' | 'READY' | 'LOST';
+
+/** Pure transition function for the connection state machine (unit-testable). */
+export function reduceConnState(current: ConnectionState, event: ConnectionEvent): ConnectionState {
+  switch (event) {
+    case 'LOST': return 'disconnected';
+    case 'PROBE': return 'probing';
+    case 'FOUND': return current === 'probing' ? 'handshake' : current;
+    case 'READY': return current === 'handshake' ? 'connected' : current;
+    default: return current;
+  }
+}
+
+/** The postMessage/CustomEvent payload the plugin UI (P2) renders. */
+export interface ConnectionStatePayload {
+  type: 'CONN_STATE';
+  state: ConnectionState;
+  /** Timestamp (ms) this state was entered — the UI shows an age from it. */
+  since: number;
+  /** Short human hint for the current state (e.g. which port is being probed). */
+  detail?: string;
+  /** Broker WS url, present from `handshake` onward. */
+  brokerUrl?: string;
+  /** Broker port, present from `handshake` onward. */
+  port?: number;
+  /** ms since the last broker PONG, present while `connected`. */
+  lastPongAge?: number;
+  protocolVersion: number;
+}
+
+/** Build a ConnectionStatePayload with the protocol version stamped in (pure). */
+export function makeStatePayload(
+  state: ConnectionState,
+  extra: Partial<Omit<ConnectionStatePayload, 'type' | 'state' | 'protocolVersion'>> = {},
+): ConnectionStatePayload {
+  return {
+    type: 'CONN_STATE',
+    state,
+    since: extra.since ?? Date.now(),
+    protocolVersion: PROTOCOL_VERSION,
+    ...extra,
+  };
+}
+
+// ── Reconnect backoff (pure, deterministic with an injected rand) ───
+export interface BackoffOpts {
+  minMs: number;
+  maxMs: number;
+  /** Growth multiplier per step (default 2). */
+  factor?: number;
+  /** Fractional jitter added on top of the base (default RECONNECT_JITTER). */
+  jitter?: number;
+}
+
+/**
+ * Compute the next backoff step. `base` grows deterministically (minMs, then
+ * ×factor each call, capped at maxMs) so callers store it for the next step;
+ * `delay` is `base` plus up to `jitter·base` of randomness (via the injected
+ * `rand`, default Math.random) so a fleet of plugins never reconnect in lockstep.
+ * A successful connect resets by passing base 0 next time (→ minMs).
+ */
+export function nextBackoff(
+  prevBase: number,
+  opts: BackoffOpts,
+  rand: () => number = Math.random,
+): { base: number; delay: number } {
+  const factor = opts.factor ?? 2;
+  const jitter = opts.jitter ?? RECONNECT_JITTER;
+  const base = prevBase < opts.minMs ? opts.minMs : Math.min(prevBase * factor, opts.maxMs);
+  const delay = Math.round(base + base * jitter * rand());
+  return { base, delay };
 }

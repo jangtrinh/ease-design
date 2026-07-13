@@ -16,6 +16,41 @@
   var PORT_RANGE_END = 9419;
   var CHUNK_LIMIT = 512 * 1024;
   var BROKER_IDLE_SHUTDOWN_MS = 30 * 6e4;
+  var PLUGIN_HEARTBEAT_INTERVAL_MS = 1e4;
+  var PLUGIN_PONG_TIMEOUT_MS = 25e3;
+  var RECONNECT_BACKOFF_MIN_MS = 500;
+  var RECONNECT_BACKOFF_MAX_MS = 8e3;
+  var RECONNECT_JITTER = 0.25;
+  function reduceConnState(current, event) {
+    switch (event) {
+      case "LOST":
+        return "disconnected";
+      case "PROBE":
+        return "probing";
+      case "FOUND":
+        return current === "probing" ? "handshake" : current;
+      case "READY":
+        return current === "handshake" ? "connected" : current;
+      default:
+        return current;
+    }
+  }
+  function makeStatePayload(state, extra = {}) {
+    return {
+      type: "CONN_STATE",
+      state,
+      since: extra.since ?? Date.now(),
+      protocolVersion: PROTOCOL_VERSION,
+      ...extra
+    };
+  }
+  function nextBackoff(prevBase, opts, rand = Math.random) {
+    const factor = opts.factor ?? 2;
+    const jitter = opts.jitter ?? RECONNECT_JITTER;
+    const base = prevBase < opts.minMs ? opts.minMs : Math.min(prevBase * factor, opts.maxMs);
+    const delay = Math.round(base + base * jitter * rand());
+    return { base, delay };
+  }
 
   // plugin/src/ui/converter/color-utils.ts
   var NAMED_COLORS = {
@@ -1418,20 +1453,46 @@
 
   // plugin/src/ui/ui-relay.ts
   var PLUGIN_VERSION = "0.1.0";
-  var PORT_PROBE_TIMEOUT_MS = 2500;
-  var RECONNECT_BACKOFF_MAX_MS = 15e3;
+  var PORT_PROBE_TIMEOUT_MS = 1200;
+  var BACKOFF_OPTS = { minMs: RECONNECT_BACKOFF_MIN_MS, maxMs: RECONNECT_BACKOFF_MAX_MS };
   var ws = null;
-  var reconnectBackoffMs = 1e3;
+  var backoffBase = 0;
+  var heartbeatTimer = null;
+  var lastPongAt = 0;
+  var connState = "disconnected";
   var fileInfo = {};
   var chunkBuffers = /* @__PURE__ */ new Map();
-  function setStatus(text, cls = "", detail = "") {
+  function renderStatusDom(p) {
     const statusEl = document.getElementById("status");
     const detailEl = document.getElementById("detail");
+    const label = {
+      disconnected: { text: "disconnected", cls: "err" },
+      probing: { text: "searching for broker\u2026", cls: "" },
+      handshake: { text: "connecting\u2026", cls: "" },
+      connected: { text: "connected", cls: "ok" }
+    };
+    const { text, cls } = label[p.state];
     if (statusEl) {
       statusEl.textContent = `figma-agent: ${text}`;
       statusEl.className = cls;
     }
-    if (detailEl) detailEl.textContent = detail;
+    if (detailEl) detailEl.textContent = p.detail ?? "";
+  }
+  function transition(event, extra = {}) {
+    connState = reduceConnState(connState, event);
+    const payload = makeStatePayload(connState, { since: Date.now(), ...extra });
+    renderStatusDom(payload);
+    try {
+      window.dispatchEvent(new CustomEvent("figma-agent:conn-state", { detail: payload }));
+    } catch {
+    }
+  }
+  function setStatusText(text, cls = "") {
+    const statusEl = document.getElementById("status");
+    if (statusEl) {
+      statusEl.textContent = `figma-agent: ${text}`;
+      statusEl.className = cls;
+    }
   }
   function wsSend(msg) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -1459,6 +1520,10 @@
     try {
       msg = JSON.parse(raw);
     } catch {
+      return;
+    }
+    if (msg.type === "PONG") {
+      lastPongAt = Date.now();
       return;
     }
     if (typeof msg.chunk === "string" && typeof msg.seq === "number" && typeof msg.id === "string") {
@@ -1494,9 +1559,9 @@
           sendErr(req.id, "E_INVALID_ARGS", "HTML_TO_FIGMA requires params.html");
           return;
         }
-        setStatus("connected \u2014 rendering html\u2026", "ok");
+        setStatusText("rendering html\u2026", "ok");
         const payload = await renderHtmlToPayload(p.html, p.width ?? 1280, p.name ?? "HTML Import");
-        setStatus("connected", "ok");
+        setStatusText("connected", "ok");
         parent.postMessage({
           pluginMessage: {
             requestId: req.id,
@@ -1508,7 +1573,7 @@
         parent.postMessage({ pluginMessage: { requestId: req.id, cmd: req.cmd, params: req.params } }, "*");
       }
     } catch (err) {
-      setStatus("connected", "ok");
+      setStatusText("connected", "ok");
       sendErr(req.id, "E_PLUGIN_ERROR", err instanceof Error ? err.message : String(err));
     }
   }
@@ -1529,6 +1594,45 @@
       wsSend(reply);
     }
   });
+  function stopHeartbeat() {
+    if (heartbeatTimer !== null) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+  function startHeartbeat(socket) {
+    stopHeartbeat();
+    lastPongAt = Date.now();
+    heartbeatTimer = setInterval(() => {
+      if (ws !== socket) {
+        stopHeartbeat();
+        return;
+      }
+      if (Date.now() - lastPongAt > PLUGIN_PONG_TIMEOUT_MS) {
+        teardown(socket, "heartbeat lost \u2014 reconnecting\u2026");
+        return;
+      }
+      try {
+        socket.send(JSON.stringify({ type: "PING", data: { t: Date.now() } }));
+      } catch {
+        teardown(socket, "ping failed \u2014 reconnecting\u2026");
+      }
+    }, PLUGIN_HEARTBEAT_INTERVAL_MS);
+  }
+  function teardown(socket, reason) {
+    if (ws !== socket) return;
+    ws = null;
+    stopHeartbeat();
+    transition("LOST", { detail: reason });
+    try {
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.onmessage = null;
+      socket.close();
+    } catch {
+    }
+    scheduleReconnect();
+  }
   function probePort(port, host) {
     return new Promise((resolve) => {
       let settled = false;
@@ -1565,7 +1669,7 @@
   }
   async function scanForBroker() {
     for (let port = PORT_RANGE_START; port <= PORT_RANGE_END; port++) {
-      setStatus(`searching broker on localhost:${port}\u2026`);
+      transition("PROBE", { detail: `probing localhost:${port}\u2026`, port });
       const socket = await probePort(port, "localhost");
       if (socket) return socket;
     }
@@ -1573,39 +1677,38 @@
   }
   function adoptSocket(socket) {
     ws = socket;
-    reconnectBackoffMs = 1e3;
+    backoffBase = 0;
     chunkBuffers.clear();
+    const url = socket.url.replace(/\/$/, "");
+    const portMatch = /:(\d+)/.exec(url);
+    const port = portMatch ? Number(portMatch[1]) : void 0;
+    transition("FOUND", { detail: `broker at ${url}`, brokerUrl: url, port });
     socket.onmessage = (ev) => handleWireData(String(ev.data));
     socket.onerror = () => {
     };
-    socket.onclose = () => {
-      ws = null;
-      setStatus("broker connection lost \u2014 reconnecting\u2026", "err");
-      scheduleReconnect();
-    };
+    socket.onclose = () => teardown(socket, "broker connection lost \u2014 reconnecting\u2026");
     wsSend({ type: "PLUGIN_HELLO", data: { ...fileInfo, pluginVersion: PLUGIN_VERSION, protocolV: PROTOCOL_VERSION } });
-    const url = socket.url.replace(/\/$/, "");
-    setStatus("connected", "ok", `broker at ${url} \xB7 protocol v${PROTOCOL_VERSION}`);
+    startHeartbeat(socket);
+    transition("READY", { detail: `broker at ${url} \xB7 protocol v${PROTOCOL_VERSION}`, brokerUrl: url, port });
   }
   function scheduleReconnect() {
-    setTimeout(() => void connectLoop(), reconnectBackoffMs);
-    reconnectBackoffMs = Math.min(reconnectBackoffMs * 2, RECONNECT_BACKOFF_MAX_MS);
+    const { base, delay } = nextBackoff(backoffBase, BACKOFF_OPTS);
+    backoffBase = base;
+    setTimeout(() => void connectLoop(), delay);
   }
   async function connectLoop() {
     try {
       const socket = await scanForBroker();
       if (!socket) {
-        setStatus(
-          `no broker on :${PORT_RANGE_START}-${PORT_RANGE_END} \u2014 retrying\u2026`,
-          "err",
-          "start one with: figma-agent status"
-        );
+        transition("PROBE", {
+          detail: `no broker on :${PORT_RANGE_START}-${PORT_RANGE_END} \u2014 is a CLI command running? retrying\u2026`
+        });
         scheduleReconnect();
         return;
       }
       adoptSocket(socket);
     } catch (err) {
-      setStatus("relay error \u2014 retrying\u2026", "err", err instanceof Error ? err.message : String(err));
+      transition("LOST", { detail: err instanceof Error ? err.message : String(err) });
       scheduleReconnect();
     }
   }

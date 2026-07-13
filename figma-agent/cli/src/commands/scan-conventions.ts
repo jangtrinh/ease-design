@@ -24,10 +24,12 @@ import { resolve } from 'node:path';
 import type { CommandArgs } from '../figma-agent.ts';
 import { CliError } from '../transport/protocol-helpers.ts';
 import { runCommand } from '../transport/broker-client.ts';
+import { runWithWarmRetry } from '../transport/warm-retry.ts';
 
 /** Default per-section node-visit budget (matches the proven seed walk). */
 export const DEFAULT_BUDGET = 14_000;
-const WALK_TIMEOUT_MS = 90_000;
+/** Default per-attempt plugin-walk timeout; --timeout <ms> overrides it. */
+export const DEFAULT_WALK_TIMEOUT_MS = 90_000;
 const WIRE_MARGIN_MS = 2_000;
 
 /** A command runner: the EXEC_JS transport call, injectable so the walk is testable. */
@@ -105,11 +107,13 @@ export async function scanConventions(
   sectionIds: string[],
   budget: number,
   runner: Runner = runCommand,
+  walkTimeoutMs: number = DEFAULT_WALK_TIMEOUT_MS,
 ): Promise<SectionDNA[]> {
   const code = buildWalkCode(sectionIds, budget);
-  const reply = (await runner('EXEC_JS', { code, timeoutMs: WALK_TIMEOUT_MS }, { timeoutMs: WALK_TIMEOUT_MS + WIRE_MARGIN_MS })) as
-    | { result?: unknown }
-    | null;
+  // Cold big-file walks can exceed the timeout on the first pass; retry once warm.
+  const reply = (await runWithWarmRetry(() =>
+    runner('EXEC_JS', { code, timeoutMs: walkTimeoutMs }, { timeoutMs: walkTimeoutMs + WIRE_MARGIN_MS }),
+  )) as { result?: unknown } | null;
   const result = reply && typeof reply === 'object' ? (reply as { result?: unknown }).result : undefined;
   if (!Array.isArray(result)) {
     throw new CliError('E_EVAL', 'scan-conventions walk did not return a section array');
@@ -139,6 +143,7 @@ export async function execute(
   budget: number,
   outPath: string | undefined,
   runner: Runner = runCommand,
+  walkTimeoutMs: number = DEFAULT_WALK_TIMEOUT_MS,
 ): Promise<ScanConventionsResult> {
   if (sectionIds.length === 0) {
     throw new CliError('E_INVALID_ARGS', 'scan-conventions requires at least one <sectionId>');
@@ -146,7 +151,7 @@ export async function execute(
   if (!Number.isFinite(budget) || budget <= 0) {
     throw new CliError('E_INVALID_ARGS', `--budget must be a positive number, got "${budget}"`);
   }
-  const dna = await scanConventions(sectionIds, budget, runner);
+  const dna = await scanConventions(sectionIds, budget, runner, walkTimeoutMs);
   const truncated = dna.filter((s) => s.truncated === true).map((s) => s.section ?? s.id ?? '?');
   const missing = dna.filter((s) => s.missing === true).map((s) => s.id ?? '?');
 
@@ -162,5 +167,6 @@ export async function run(args: CommandArgs): Promise<unknown> {
   const sectionIds = args.positionals;
   const budget = args.num('budget') ?? DEFAULT_BUDGET;
   const outPath = args.str('out');
-  return execute(sectionIds, budget, outPath);
+  const walkTimeoutMs = args.num('timeout') ?? DEFAULT_WALK_TIMEOUT_MS;
+  return execute(sectionIds, budget, outPath, runCommand, walkTimeoutMs);
 }

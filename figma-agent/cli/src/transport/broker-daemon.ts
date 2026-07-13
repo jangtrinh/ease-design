@@ -8,23 +8,52 @@
 import { appendFileSync, readFileSync, unlinkSync } from 'node:fs';
 import WebSocket, { WebSocketServer } from 'ws';
 import {
-  BROKER_FILE, BROKER_IDLE_SHUTDOWN_MS, HEARTBEAT_INTERVAL_MS, PORT_RANGE_END, PORT_RANGE_START, PROTOCOL_VERSION,
+  BROKER_FILE, BROKER_IDLE_SHUTDOWN_MS, HEARTBEAT_INTERVAL_MS, PLUGIN_WAIT_MS,
+  PORT_RANGE_END, PORT_RANGE_START, PROTOCOL_VERSION,
   type BrokerAdvertisement, type ErrorCode, type EventMsg, type ReplyErr,
 } from '../../../shared/protocol.ts';
 import { isPidAlive, readAdvertisement, selfBuildMtime, writeAdvertisement } from './broker-discovery.ts';
 import { isChunkMsg, isEventMsg, isReplyMsg, isRequestMsg, parseWireMsg, rawToString } from './protocol-helpers.ts';
 
 const LOG_FILE = '/tmp/figma-agent-broker.log';
-const IDLE_CHECK_MS = 60_000;
+
+/** Read a positive-integer env override, else fall back. Lets manual acceptance
+ *  shrink the idle-shutdown / heartbeat / plugin-wait knobs to seconds. */
+function envMs(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+const IDLE_SHUTDOWN_MS = envMs('FIGMA_AGENT_IDLE_SHUTDOWN_MS', BROKER_IDLE_SHUTDOWN_MS);
+const HEARTBEAT_MS = envMs('FIGMA_AGENT_HEARTBEAT_MS', HEARTBEAT_INTERVAL_MS);
+const PLUGIN_WAIT_TIMEOUT_MS = envMs('FIGMA_AGENT_PLUGIN_WAIT_MS', PLUGIN_WAIT_MS);
+// Idle check cadence scales with the (possibly shrunk) idle window so a 5s test
+// override actually fires within a few seconds, not the fixed 60s of production.
+const IDLE_CHECK_MS = Math.min(60_000, Math.max(500, Math.floor(IDLE_SHUTDOWN_MS / 3)));
+
+// Commands answered instantly with E_NO_PLUGIN when no plugin is connected —
+// never parked in the plugin-wait queue (a status probe must not hang 12s).
+const WAIT_EXEMPT = new Set(['STATUS']);
 
 type TrackedWs = WebSocket & { isAlive?: boolean };
+
+/** A request parked until a plugin (re)connects or the wait window elapses. */
+interface ParkedRequest {
+  id: string;
+  from: WebSocket;
+  rawText: string;
+  deadline: number;
+}
 
 interface BrokerState {
   pluginWs: WebSocket | null;
   pluginInfo: Record<string, unknown> | null;
   cliClients: Set<WebSocket>;
   pending: Map<string, WebSocket>; // request id → CLI client awaiting the reply
+  waiting: ParkedRequest[]; // requests parked for a not-yet-connected plugin
   lastBusyAt: number;
+  lastPluginSeenAt: number; // ms of the last inbound frame/pong from the plugin
 }
 
 function log(line: string): void {
@@ -73,7 +102,10 @@ export async function runBrokerDaemon(): Promise<void> {
   if (!wss6) log('IPv6 loopback (::1) bind unavailable — IPv4 only');
 
   const startedAt = Date.now();
-  const st: BrokerState = { pluginWs: null, pluginInfo: null, cliClients: new Set(), pending: new Map(), lastBusyAt: Date.now() };
+  const st: BrokerState = {
+    pluginWs: null, pluginInfo: null, cliClients: new Set(), pending: new Map(),
+    waiting: [], lastBusyAt: Date.now(), lastPluginSeenAt: 0,
+  };
   writeAdvertisement(port, startedAt);
   log(`broker listening on 127.0.0.1:${port}${wss6 ? ' + [::1]:' + port : ''}`);
 
@@ -96,8 +128,21 @@ export async function runBrokerDaemon(): Promise<void> {
     }
   };
 
-  const forwardToPlugin = (from: WebSocket, id: string, rawText: string): void => {
+  const forwardToPlugin = (from: WebSocket, id: string, rawText: string, cmd?: string): void => {
     if (!st.pluginWs || st.pluginWs.readyState !== WebSocket.OPEN) {
+      // No plugin yet. Park the request (bounded) so a just-respawned broker gives
+      // the plugin's reconnect loop time to land — unless the command is exempt
+      // (STATUS) or waiting is disabled. This is the fix for the respawn↔reconnect
+      // race that made the first call after an idle-shutdown fail intermittently.
+      if (cmd && WAIT_EXEMPT.has(cmd)) {
+        sendReplyErr(from, id, 'E_NO_PLUGIN', 'no Figma plugin connected — open the figma-agent plugin in Figma');
+        return;
+      }
+      if (PLUGIN_WAIT_TIMEOUT_MS > 0) {
+        st.waiting.push({ id, from, rawText, deadline: Date.now() + PLUGIN_WAIT_TIMEOUT_MS });
+        log(`parked ${id}${cmd ? ` (${cmd})` : ''} — awaiting plugin (${st.waiting.length} queued)`);
+        return;
+      }
       sendReplyErr(from, id, 'E_NO_PLUGIN', 'no Figma plugin connected — open the figma-agent plugin in Figma');
       return;
     }
@@ -106,6 +151,17 @@ export async function runBrokerDaemon(): Promise<void> {
     catch (err) {
       st.pending.delete(id);
       sendReplyErr(from, id, 'E_PLUGIN_ERROR', `relay to plugin failed: ${(err as Error).message}`);
+    }
+  };
+
+  // Plugin just registered → flush every parked request to it (drop dead CLIs).
+  const flushWaiting = (): void => {
+    if (st.waiting.length === 0) return;
+    const queued = st.waiting;
+    st.waiting = [];
+    log(`plugin connected — flushing ${queued.length} parked request(s)`);
+    for (const req of queued) {
+      if (req.from.readyState === WebSocket.OPEN) forwardToPlugin(req.from, req.id, req.rawText);
     }
   };
 
@@ -128,6 +184,7 @@ export async function runBrokerDaemon(): Promise<void> {
     } else {
       st.cliClients.delete(ws);
       for (const [id, client] of st.pending) if (client === ws) st.pending.delete(id);
+      st.waiting = st.waiting.filter((req) => req.from !== ws); // drop its parked requests
     }
   };
 
@@ -136,6 +193,7 @@ export async function runBrokerDaemon(): Promise<void> {
     if (!msg) return;
     // Hidden control frame from a newer CLI build replacing this broker.
     if ((msg as { type?: string }).type === 'BROKER_SHUTDOWN_REQUEST') shutdown(0, 'BROKER_SHUTDOWN_REQUEST');
+    if (ws === st.pluginWs) st.lastPluginSeenAt = Date.now(); // any plugin frame = liveness
     if (isChunkMsg(msg)) {
       // Pass-through both ways — the broker never reassembles chunks.
       if (ws === st.pluginWs) routeFromPlugin(msg.id, text, msg.last);
@@ -143,18 +201,44 @@ export async function runBrokerDaemon(): Promise<void> {
     } else if (isReplyMsg(msg)) {
       if (ws === st.pluginWs) routeFromPlugin(msg.id, text, true);
     } else if (isRequestMsg(msg)) {
-      forwardToPlugin(ws, msg.id, text);
+      forwardToPlugin(ws, msg.id, text, msg.cmd);
     } else if (isEventMsg(msg)) {
       if (msg.type === 'PLUGIN_HELLO') {
         if (st.pluginWs && st.pluginWs !== ws) st.pluginWs.terminate(); // single-plugin model
         st.cliClients.delete(ws);
         st.pluginWs = ws;
         st.pluginInfo = msg.data;
+        st.lastPluginSeenAt = Date.now();
         log(`plugin registered: ${JSON.stringify(msg.data)}`);
+        flushWaiting(); // deliver any requests parked during the reconnect gap
+      } else if (msg.type === 'PING') {
+        // App-level heartbeat from the plugin — answer so it knows the socket lives.
+        if (ws === st.pluginWs) {
+          try { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'PONG', data: { t: Date.now() } } satisfies EventMsg)); }
+          catch { /* plugin vanished */ }
+        }
       } else if (ws === st.pluginWs) {
         broadcastToClients(text); // FILE_INFO etc. fan out to CLI clients
       }
     }
+  };
+
+  // Single source for the greeting + `figma-agent status` broker block. Carries
+  // liveness (pluginConnected, lastHeartbeatAge, state) so the CLI can report the
+  // connection health without a plugin round-trip.
+  const brokerHello = (): EventMsg => {
+    const connected = !!st.pluginWs && st.pluginWs.readyState === WebSocket.OPEN;
+    return {
+      type: 'BROKER_HELLO',
+      data: {
+        port, pid: process.pid, protocolV: PROTOCOL_VERSION, buildMtime: selfBuildMtime(),
+        uptimeMs: Date.now() - startedAt,
+        pluginConnected: connected,
+        pluginState: connected ? 'connected' : 'disconnected',
+        lastHeartbeatAge: connected && st.lastPluginSeenAt ? Date.now() - st.lastPluginSeenAt : null,
+        pluginInfo: st.pluginInfo ?? null,
+      },
+    };
   };
 
   const onConnection = (ws: WebSocket, req: import('node:http').IncomingMessage): void => {
@@ -163,23 +247,20 @@ export async function runBrokerDaemon(): Promise<void> {
     st.cliClients.add(ws); // provisional; promoted to plugin on PLUGIN_HELLO
     st.lastBusyAt = Date.now();
     log(`connection from ${req.socket.remoteAddress ?? '?'} (clients: ${st.cliClients.size})`);
-    ws.on('pong', () => { tracked.isAlive = true; });
+    ws.on('pong', () => { tracked.isAlive = true; if (ws === st.pluginWs) st.lastPluginSeenAt = Date.now(); });
     ws.on('error', (err) => log(`ws error: ${err.message}`));
     ws.on('message', (raw) => {
       try { handleMessage(ws, rawToString(raw)); }
       catch (err) { log(`handleMessage failed: ${(err as Error).message}`); }
     });
     ws.on('close', () => handleClose(ws));
-    const hello: EventMsg = {
-      type: 'BROKER_HELLO',
-      data: { port, pid: process.pid, protocolV: PROTOCOL_VERSION, buildMtime: selfBuildMtime(), pluginConnected: !!st.pluginWs, pluginInfo: st.pluginInfo ?? null },
-    };
-    try { ws.send(JSON.stringify(hello)); } catch { /* ignore */ }
+    try { ws.send(JSON.stringify(brokerHello())); } catch { /* ignore */ }
   };
   wss.on('connection', onConnection);
   wss6?.on('connection', onConnection);
 
-  // Heartbeat: ping every 30s; drop sockets that missed the previous pong.
+  // Heartbeat: WS-ping on the heartbeat cadence; drop sockets that missed the
+  // previous pong (broker→client liveness; browsers auto-pong at the WS layer).
   setInterval(() => {
     const allClients = [...wss!.clients, ...(wss6 ? wss6.clients : [])];
     for (const ws of allClients) {
@@ -188,19 +269,36 @@ export async function runBrokerDaemon(): Promise<void> {
       tracked.isAlive = false;
       tracked.ping();
     }
-  }, HEARTBEAT_INTERVAL_MS);
+  }, HEARTBEAT_MS);
 
-  // Advertisement refresh (30s); yield if a different live broker took over.
+  // Sweep parked requests: fail any that outlived their plugin-wait window, and
+  // drop those whose CLI already hung up. Runs at ~4Hz relative to the window.
+  setInterval(() => {
+    if (st.waiting.length === 0) return;
+    const now = Date.now();
+    const survivors: ParkedRequest[] = [];
+    for (const req of st.waiting) {
+      if (req.from.readyState !== WebSocket.OPEN) continue; // CLI gone — drop silently
+      if (now >= req.deadline) {
+        sendReplyErr(req.from, req.id, 'E_NO_PLUGIN', 'no Figma plugin connected — open the figma-agent plugin in Figma');
+      } else {
+        survivors.push(req);
+      }
+    }
+    st.waiting = survivors;
+  }, Math.min(500, Math.max(100, Math.floor(PLUGIN_WAIT_TIMEOUT_MS / 8))));
+
+  // Advertisement refresh (fixed 30s); yield if a different live broker took over.
   setInterval(() => {
     const ad = readAdvertisement();
     if (ad && ad.pid !== process.pid && isPidAlive(ad.pid)) shutdown(0, `replaced by broker pid ${ad.pid}`);
     writeAdvertisement(port, startedAt);
   }, HEARTBEAT_INTERVAL_MS);
 
-  // Idle shutdown: no plugin AND no CLI clients for 30 min.
+  // Idle shutdown: no plugin AND no CLI clients for the idle window (env-overridable).
   setInterval(() => {
     if (st.pluginWs || st.cliClients.size > 0) st.lastBusyAt = Date.now();
-    else if (Date.now() - st.lastBusyAt > BROKER_IDLE_SHUTDOWN_MS) shutdown(0, 'idle for 30min');
+    else if (Date.now() - st.lastBusyAt > IDLE_SHUTDOWN_MS) shutdown(0, `idle for ${IDLE_SHUTDOWN_MS}ms`);
   }, IDLE_CHECK_MS);
 
   process.on('SIGTERM', () => shutdown(0, 'SIGTERM'));

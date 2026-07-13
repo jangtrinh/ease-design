@@ -103,6 +103,32 @@ function exchange(ws: WebSocket, cmd: CommandName, params: unknown, timeoutMs: n
 }
 
 /**
+ * Connect, read the broker's BROKER_HELLO greeting (port, pid, uptime, protocol,
+ * plugin liveness), and close — no plugin round-trip. Used by `figma-agent
+ * status` to report broker + connection health even when the plugin is absent.
+ */
+export function fetchBrokerHello(port: number): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    const timer = setTimeout(() => {
+      ws.terminate();
+      reject(new CliError('E_NO_BROKER', `broker hello timed out on port ${port}`));
+    }, CONNECT_TIMEOUT_MS);
+    const done = (fn: () => void): void => {
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* ignore */ }
+      fn();
+    };
+    ws.on('message', (raw) => {
+      const msg = parseWireMsg(rawToString(raw));
+      if (msg && isEventMsg(msg) && msg.type === 'BROKER_HELLO') done(() => resolve(msg.data));
+    });
+    ws.once('error', (err) => done(() => reject(new CliError('E_NO_BROKER', `broker hello failed: ${err.message}`))));
+    ws.once('close', () => { clearTimeout(timer); reject(new CliError('E_NO_BROKER', 'broker closed before hello')); });
+  });
+}
+
+/**
  * Run one command through the broker. Connect failure after a valid
  * advertisement forces one rediscovery (broker may have just died).
  */

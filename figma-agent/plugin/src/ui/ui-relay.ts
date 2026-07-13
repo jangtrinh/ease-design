@@ -1,33 +1,66 @@
 // Plugin UI entry: WebSocket client ↔ plugin-main postMessage bridge.
-// Scans broker ports 9410-9419 until BROKER_HELLO, registers with PLUGIN_HELLO,
-// then relays RequestMsg → main (HTML_TO_FIGMA is converted here first) and
-// replies from main → WS (chunked when > CHUNK_LIMIT). No Figma Plugin API —
-// this iframe only has DOM + WebSocket + parent.postMessage.
+// Probes broker ports 9410-9419 in a FOREVER loop (exponential backoff + jitter),
+// registers with PLUGIN_HELLO, runs an app-level heartbeat (PING/PONG) to detect a
+// half-open socket, and drives a disconnected→probing→handshake→connected state
+// machine whose transitions are posted to the UI. Relays RequestMsg → main
+// (HTML_TO_FIGMA is converted here first) and replies from main → WS (chunked when
+// > CHUNK_LIMIT). No Figma Plugin API — this iframe only has DOM + WebSocket +
+// parent.postMessage.
 
 import {
-  CHUNK_LIMIT, PORT_RANGE_END, PORT_RANGE_START, PROTOCOL_VERSION,
-  type ChunkMsg, type ErrorCode, type ReplyMsg, type RequestMsg,
+  CHUNK_LIMIT, PLUGIN_HEARTBEAT_INTERVAL_MS, PLUGIN_PONG_TIMEOUT_MS,
+  PORT_RANGE_END, PORT_RANGE_START, PROTOCOL_VERSION,
+  RECONNECT_BACKOFF_MAX_MS, RECONNECT_BACKOFF_MIN_MS,
+  makeStatePayload, nextBackoff, reduceConnState,
+  type ChunkMsg, type ConnectionEvent, type ConnectionState, type ConnectionStatePayload,
+  type ErrorCode, type ReplyMsg, type RequestMsg,
 } from '../../../shared/protocol';
 import { renderHtmlToPayload } from './render-host';
 
 const PLUGIN_VERSION = '0.1.0';
-const PORT_PROBE_TIMEOUT_MS = 2500;
-const RECONNECT_BACKOFF_MAX_MS = 15_000;
+const PORT_PROBE_TIMEOUT_MS = 1200; // a real broker greets in <50ms; short = fast scan
+const BACKOFF_OPTS = { minMs: RECONNECT_BACKOFF_MIN_MS, maxMs: RECONNECT_BACKOFF_MAX_MS };
 
 let ws: WebSocket | null = null;
-let reconnectBackoffMs = 1000;
+let backoffBase = 0; // grows via nextBackoff; reset to 0 (→ min) on a successful connect
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let lastPongAt = 0;
+let connState: ConnectionState = 'disconnected';
 let fileInfo: Record<string, unknown> = {}; // FILE_INFO from main (fileName, fileKey…)
 const chunkBuffers = new Map<string, string[]>(); // requestId → chunk slices
 
-// ─── Status badge ───────────────────────────────────────────────────
-function setStatus(text: string, cls: '' | 'ok' | 'err' = '', detail = ''): void {
+// ─── Connection state machine → UI ──────────────────────────────────
+// Every transition posts a ConnectionStatePayload as the `figma-agent:conn-state`
+// CustomEvent (the P2 panel redesign consumes exactly this shape) AND updates the
+// current minimal status DOM so P1 is usable before P2 lands.
+function renderStatusDom(p: ConnectionStatePayload): void {
   const statusEl = document.getElementById('status');
   const detailEl = document.getElementById('detail');
+  const label: Record<ConnectionState, { text: string; cls: string }> = {
+    disconnected: { text: 'disconnected', cls: 'err' },
+    probing: { text: 'searching for broker…', cls: '' },
+    handshake: { text: 'connecting…', cls: '' },
+    connected: { text: 'connected', cls: 'ok' },
+  };
+  const { text, cls } = label[p.state];
   if (statusEl) {
     statusEl.textContent = `figma-agent: ${text}`;
     statusEl.className = cls;
   }
-  if (detailEl) detailEl.textContent = detail;
+  if (detailEl) detailEl.textContent = p.detail ?? '';
+}
+
+function transition(event: ConnectionEvent, extra: Partial<ConnectionStatePayload> = {}): void {
+  connState = reduceConnState(connState, event);
+  const payload = makeStatePayload(connState, { since: Date.now(), ...extra });
+  renderStatusDom(payload);
+  try { window.dispatchEvent(new CustomEvent('figma-agent:conn-state', { detail: payload })); } catch { /* no DOM event support */ }
+}
+
+/** Ad-hoc status text within a state (e.g. HTML render progress) — no transition. */
+function setStatusText(text: string, cls: '' | 'ok' | 'err' = ''): void {
+  const statusEl = document.getElementById('status');
+  if (statusEl) { statusEl.textContent = `figma-agent: ${text}`; statusEl.className = cls; }
 }
 
 // ─── Outbound WS (with chunking for big replies) ────────────────────
@@ -62,6 +95,7 @@ function handleWireData(raw: string): void {
   } catch {
     return; // malformed frame — ignore
   }
+  if (msg.type === 'PONG') { lastPongAt = Date.now(); return; } // heartbeat ack
   if (typeof msg.chunk === 'string' && typeof msg.seq === 'number' && typeof msg.id === 'string') {
     handleChunk(msg as unknown as ChunkMsg);
     return;
@@ -104,9 +138,9 @@ async function handleRequest(req: RequestMsg): Promise<void> {
         sendErr(req.id, 'E_INVALID_ARGS', 'HTML_TO_FIGMA requires params.html');
         return;
       }
-      setStatus('connected — rendering html…', 'ok');
+      setStatusText('rendering html…', 'ok');
       const payload = await renderHtmlToPayload(p.html, p.width ?? 1280, p.name ?? 'HTML Import');
-      setStatus('connected', 'ok');
+      setStatusText('connected', 'ok');
       parent.postMessage({
         pluginMessage: {
           requestId: req.id,
@@ -119,7 +153,7 @@ async function handleRequest(req: RequestMsg): Promise<void> {
       parent.postMessage({ pluginMessage: { requestId: req.id, cmd: req.cmd, params: req.params } }, '*');
     }
   } catch (err) {
-    setStatus('connected', 'ok');
+    setStatusText('connected', 'ok');
     sendErr(req.id, 'E_PLUGIN_ERROR', err instanceof Error ? err.message : String(err));
   }
 }
@@ -150,9 +184,42 @@ window.addEventListener('message', (ev: MessageEvent) => {
   }
 });
 
+// ─── App-level heartbeat: PING the broker, reconnect on a missed PONG ─
+function stopHeartbeat(): void {
+  if (heartbeatTimer !== null) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
+
+function startHeartbeat(socket: WebSocket): void {
+  stopHeartbeat();
+  lastPongAt = Date.now();
+  heartbeatTimer = setInterval(() => {
+    if (ws !== socket) { stopHeartbeat(); return; }
+    if (Date.now() - lastPongAt > PLUGIN_PONG_TIMEOUT_MS) {
+      teardown(socket, 'heartbeat lost — reconnecting…'); // half-open socket → recover
+      return;
+    }
+    try { socket.send(JSON.stringify({ type: 'PING', data: { t: Date.now() } })); }
+    catch { teardown(socket, 'ping failed — reconnecting…'); }
+  }, PLUGIN_HEARTBEAT_INTERVAL_MS);
+}
+
+/** Tear one socket down once, then re-enter the reconnect loop. Idempotent per socket. */
+function teardown(socket: WebSocket, reason: string): void {
+  if (ws !== socket) return; // already replaced / torn down
+  ws = null;
+  stopHeartbeat();
+  transition('LOST', { detail: reason });
+  try {
+    socket.onclose = null; socket.onerror = null; socket.onmessage = null;
+    socket.close();
+  } catch { /* already closed */ }
+  scheduleReconnect();
+}
+
 // ─── Broker discovery: probe each port until BROKER_HELLO ───────────
 // The broker binds 127.0.0.1 (IPv4). Chromium may resolve `localhost` to ::1
-// (IPv6) first, which refuses — so probe the explicit IPv4 host, then localhost.
+// (IPv6) first, which refuses — so the broker listens on both loopback families
+// and we probe ws://localhost:PORT (allowedDomains accepts only hostnames).
 function probePort(port: number, host: string): Promise<WebSocket | null> {
   return new Promise((resolve) => {
     let settled = false;
@@ -184,13 +251,9 @@ function probePort(port: number, host: string): Promise<WebSocket | null> {
   });
 }
 
-// Evidence-based (southleft production manifest + Figma docs): allowedDomains
-// accepts ONLY hostnames (localhost), never IPs — and each non-80 port must be
-// listed explicitly. So we probe ws://localhost:PORT only; the broker listens on
-// both loopback families so whichever way Chromium resolves `localhost` works.
 async function scanForBroker(): Promise<WebSocket | null> {
   for (let port = PORT_RANGE_START; port <= PORT_RANGE_END; port++) {
-    setStatus(`searching broker on localhost:${port}…`);
+    transition('PROBE', { detail: `probing localhost:${port}…`, port });
     const socket = await probePort(port, 'localhost');
     if (socket) return socket;
   }
@@ -199,38 +262,42 @@ async function scanForBroker(): Promise<WebSocket | null> {
 
 function adoptSocket(socket: WebSocket): void {
   ws = socket;
-  reconnectBackoffMs = 1000;
+  backoffBase = 0; // reset backoff on a live connection
   chunkBuffers.clear();
+  const url = socket.url.replace(/\/$/, '');
+  const portMatch = /:(\d+)/.exec(url);
+  const port = portMatch ? Number(portMatch[1]) : undefined;
+
+  transition('FOUND', { detail: `broker at ${url}`, brokerUrl: url, port });
   socket.onmessage = (ev) => handleWireData(String(ev.data));
   socket.onerror = () => { /* onclose fires next and drives the reconnect */ };
-  socket.onclose = () => {
-    ws = null;
-    setStatus('broker connection lost — reconnecting…', 'err');
-    scheduleReconnect();
-  };
+  socket.onclose = () => teardown(socket, 'broker connection lost — reconnecting…');
+
   // Register plugin identity (fileName merged in once main sends FILE_INFO)
   wsSend({ type: 'PLUGIN_HELLO', data: { ...fileInfo, pluginVersion: PLUGIN_VERSION, protocolV: PROTOCOL_VERSION } });
-  const url = socket.url.replace(/\/$/, '');
-  setStatus('connected', 'ok', `broker at ${url} · protocol v${PROTOCOL_VERSION}`);
+  startHeartbeat(socket);
+  transition('READY', { detail: `broker at ${url} · protocol v${PROTOCOL_VERSION}`, brokerUrl: url, port });
 }
 
 function scheduleReconnect(): void {
-  setTimeout(() => void connectLoop(), reconnectBackoffMs);
-  reconnectBackoffMs = Math.min(reconnectBackoffMs * 2, RECONNECT_BACKOFF_MAX_MS);
+  const { base, delay } = nextBackoff(backoffBase, BACKOFF_OPTS);
+  backoffBase = base;
+  setTimeout(() => void connectLoop(), delay);
 }
 
 async function connectLoop(): Promise<void> {
   try {
     const socket = await scanForBroker();
     if (!socket) {
-      setStatus(`no broker on :${PORT_RANGE_START}-${PORT_RANGE_END} — retrying…`, 'err',
-        'start one with: figma-agent status');
+      transition('PROBE', {
+        detail: `no broker on :${PORT_RANGE_START}-${PORT_RANGE_END} — is a CLI command running? retrying…`,
+      });
       scheduleReconnect();
       return;
     }
     adoptSocket(socket);
   } catch (err) {
-    setStatus('relay error — retrying…', 'err', err instanceof Error ? err.message : String(err));
+    transition('LOST', { detail: err instanceof Error ? err.message : String(err) });
     scheduleReconnect();
   }
 }
