@@ -57,6 +57,28 @@ describe("ds-a11y — checkTokenContrast", () => {
   it("is deterministic", () => {
     expect(checkTokenContrast(tokens)).toEqual(checkTokenContrast(tokens));
   });
+
+  // ── L5: inferred-mode `unresolved` respects $type ──────────────────────────
+  it("(L5) a NON-color token whose NAME looks textish is never swept into unresolved", () => {
+    const mixed: ResolvedToken[] = [
+      { path: "typography-sizes.text-2xl", type: "dimension", value: "24px" }, // textish name, not a colour
+      tok("text.body", "#111111"),
+      tok("bg.default", "#FFFFFF"),
+    ];
+    const r = checkTokenContrast(mixed);
+    expect(r.inferred).toBe(true);
+    expect(r.unresolved).not.toContain("typography-sizes.text-2xl");
+  });
+
+  it("(L5) a COLOR token that looks textish but has no hex IS still reported unresolved", () => {
+    const ghost: ResolvedToken[] = [
+      tok("color.text-ghost", "{missing.alias}"), // colour-typed, textish, unresolved → no hex
+      tok("bg.default", "#FFFFFF"),
+    ];
+    const r = checkTokenContrast(ghost);
+    expect(r.inferred).toBe(true);
+    expect(r.unresolved).toContain("color.text-ghost");
+  });
 });
 
 // ─── command ─────────────────────────────────────────────────────────────────

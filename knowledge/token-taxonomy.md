@@ -233,8 +233,9 @@ not invent new raw values that should have resolved through an existing semantic
 The Design-OS standard for the **semantic tier** is the shadcn model: every surface role ships with
 its paired text colour — `background`/`foreground`, `card`/`card-foreground`, `popover`/`…`,
 `primary`/`primary-foreground`, `secondary`/`…`, `muted`/`muted-foreground`, `accent`/`…`,
-plus the unpaired `destructive`, `border`, `input`, `ring`, the `sidebar-*` set, `radius`, and
-`chart-1…5`. A bare `foreground` pairs with `background` (the app default).
+plus the unpaired `destructive`, `border`, `scrim` (the fixed neutral-dark overlay veil — a dimmer,
+not a foreground, so it never flips with `colorMode`), `input`, `ring`, the `sidebar-*` set, `radius`,
+and `chart-1…5`. A bare `foreground` pairs with `background` (the app default).
 
 **Why the pairing is load-bearing, not cosmetic:** because a `-foreground` token names its ONE
 intended background, **contrast becomes deterministic**. `ui ds a11y` checks `{role}-foreground`
@@ -262,11 +263,16 @@ audits at `mode: paired`, 14 pairs, 0 failures before a human touches it. A stan
 only in prose drifts; this one has an emitter (the compiler) and a gate (`ds a11y` + the
 23-persona test) — that pairing of emitter+linter is the pattern for every future standard.
 
-**Honesty caveat — only DECLARED pairs are gated.** `{role}-foreground` on `{role}` is audited;
-interaction-state surfaces are not: `primary-foreground` on `primary-hover` is a real rendered
-pair no tool currently checks (it once shipped at ~2.8:1 while the declared pair passed). Keep
-hover/active surfaces within AA of the same foreground by construction, and treat a future
-"state-pair audit" as the known gap in the standard.
+**State pairs are gated too — the former gap is closed.** Beyond the declared `{role}`/`{role}-foreground`
+pair, `ui ds a11y` now also audits each role's INTERACTION surfaces — `{role}-foreground` on
+`{role}-hover` and `{role}-active` — returned as `statePairs` (each carrying a `state` field) and
+folded into `failures`, so they gate identically (`checkedPairs` stays the base count; `checkedStatePairs`
+is separate). The compiler earns a clean audit by construction: `primary-hover` is picked
+contrast-aware so the primary foreground still clears ≥4.5 on it — and for a light brand fill whose
+foreground is black, the hover walks LIGHTER instead of the naive darker step (which once shipped at
+~2.8:1). Same emitter+linter discipline as the base pairs; the 23-persona test gates ≥1 clean state pair
+on every compiled DS. (This was the one-time "state-pair audit" gap; a `{role}` with no `-hover`/`-active`
+surface simply contributes no state pair.)
 
 ## Onboarding an existing token file — `ui ds import`
 

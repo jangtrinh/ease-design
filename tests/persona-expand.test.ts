@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { expandPersona, ExpandError } from "../src/core/persona-expand.js";
+import { expandPersona, ExpandError, pickAccentFg } from "../src/core/persona-expand.js";
 import { loadPersonaIndex, findPersona } from "../src/core/persona-loader.js";
 import { resolveTokens } from "../src/core/token-resolve.js";
 import { parseTokenFile } from "../src/core/token-model.js";
-import { contrastRatio } from "../src/core/color-scale.js";
+import { contrastRatio, STOPS } from "../src/core/color-scale.js";
 
 const PERSONAS_PATH = new URL(
   "../knowledge/personas/personas.json",
@@ -76,8 +76,14 @@ describe("expandPersona — token skeleton", () => {
     expect(color["secondary"]?.$value).toBe("{neutral.200}");
     expect(color["accent"]?.$value).toBe("{primary.100}");
     expect(color["popover"]?.$value).toBe("{neutral.100}");
-    for (const role of ["secondary", "accent", "popover", "sidebar", "sidebar-accent"]) {
+    // Neutral foregrounds on the soft surfaces: secondary/popover/sidebar.
+    for (const role of ["secondary", "popover", "sidebar"]) {
       expect(color[`${role}-foreground`]?.$value, `${role}-foreground`).toMatch(/^\{neutral\.\d+\}$/);
+    }
+    // Accent + sidebar-accent foregrounds are ON-BRAND (Fix 4): the darkest primary step that
+    // clears AA on the accent tint, not a flat neutral.
+    for (const role of ["accent", "sidebar-accent"]) {
+      expect(color[`${role}-foreground`]?.$value, `${role}-foreground`).toMatch(/^\{primary\.\d+\}$/);
     }
     // Sidebar-primary reuses the brand fill → on-color (white/black) foreground.
     expect(color["sidebar-primary"]?.$value).toBe("{primary.500}");
@@ -88,6 +94,10 @@ describe("expandPersona — token skeleton", () => {
     expect(color["ring"]?.$value).toMatch(/^\{primary\.\d+\}$/);   // a brand step
     expect(color["sidebar-border"]?.$value).toBe("{neutral.200}");
     expect(color["sidebar-ring"]?.$value).toMatch(/^\{primary\.\d+\}$/);
+
+    // Scrim — unpaired dimming veil: a FIXED neutral-dark alias in every theme (Fix 3), NOT a foreground.
+    expect(color["scrim"]?.$value).toBe("{neutral.950}");
+    expect(color["scrim-foreground"], "scrim is unpaired — no foreground").toBeUndefined();
 
     // Data-viz palette — semantic aliases into a real chart PRIMITIVE scale (two-tier discipline).
     for (let i = 1; i <= 5; i++) {
@@ -249,6 +259,39 @@ describe("expandPersona — brandHex override", () => {
       expandPersona({ persona, intent: "test", brandHex: "#1" });
     } catch (e) {
       expect(e instanceof ExpandError && e.code).toBe("BAD_BRAND_HEX");
+    }
+  });
+});
+
+// ─── Accent foreground: on-brand tint first, guaranteed-AA neutral fallback (Fix 4) ─
+
+describe("pickAccentFg — on-brand tint with neutral fallback", () => {
+  type Cat = Record<string, { $value: string; $type: "color" }>;
+  const cat = (hexes: Record<number, string>): Cat =>
+    Object.fromEntries(STOPS.map((s) => [String(s), { $value: hexes[s] ?? "#808080", $type: "color" }])) as Cat;
+
+  it("prefers the DARKEST on-brand primary step that clears AA on a light accent surface", () => {
+    // Dark high stops clear on a very light accent tint; the darkest (950) wins.
+    const primary = cat({ 950: "#0B0B1A", 900: "#141433", 800: "#232357", 500: "#5B5BD6", 100: "#E6E6FF" });
+    const neutral = cat({ 900: "#18181B" });
+    expect(pickAccentFg(primary, neutral, "#F0F0FF", [900, 950, 800])).toBe("{primary.950}");
+  });
+
+  it("falls back to the guaranteed-AA neutral pick when NO primary step clears", () => {
+    const flatPrimary = cat({}); // every stop #808080 → none clears on a light accent
+    const neutral = cat({ 900: "#111111", 950: "#0A0A0A" });
+    expect(pickAccentFg(flatPrimary, neutral, "#DDDDDD", [900, 950, 800])).toBe("{neutral.900}");
+  });
+
+  it("every persona's accent/sidebar-accent foreground clears AA on its accent surface", () => {
+    for (const p of loadPersonaIndex(PERSONAS_PATH)) {
+      const resolved = resolveTokens(expandPersona({ persona: p, intent: "test" }).tokens);
+      const m = new Map(resolved.map((t) => [t.path, t.value as string]));
+      for (const role of ["accent", "sidebar-accent"]) {
+        const fg = m.get(`color.${role}-foreground`)!;
+        const surface = m.get(`color.${role}`)!;
+        expect(contrastRatio(fg, surface), `${p.slug} ${role}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 });

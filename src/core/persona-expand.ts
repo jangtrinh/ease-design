@@ -202,6 +202,61 @@ function pickOnColorFg(surfaceHex: string): string {
   return clearsAA(PURE_WHITE, surfaceHex) ? "{base.white}" : "{base.black}";
 }
 
+const PURE_BLACK = "#000000";
+
+/** The on-color foreground HEX for a saturated fill — mirrors pickOnColorFg's decision. */
+function onColorFgHex(surfaceHex: string): string {
+  return clearsAA(PURE_WHITE, surfaceHex) ? PURE_WHITE : PURE_BLACK;
+}
+
+// ─── Interaction-state surface picking (state-pair standard: fg AA on hover/active) ─
+
+/**
+ * Preference order for an interaction-state surface step (hover/active): try the
+ * conventional DARKER neighbour first (600), walk further darker, then fall back
+ * LIGHTER. Whichever foreground the base pair uses, the first CLEARING step wins — so
+ * the state surface never drops the paired foreground below AA. For a white foreground
+ * the darker 600 always clears; for a black foreground (a light brand fill) 600 loses
+ * contrast, so the walk lands on a lighter step (400) that restores it.
+ */
+const HOVER_STOP_ORDER = [600, 700, 800, 900, 950, 400, 300, 200, 100, 50] as const;
+
+/**
+ * Pick a `{role}-hover`/`{role}-active` state step (returns the stop number) whose resolved
+ * surface keeps `fgHex` at ≥4.5:1 — the SAME foreground the `{role}` pair uses. Deterministic:
+ * evaluates HOVER_STOP_ORDER and returns the first clearing step; the WCAG overlap guarantee
+ * (950 clears white, 50 clears black) makes a hit certain. Extends the L7 contrast-aware picker
+ * family to interaction surfaces, closing the documented state-pair gap.
+ */
+function pickStateStop(cat: ColorCat, fgHex: string): number {
+  for (const stop of HOVER_STOP_ORDER) {
+    if (clearsAA(fgHex, stopHex(cat, stop))) return stop;
+  }
+  return 600;
+}
+
+// ─── Accent foreground: on-brand tint first, guaranteed-AA neutral fallback ──────
+
+/** STOPS darkest→lightest (950…50) — the on-brand accent-fg search order. */
+const ACCENT_FG_ORDER: readonly number[] = [...STOPS].sort((a, b) => b - a);
+
+/**
+ * Pick the accent-surface foreground, preferring an ON-BRAND tint over a flat neutral.
+ * Tries the DARKEST primary step that clears AA (≥4.5) on the accent surface — an on-brand
+ * text colour that carries the hue (a near-black brand-tinted ink on a light accent, a light
+ * brand step on a dark accent). If NO primary step clears (a pathological scale), falls back
+ * to the guaranteed-AA neutral pick. Deterministic; returns a `{primary.NNN}` or `{neutral.NNN}`
+ * alias. Exported for the fallback unit test (real scales always yield an on-brand step).
+ */
+export function pickAccentFg(
+  primary: ColorCat, neutral: ColorCat, accentHex: string, neutralOrder: readonly number[],
+): string {
+  for (const stop of ACCENT_FG_ORDER) {
+    if (clearsAA(stopHex(primary, stop), accentHex)) return `{primary.${stop}}`;
+  }
+  return pickNeutralFg(neutral, [accentHex], neutralOrder);
+}
+
 // ─── Non-text (UI) contrast: focus ring picking ─────────────────────────────────
 
 /**
@@ -405,6 +460,9 @@ export function expandPersona(opts: ExpandOptions): ExpandResult {
   // tint in dark mode — the hover/highlight surface. Its neutral foreground is picked
   // contrast-aware (dark-on-light in light mode, light-on-dark in dark), so it clears AA.
   const accentHex    = isDarkOnly ? stopHex(primary, 800) : stopHex(primary, 100);
+  // The primary fill's on-color foreground hex (white or black) — the SAME foreground the
+  // primary-hover state surface must keep at ≥4.5 (state-pair standard). Mirrors pickOnColorFg.
+  const primaryFgHex = onColorFgHex(stopHex(primary, 500));
 
   // Neutral foreground preference orders. Light mode leads dark→light (strong body
   // text = darkest; muted = lightest that still clears AA); dark-only mirrors it.
@@ -418,15 +476,21 @@ export function expandPersona(opts: ExpandOptions): ExpandResult {
     // Card surface + its text.
     "card":               { $value: isDarkOnly ? "{neutral.800}" : "{neutral.100}", $type: "color" },
     "card-foreground":    { $value: pickNeutralFg(neutral, [cardHex], strongOrder),  $type: "color" },
-    // Brand: primary fill + its text; primary-hover is an unpaired state variant.
+    // Brand: primary fill + its text; primary-hover is the interaction-state surface —
+    // picked CONTRAST-AWARE so primary-foreground still clears AA on it (state-pair standard).
     "primary":            { $value: "{primary.500}", $type: "color" },
     "primary-foreground": { $value: pickOnColorFg(stopHex(primary, 500)), $type: "color" },
-    "primary-hover":      { $value: "{primary.600}", $type: "color" },
+    "primary-hover":      { $value: `{primary.${pickStateStop(primary, primaryFgHex)}}`, $type: "color" },
     // Muted/subdued surface + its (body-adjacent) text — text must also clear on background.
     "muted":              { $value: isDarkOnly ? "{neutral.700}" : "{neutral.200}", $type: "color" },
     "muted-foreground":   { $value: pickNeutralFg(neutral, [mutedHex, bgHex], mutedOrder), $type: "color" },
     // Unpaired hairline (may share muted's neutral; a theme can diverge them).
     "border":             { $value: isDarkOnly ? "{neutral.700}" : "{neutral.200}", $type: "color" },
+    // Scrim — the dimming veil behind modals/drawers (unpaired, NOT a foreground). A FIXED
+    // neutral-dark primitive in BOTH light and dark themes: a scrim must darken the content
+    // behind the overlay, so — unlike a foreground — it must NOT flip with colorMode (a light
+    // veil in dark mode would fail to dim). Components apply it through color-mix (alpha).
+    "scrim":              { $value: "{neutral.950}", $type: "color" },
     // Status quartet — richer than shadcn, still standard-conformant because paired.
     "danger":             { $value: "{danger.500}",  $type: "color" },
     "danger-foreground":  { $value: pickOnColorFg(stopHex(danger, 500)),  $type: "color" },
@@ -440,9 +504,10 @@ export function expandPersona(opts: ExpandOptions): ExpandResult {
     // Secondary — a soft neutral action surface (secondary buttons, chips) + its text.
     "secondary":            { $value: isDarkOnly ? "{neutral.700}" : "{neutral.200}", $type: "color" },
     "secondary-foreground": { $value: pickNeutralFg(neutral, [secondaryHex], strongOrder), $type: "color" },
-    // Accent — hover/highlight tint (a primary step) + its contrast-aware text.
+    // Accent — hover/highlight tint (a primary step) + its text. On-brand tint first: the
+    // darkest primary step that clears AA on the accent surface; guaranteed-AA neutral fallback.
     "accent":               { $value: isDarkOnly ? "{primary.800}" : "{primary.100}", $type: "color" },
-    "accent-foreground":    { $value: pickNeutralFg(neutral, [accentHex], strongOrder), $type: "color" },
+    "accent-foreground":    { $value: pickAccentFg(primary, neutral, accentHex, strongOrder), $type: "color" },
     // Popover — elevated overlay surface (its own role; may share card's primitive) + text.
     "popover":              { $value: isDarkOnly ? "{neutral.800}" : "{neutral.100}", $type: "color" },
     "popover-foreground":   { $value: pickNeutralFg(neutral, [popoverHex], strongOrder), $type: "color" },
@@ -456,7 +521,7 @@ export function expandPersona(opts: ExpandOptions): ExpandResult {
     "sidebar-primary":            { $value: "{primary.500}", $type: "color" },
     "sidebar-primary-foreground": { $value: pickOnColorFg(stopHex(primary, 500)), $type: "color" },
     "sidebar-accent":             { $value: isDarkOnly ? "{primary.800}" : "{primary.100}", $type: "color" },
-    "sidebar-accent-foreground":  { $value: pickNeutralFg(neutral, [accentHex], strongOrder), $type: "color" },
+    "sidebar-accent-foreground":  { $value: pickAccentFg(primary, neutral, accentHex, strongOrder), $type: "color" },
     "sidebar-border":             { $value: isDarkOnly ? "{neutral.700}" : "{neutral.200}", $type: "color" },
     "sidebar-ring":               { $value: pickRingStop(primary, sidebarHex), $type: "color" },
     // ── Data-viz palette (unpaired) — aliases into the chart primitive scale ───

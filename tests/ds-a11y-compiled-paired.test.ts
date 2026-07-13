@@ -7,6 +7,9 @@
  * foregrounds, so `ui ds a11y` runs in the deterministic "paired" mode (never the legacy
  * "inferred" fallback) and reports ZERO failures across all 14 pairs. This exercises the
  * real CLI end-to-end: init → a11y --json.
+ *
+ * It also gates the STATE-PAIR audit (W1): every compiled DS emits primary-hover, whose
+ * surface is picked contrast-aware, so ≥1 interaction-state pair is checked and it too passes.
  */
 import { describe, expect, it } from "vitest";
 import { mkdtempSync } from "node:fs";
@@ -30,7 +33,7 @@ function capture(args: string[]): { exitCode: number; stdout: string } {
   return { exitCode, stdout };
 }
 
-interface A11yData { mode: string; failures: unknown[]; checkedPairs: number; inferred: boolean }
+interface A11yData { mode: string; failures: unknown[]; checkedPairs: number; checkedStatePairs: number; statePairs: unknown[]; inferred: boolean }
 
 /** Compile a DS for `persona` into a temp dir, then run `ds a11y --json` and parse it. */
 function initThenA11y(persona: string): { exitCode: number; data: A11yData } {
@@ -46,31 +49,37 @@ const EXPECTED_PAIRS = 14;
 
 describe("compiled DS → ui ds a11y paired mode with zero failures (L7/L8)", () => {
   // Two personas from DIFFERENT families, per the acceptance criterion.
-  it("saas-aurora-minimal (functional-saas): mode 'paired', 14 pairs, 0 failures, exit 0", () => {
+  it("saas-aurora-minimal (functional-saas): mode 'paired', 14 pairs, ≥1 state pair, 0 failures, exit 0", () => {
+    // saas-aurora has a BLACK primary-foreground: its hover surface must be picked lighter
+    // (not the naive 600) or the state pair fails — the exact bug W1 closes.
     const { exitCode, data } = initThenA11y("saas-aurora-minimal");
     expect(data.mode).toBe("paired");
     expect(data.inferred).toBe(false);
     expect(data.checkedPairs).toBe(EXPECTED_PAIRS);
+    expect(data.checkedStatePairs).toBeGreaterThanOrEqual(1);
     expect(data.failures).toHaveLength(0);
     expect(exitCode).toBe(0);
   });
 
-  it("liquid-glass (material-surface): mode 'paired', 14 pairs, 0 failures, exit 0", () => {
+  it("liquid-glass (material-surface): mode 'paired', 14 pairs, ≥1 state pair, 0 failures, exit 0", () => {
     const { exitCode, data } = initThenA11y("liquid-glass");
     expect(data.mode).toBe("paired");
     expect(data.inferred).toBe(false);
     expect(data.checkedPairs).toBe(EXPECTED_PAIRS);
+    expect(data.checkedStatePairs).toBeGreaterThanOrEqual(1);
     expect(data.failures).toHaveLength(0);
     expect(exitCode).toBe(0);
   });
 
   // Stronger guarantee: EVERY persona compiles to a clean paired audit over all 14 pairs —
   // the contrast-aware picker must never leave a sub-AA foreground for any brand hue.
-  it("every persona in the index compiles to paired mode, 14 pairs, 0 a11y failures", () => {
+  it("every persona in the index compiles to paired mode, 14 pairs, ≥1 state pair, 0 a11y failures", () => {
     for (const p of loadPersonaIndex(PERSONA_DATA)) {
       const { exitCode, data } = initThenA11y(p.slug);
       expect(data.mode, `${p.slug} mode`).toBe("paired");
       expect(data.checkedPairs, `${p.slug} pairs`).toBe(EXPECTED_PAIRS);
+      // Every persona ships primary-hover → its state pair is checked and must also pass.
+      expect(data.checkedStatePairs, `${p.slug} state pairs`).toBeGreaterThanOrEqual(1);
       expect(data.failures, `${p.slug} failures`).toHaveLength(0);
       expect(exitCode, `${p.slug} exit`).toBe(0);
     }

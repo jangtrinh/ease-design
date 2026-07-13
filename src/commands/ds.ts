@@ -37,7 +37,7 @@ Subcommands:
   status         Show the manifest summary (generation, persona, hashes)
   diff           Compare two DS states (dirs with design.tokens.json) → semver + visual-breaking classification
   docs           Regenerate component reference docs from the registry (decay-proof)
-  a11y           Token-pair contrast audit (text×surface ≥ AA); exit 1 on a fail. Declared pairs only — not a conformance claim.
+  a11y           Token-pair contrast audit (text×surface ≥ AA, incl. hover/active state pairs); exit 1 on a fail. Declared tokens only — not a conformance claim.
   specimen       Report each component's variant×state matrix + applicable-state gaps (missing disabled/empty)
   preview        Generate a self-contained specimen.html from the compiled tokens + registry
 

@@ -542,7 +542,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "REGISTRY_NOT_FOUND", "BAD_REGISTRY", "WRITE_ERROR"],
       },
       a11y: {
-        summary: "Token-pair contrast audit (text×surface ≥ AA); declared pairs only",
+        summary: "Token-pair contrast audit (text×surface ≥ AA, incl. hover/active state pairs); declared tokens only",
         positionals: [],
         flags: [
           { name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd)" },

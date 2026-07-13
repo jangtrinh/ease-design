@@ -3,7 +3,7 @@
  *
  * The surface is the L8 popover pair (`--color-popover` + `--color-popover-foreground`) on
  * `--radius-card`, lifted by the semantic `elevation.overlay` shadow (its `--elevation-overlay-*`
- * members). The scrim is a `color-mix` of `--color-foreground` toward transparent. The modal
+ * members). The scrim is a `color-mix` of the semantic `--color-scrim` veil toward transparent. The modal
  * carries `role="dialog"`, `aria-modal="true"`, and `aria-labelledby`/`aria-describedby`; the
  * icon close button is named with `aria-label`. States: Default | Open (rendered open).
  *
@@ -15,7 +15,7 @@ const markup = `<div class="ui-kit ui-dialog">
   <style>
     .ui-dialog { font-family: var(--font-family-body); }
     .ui-dialog__stage { position: relative; min-height: var(--space-16); padding: var(--space-8) var(--space-4); border-radius: var(--radius-card); overflow: hidden; background: var(--color-muted); }
-    .ui-dialog__scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--color-foreground) 45%, transparent); }
+    .ui-dialog__scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--color-scrim) 45%, transparent); }
     .ui-dialog__modal {
       position: relative; margin: 0 auto; max-width: 380px; display: grid; gap: var(--space-4);
       padding: var(--space-5); background: var(--color-popover); color: var(--color-popover-foreground);
@@ -66,7 +66,7 @@ export const dialog: KitComponent = {
     "State=Default", "State=Open",
   ],
   tokensUsed: [
-    "color.muted", "color.foreground",
+    "color.muted", "color.scrim",
     "color.popover", "color.popover-foreground", "color.muted-foreground", "color.ring",
     "color.secondary", "color.secondary-foreground",
     "color.danger", "color.danger-foreground",
