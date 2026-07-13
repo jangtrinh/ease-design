@@ -1,14 +1,492 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
+<title>Figma Design Agent</title>
 <style>
-  body{font:12px/1.5 -apple-system,sans-serif;margin:8px;color:#333}
-  #status{padding:6px 8px;border-radius:6px;background:#eee}
-  #status.ok{background:#d9f2df}
-  #status.err{background:#fde2e2}
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design tokens — DOGFOODED from ease-design's own DS pipeline, NOT hand-picked.
+   Same persona as EaseUI (saas-aurora-minimal) so the panel is one product identity.
+   Do NOT edit the :root block by hand; regenerate it (run from the repo root):
+
+     ui ds init figma-panel --persona saas-aurora-minimal \
+       --intent "compact tool chrome for the Figma bridge panel" \
+       --dir <tmp> --persona-data knowledge/personas/personas.json
+     ui tokens compile <tmp>/design/design.tokens.json --target css
+
+   Persona family: functional-saas · 160 tokens · compiled 2026-07-14.
+   Rule: no hex outside this :root — every color in the chrome below goes through a var().
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  --base-black: #000000;
+  --base-white: #FFFFFF;
+  --chart-1: #727CD9;
+  --chart-2: #C25F93;
+  --chart-3: #C16F0E;
+  --chart-4: #639737;
+  --chart-5: #0098A5;
+  --color-accent: #EAEDFF;
+  --color-accent-foreground: #040026;
+  --color-background: #F2F5FC;
+  --color-border: #C5CBD6;
+  --color-card: #E4E8F0;
+  --color-card-foreground: #0B0D13;
+  --color-chart-1: #727CD9;
+  --color-chart-2: #C25F93;
+  --color-chart-3: #C16F0E;
+  --color-chart-4: #639737;
+  --color-chart-5: #0098A5;
+  --color-danger: #CB262C;
+  --color-danger-foreground: #FFFFFF;
+  --color-foreground: #0B0D13;
+  --color-info: #2367D3;
+  --color-info-foreground: #FFFFFF;
+  --color-input: #A5ABB8;
+  --color-muted: #C5CBD6;
+  --color-muted-foreground: #4F5662;
+  --color-popover: #E4E8F0;
+  --color-popover-foreground: #0B0D13;
+  --color-primary: #6366F1;
+  --color-primary-foreground: #000000;
+  --color-primary-hover: #7D87FF;
+  --color-ring: #6366F1;
+  --color-scrim: #020306;
+  --color-secondary: #C5CBD6;
+  --color-secondary-foreground: #0B0D13;
+  --color-sidebar: #E4E8F0;
+  --color-sidebar-accent: #EAEDFF;
+  --color-sidebar-accent-foreground: #040026;
+  --color-sidebar-border: #C5CBD6;
+  --color-sidebar-foreground: #0B0D13;
+  --color-sidebar-primary: #6366F1;
+  --color-sidebar-primary-foreground: #000000;
+  --color-sidebar-ring: #6366F1;
+  --color-success: #007B54;
+  --color-success-foreground: #FFFFFF;
+  --color-warning: #A66900;
+  --color-warning-foreground: #FFFFFF;
+  --danger-50: #FFF1EF;
+  --danger-100: #FFDEDB;
+  --danger-200: #FFB3AC;
+  --danger-300: #FF7C74;
+  --danger-400: #EF4444;
+  --danger-500: #CB262C;
+  --danger-600: #A00A19;
+  --danger-700: #73000B;
+  --danger-800: #480003;
+  --danger-900: #250000;
+  --danger-950: #110000;
+  --duration-base: 200ms;
+  --duration-fast: 150ms;
+  --duration-slow: 300ms;
+  --elevation-card-blur: 2px;
+  --elevation-card-color: #080D17;
+  --elevation-card-offset-x: 0px;
+  --elevation-card-offset-y: 1px;
+  --elevation-card-spread: 0px;
+  --elevation-overlay-blur: 24px;
+  --elevation-overlay-color: #080D17;
+  --elevation-overlay-offset-x: 0px;
+  --elevation-overlay-offset-y: 12px;
+  --elevation-overlay-spread: 0px;
+  --font-family-body: Inter, system-ui, sans-serif;
+  --font-family-display: Inter, system-ui, sans-serif;
+  --font-size-2xl: 25px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 32px;
+  --font-size-lg: 20px;
+  --font-size-md: 18px;
+  --font-size-sm: 16px;
+  --font-size-xl: 22px;
+  --font-size-xs: 14px;
+  --font-weight-bold: 700;
+  --font-weight-medium: 500;
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --info-50: #EAF2FF;
+  --info-100: #D5E5FF;
+  --info-200: #A5C8FF;
+  --info-300: #6FA6FF;
+  --info-400: #3B82F6;
+  --info-500: #2367D3;
+  --info-600: #104BA7;
+  --info-700: #043279;
+  --info-800: #001B4D;
+  --info-900: #000927;
+  --info-950: #000114;
+  --motion-base: 200ms;
+  --motion-fast: 150ms;
+  --neutral-50: #F2F5FC;
+  --neutral-100: #E4E8F0;
+  --neutral-200: #C5CBD6;
+  --neutral-300: #A5ABB8;
+  --neutral-400: #868D9B;
+  --neutral-500: #6B7280;
+  --neutral-600: #4F5662;
+  --neutral-700: #363B45;
+  --neutral-800: #1E222A;
+  --neutral-900: #0B0D13;
+  --neutral-950: #020306;
+  --primary-50: #FAFBFF;
+  --primary-100: #EAEDFF;
+  --primary-200: #C6CFFF;
+  --primary-300: #A0ACFF;
+  --primary-400: #7D87FF;
+  --primary-500: #6366F1;
+  --primary-600: #4946C9;
+  --primary-700: #322A9A;
+  --primary-800: #1D126A;
+  --primary-900: #0C023E;
+  --primary-950: #040026;
+  --radius-button: 6px;
+  --radius-card: 10px;
+  --radius-full: 9999px;
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --shadow-lg-blur: 24px;
+  --shadow-lg-color: #080D17;
+  --shadow-lg-offset-x: 0px;
+  --shadow-lg-offset-y: 12px;
+  --shadow-lg-spread: 0px;
+  --shadow-md-blur: 8px;
+  --shadow-md-color: #080D17;
+  --shadow-md-offset-x: 0px;
+  --shadow-md-offset-y: 4px;
+  --shadow-md-spread: 0px;
+  --shadow-sm-blur: 2px;
+  --shadow-sm-color: #080D17;
+  --shadow-sm-offset-x: 0px;
+  --shadow-sm-offset-y: 1px;
+  --shadow-sm-spread: 0px;
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-component: 16px;
+  --space-inline: 8px;
+  --space-section: 40px;
+  --success-50: #AFFFD8;
+  --success-100: #87F7C4;
+  --success-200: #54DAA2;
+  --success-300: #10B981;
+  --success-400: #009868;
+  --success-500: #007B54;
+  --success-600: #005C3E;
+  --success-700: #003F29;
+  --success-800: #002415;
+  --success-900: #000E06;
+  --success-950: #000401;
+  --text-body-font-family: Inter, system-ui, sans-serif;
+  --text-body-font-size: 18px;
+  --text-body-font-weight: 400;
+  --text-body-letter-spacing: 0px;
+  --text-body-line-height: 1.5;
+  --text-caption-font-family: Inter, system-ui, sans-serif;
+  --text-caption-font-size: 16px;
+  --text-caption-font-weight: 400;
+  --text-caption-letter-spacing: 0px;
+  --text-caption-line-height: 1.4;
+  --text-heading-font-family: Inter, system-ui, sans-serif;
+  --text-heading-font-size: 25px;
+  --text-heading-font-weight: 600;
+  --text-heading-letter-spacing: 0px;
+  --text-heading-line-height: 1.2;
+  --warning-50: #FFFBF7;
+  --warning-100: #FFECD6;
+  --warning-200: #FFC785;
+  --warning-300: #F59E0B;
+  --warning-400: #CB8100;
+  --warning-500: #A66900;
+  --warning-600: #7E4E00;
+  --warning-700: #593500;
+  --warning-800: #371E00;
+  --warning-900: #1A0C00;
+  --warning-950: #0A0300;
+}
+
+/* Panel override (spec P2 §Tokens): the plugin iframe cannot load a webfont, so
+   the display/body families fall back to the host system stack — self-contained. */
+:root {
+  --font-family-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Panel chrome ─────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-foreground);
+  background: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  min-height: 100%;
+}
+
+/* Header: title · version · docs link */
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.brand-title {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+.brand-version {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+.docs-link {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+.docs-link:hover { background: var(--color-accent); color: var(--color-accent-foreground); }
+.docs-link:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+
+/* Status hero */
+.status-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm-offset-x) var(--shadow-sm-offset-y) var(--shadow-sm-blur) var(--shadow-sm-spread) var(--color-scrim);
+}
+.status-row { display: flex; align-items: center; gap: var(--space-3); }
+.status-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-foreground);
+}
+.status-dot[data-tone="success"] { background: var(--color-success); }
+.status-dot[data-tone="warning"] { background: var(--color-warning); }
+.status-dot[data-tone="info"]    { background: var(--color-info); }
+.status-dot[data-tone="muted"]   { background: var(--color-muted-foreground); }
+.status-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background: inherit;
+  opacity: 0;
+}
+.status-dot.is-pulsing::after { animation: fga-ping 1.6s ease-out infinite; }
+
+.status-pill {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+.status-sentence { margin: 0; color: var(--color-muted-foreground); }
+.status-sentence:empty { display: none; }
+.status-meta {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.status-meta:empty { display: none; }
+
+/* Onboarding (first-run only; JS toggles [hidden]) */
+.onboarding {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent);
+  border-radius: var(--radius-md);
+}
+.onboarding-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-accent-foreground);
+}
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--font-size-xs);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-foreground);
+}
+
+/* Section label (activity heading + details summary) */
+.section-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  color: var(--color-muted-foreground);
+}
+
+/* Activity log */
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 168px;
+  overflow-y: auto;
+}
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--font-size-xs);
+}
+.log-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+}
+.log-dot[data-ok="false"] { background: var(--color-danger); }
+.log-tool { font-weight: var(--font-weight-medium); color: var(--color-foreground); }
+.log-meta {
+  margin-left: auto;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.activity-empty { font-size: var(--font-size-xs); color: var(--color-muted-foreground); }
+
+/* Troubleshoot hint */
+.hint { margin: 0; font-size: var(--font-size-xs); color: var(--color-muted-foreground); }
+.hint:empty { display: none; }
+
+/* Connection details */
+.conn-details {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+.conn-details > summary {
+  cursor: pointer;
+  list-style: revert;
+}
+.conn-details > summary:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+.detail-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-xs);
+}
+.detail-grid dt { color: var(--color-muted-foreground); }
+.detail-grid dd { margin: 0; color: var(--color-foreground); font-variant-numeric: tabular-nums; }
+
+.ghost-btn {
+  margin-top: var(--space-3);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+.ghost-btn:hover { background: var(--color-card); border-color: var(--color-input); }
+.ghost-btn:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+
+/* Motion — the probing dot pings outward. Guarded below for reduced motion. */
+@keyframes fga-ping {
+  0%   { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0;    transform: scale(2.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.is-pulsing::after { animation: none; }
+  .docs-link, .ghost-btn { transition: none; }
+}
 </style>
-<div id="status">figma-agent: starting…</div>
-<div id="detail"></div>
-<script>"use strict";
+</head>
+<body>
+<main class="panel">
+  <header class="app-header">
+    <h1 class="brand-title">Figma Design Agent</h1>
+    <span class="brand-version" id="fga-version">v0.1.0</span>
+    <a class="docs-link" id="fga-docs" href="https://github.com/jangtrinh/ease-design/blob/main/figma-agent/README.md"
+       target="_blank" rel="noopener" aria-label="Open the figma-agent documentation in a new tab">Docs&nbsp;↗</a>
+  </header>
+
+  <section class="status-hero" id="fga-hero" aria-live="polite" aria-label="Connection status">
+    <div class="status-row">
+      <span class="status-dot" id="fga-dot" data-tone="muted"></span>
+      <span class="status-pill" id="fga-pill" data-tone="muted">Starting…</span>
+    </div>
+    <p class="status-sentence" id="fga-sentence">The broker starts automatically on your first CLI command.</p>
+    <p class="status-meta" id="fga-meta"></p>
+  </section>
+
+  <section class="onboarding" id="fga-onboarding" aria-label="Getting started">
+    <ul class="onboarding-list">
+      <li>This panel bridges the figma-agent CLI to this file.</li>
+      <li>Verify from a terminal: <code>figma-agent status</code></li>
+      <li>Keep this panel open while agents work.</li>
+    </ul>
+  </section>
+
+  <section class="activity" aria-label="Activity log">
+    <h2 class="section-label">Activity</h2>
+    <ul class="activity-list" id="fga-activity" aria-live="polite">
+      <li class="activity-empty">No activity yet — run a figma-agent command.</li>
+    </ul>
+  </section>
+
+  <p class="hint" id="fga-hint" aria-live="polite"></p>
+
+  <details class="conn-details">
+    <summary class="section-label">Connection details</summary>
+    <dl class="detail-grid">
+      <dt>Port</dt><dd id="fga-d-port">—</dd>
+      <dt>Protocol</dt><dd id="fga-d-proto">—</dd>
+      <dt>Heartbeat</dt><dd id="fga-d-heartbeat">—</dd>
+      <dt>Reconnect attempts</dt><dd id="fga-d-attempts">—</dd>
+      <dt>File</dt><dd id="fga-d-file">—</dd>
+      <dt>Page</dt><dd id="fga-d-page">—</dd>
+    </dl>
+    <button class="ghost-btn" id="fga-copy" type="button">Copy status</button>
+  </details>
+</main>
+<script>
+"use strict";
 (() => {
   // shared/protocol.ts
   var PROTOCOL_VERSION = 1;
@@ -51,6 +529,205 @@
     const delay = Math.round(base + base * jitter * rand());
     return { base, delay };
   }
+
+  // plugin/src/ui/panel-model.ts
+  var STATE_VIEW = {
+    connected: { pill: "Connected", tone: "success", pulse: false, sentence: "Ready \u2014 the CLI can drive this file." },
+    probing: { pill: "Looking for broker\u2026", tone: "warning", pulse: true, sentence: "" },
+    handshake: { pill: "Handshaking\u2026", tone: "info", pulse: false, sentence: "" },
+    disconnected: { pill: "No broker yet", tone: "muted", pulse: false, sentence: "The broker starts automatically on your first CLI command." }
+  };
+  function stateView(state) {
+    return STATE_VIEW[state] ?? STATE_VIEW.disconnected;
+  }
+  function formatAge(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "\u2014";
+    const s = Math.floor(ms / 1e3);
+    if (s < 1) return "just now";
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+  }
+  function formatDuration(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "\u2014";
+    if (ms < 1e3) return `${Math.round(ms)}ms`;
+    return `${(ms / 1e3).toFixed(1)}s`;
+  }
+  function timeAgo(nowMs, atMs) {
+    const s = Math.floor((nowMs - atMs) / 1e3);
+    if (s < 1) return "just now";
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    return `${Math.floor(m / 60)}h ago`;
+  }
+  function toActivityRecord(detail) {
+    if (detail === null || typeof detail !== "object") return null;
+    const d = detail;
+    if (typeof d.tool !== "string" || d.tool === "") return null;
+    return {
+      tool: d.tool,
+      ok: d.ok === true,
+      ms: typeof d.ms === "number" && Number.isFinite(d.ms) && d.ms >= 0 ? d.ms : 0,
+      at: typeof d.at === "number" && Number.isFinite(d.at) ? d.at : Date.now()
+    };
+  }
+  function humanizeTool(tool) {
+    return tool.toLowerCase().replace(/_/g, " ");
+  }
+  function pushActivity(buf, rec, max = 50) {
+    return [rec, ...buf].slice(0, Math.max(0, max));
+  }
+  function troubleshootHint(state, ageMs, hadConnection2) {
+    if (state === "probing" && ageMs >= 1e4) {
+      return "Broker not running? Any CLI command spawns it \u2014 run figma-agent status in a terminal.";
+    }
+    if (state === "disconnected" && hadConnection2) {
+      return "Connection lost \u2014 retrying automatically.";
+    }
+    return null;
+  }
+  function showOnboarding(state, hadConnection2) {
+    return !hadConnection2 && (state === "disconnected" || state === "probing");
+  }
+
+  // plugin/src/ui/panel-ui.ts
+  var el = (id) => document.getElementById(id);
+  var dot = el("fga-dot");
+  var pill = el("fga-pill");
+  var sentence = el("fga-sentence");
+  var meta = el("fga-meta");
+  var onboarding = el("fga-onboarding");
+  var hint = el("fga-hint");
+  var activityList = el("fga-activity");
+  var dPort = el("fga-d-port");
+  var dProto = el("fga-d-proto");
+  var dHeartbeat = el("fga-d-heartbeat");
+  var dAttempts = el("fga-d-attempts");
+  var dFile = el("fga-d-file");
+  var dPage = el("fga-d-page");
+  var copyBtn = el("fga-copy");
+  var payload = null;
+  var hadConnection = false;
+  var probeAttempts = 0;
+  var activity = [];
+  var sceneFile = "";
+  var scenePage = "";
+  function metaLine(state, now) {
+    if (!payload) return "";
+    const age = now - payload.since;
+    if (state === "connected") {
+      return `${payload.port ? `Port ${payload.port}` : "Connected"} \xB7 up ${formatAge(age)}`;
+    }
+    if (state === "probing") {
+      return `Attempt ${Math.max(1, probeAttempts)} \xB7 retrying (${formatAge(age)})`;
+    }
+    return "";
+  }
+  function renderDetails() {
+    const port = payload?.port;
+    const pong = payload?.lastPongAge;
+    dPort.textContent = port ? String(port) : "\u2014";
+    dProto.textContent = payload ? `v${payload.protocolVersion}` : "\u2014";
+    dHeartbeat.textContent = pong != null ? `${formatAge(pong)} ago` : "\u2014";
+    dAttempts.textContent = String(probeAttempts);
+    dFile.textContent = sceneFile || "\u2014";
+    dPage.textContent = scenePage || "\u2014";
+  }
+  function renderActivity(now) {
+    if (activity.length === 0) return;
+    const rows = activity.slice(0, 8).map((r) => {
+      const li = document.createElement("li");
+      li.className = "activity-row";
+      const d = document.createElement("span");
+      d.className = "log-dot";
+      d.dataset.ok = String(r.ok);
+      const tool = document.createElement("span");
+      tool.className = "log-tool";
+      tool.textContent = humanizeTool(r.tool);
+      const m = document.createElement("span");
+      m.className = "log-meta";
+      m.textContent = `${r.ok ? "" : "failed \xB7 "}${formatDuration(r.ms)} \xB7 ${timeAgo(now, r.at)}`;
+      li.append(d, tool, m);
+      return li;
+    });
+    activityList.replaceChildren(...rows);
+  }
+  function render() {
+    const now = Date.now();
+    const state = payload?.state ?? "disconnected";
+    const view = stateView(state);
+    dot.dataset.tone = view.tone;
+    dot.classList.toggle("is-pulsing", view.pulse);
+    pill.textContent = view.pill;
+    pill.dataset.tone = view.tone;
+    sentence.textContent = view.sentence;
+    meta.textContent = metaLine(state, now);
+    onboarding.hidden = !showOnboarding(state, hadConnection);
+    hint.textContent = troubleshootHint(state, payload ? now - payload.since : 0, hadConnection) ?? "";
+    renderDetails();
+    renderActivity(now);
+  }
+  window.addEventListener("figma-agent:conn-state", (ev) => {
+    const p = ev.detail;
+    if (!p || typeof p.state !== "string") return;
+    if (p.state === "connected") hadConnection = true;
+    if (p.state === "probing" && p.port === PORT_RANGE_START) probeAttempts++;
+    payload = p;
+    render();
+  });
+  window.addEventListener("figma-agent:activity", (ev) => {
+    const rec = toActivityRecord(ev.detail);
+    if (!rec) return;
+    activity = pushActivity(activity, rec);
+    renderActivity(Date.now());
+  });
+  window.addEventListener("message", (ev) => {
+    const pm = ev.data?.pluginMessage;
+    if (!pm || pm.type !== "FILE_INFO" || !pm.data) return;
+    if (typeof pm.data.fileName === "string") sceneFile = pm.data.fileName;
+    if (typeof pm.data.page === "string") scenePage = pm.data.page;
+    renderDetails();
+  });
+  function fallbackCopy(text, done) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      done();
+    } catch {
+    }
+  }
+  copyBtn.addEventListener("click", () => {
+    const snapshot = {
+      state: payload?.state ?? "disconnected",
+      port: payload?.port ?? null,
+      protocolVersion: payload?.protocolVersion ?? null,
+      lastPongAge: payload?.lastPongAge ?? null,
+      reconnectAttempts: probeAttempts,
+      file: sceneFile || null,
+      page: scenePage || null,
+      recentActivity: activity.slice(0, 8)
+    };
+    const text = JSON.stringify(snapshot, null, 2);
+    const done = () => {
+      copyBtn.textContent = "Copied";
+      setTimeout(() => {
+        copyBtn.textContent = "Copy status";
+      }, 1500);
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+    else fallbackCopy(text, done);
+  });
+  setInterval(render, 1e3);
+  render();
 
   // plugin/src/ui/converter/color-utils.ts
   var NAMED_COLORS = {
@@ -214,8 +891,8 @@
     if (cssAlign === "justify") return "JUSTIFIED";
     return "LEFT";
   }
-  function buildTextNode(el, cs, win) {
-    const tag = el.tagName;
+  function buildTextNode(el2, cs, win) {
+    const tag = el2.tagName;
     const isHeading = /^H[1-6]$/.test(tag);
     const fontSize = parseFloat(cs.fontSize) || 16;
     const fontWeight = parseInt(cs.fontWeight) || 400;
@@ -228,11 +905,11 @@
     const letterSpacing = cs.letterSpacing !== "normal" ? parseFloat(cs.letterSpacing) : void 0;
     const textColor = parseCssColor(cs.color);
     const textAlignHorizontal = mapTextAlign(cs.textAlign);
-    const rect = el.getBoundingClientRect();
+    const rect = el2.getBoundingClientRect();
     const segments = [];
     let fullText = "";
-    if (el.children.length > 0) {
-      for (const child of Array.from(el.childNodes)) {
+    if (el2.children.length > 0) {
+      for (const child of Array.from(el2.childNodes)) {
         if (child.nodeType === 3) {
           const text = (child.textContent || "").replace(/\s+/g, " ");
           if (text.trim()) {
@@ -278,9 +955,9 @@
       }
     }
     if (segments.length === 0) {
-      fullText = (el.innerText || el.textContent || "").trim();
+      fullText = (el2.innerText || el2.textContent || "").trim();
     }
-    const trimmedText = fullText.trim() || (el.innerText || el.textContent || "").trim();
+    const trimmedText = fullText.trim() || (el2.innerText || el2.textContent || "").trim();
     const lineHeightPx = normalizedLineHeight || Math.round(fontSize * 1.4);
     const renderedSingleLine = rect.height > 0 && rect.height < lineHeightPx * 1.5;
     const noWrap = cs.whiteSpace === "nowrap" || cs.whiteSpace === "pre";
@@ -325,9 +1002,9 @@
     }
     return node;
   }
-  function extractPseudoElement(el, win, pseudo) {
+  function extractPseudoElement(el2, win, pseudo) {
     try {
-      const pcs = win.getComputedStyle(el, pseudo);
+      const pcs = win.getComputedStyle(el2, pseudo);
       const content = pcs.content;
       if (!content || content === "none" || content === "normal") return null;
       if (pcs.display === "none" || pcs.visibility === "hidden") return null;
@@ -379,8 +1056,8 @@
       return null;
     }
   }
-  function buildDirectTextNode(el, win, directText) {
-    const textCs = win.getComputedStyle(el);
+  function buildDirectTextNode(el2, win, directText) {
+    const textCs = win.getComputedStyle(el2);
     const textColor = parseCssColor(textCs.color);
     const textNode = {
       type: "TEXT",
@@ -407,17 +1084,17 @@
   }
 
   // plugin/src/ui/converter/build-frame-children.ts
-  function hasExplicitDimension(el, prop, win) {
-    const inlineVal = el.style[prop];
+  function hasExplicitDimension(el2, prop, win) {
+    const inlineVal = el2.style[prop];
     if (inlineVal && inlineVal !== "auto" && inlineVal !== "") return true;
-    const cs = win.getComputedStyle(el);
+    const cs = win.getComputedStyle(el2);
     if (cs[prop] === "auto") return false;
     if (cs.flexBasis && cs.flexBasis !== "auto" && cs.flexBasis !== "0px") return true;
-    if (el.getAttribute("style")?.includes(prop)) return true;
-    if (el.getAttribute(prop)) return true;
+    if (el2.getAttribute("style")?.includes(prop)) return true;
+    if (el2.getAttribute(prop)) return true;
     const display = cs.display;
     if (prop === "width" && (display === "block" || display === "flex" || display === "grid")) return false;
-    const parentEl = el.parentElement;
+    const parentEl = el2.parentElement;
     if (parentEl) {
       const parentDisplay = win.getComputedStyle(parentEl).display;
       if (parentDisplay.includes("flex") || parentDisplay === "grid") {
@@ -426,14 +1103,14 @@
     }
     return false;
   }
-  function collectOrderedEntries(el) {
+  function collectOrderedEntries(el2) {
     const entries = [];
-    if (el.children.length === 0 && (el.innerText || "").trim()) {
-      entries.push({ kind: "text", text: el.innerText.trim() });
+    if (el2.children.length === 0 && (el2.innerText || "").trim()) {
+      entries.push({ kind: "text", text: el2.innerText.trim() });
       return entries;
     }
     let textRun = "";
-    for (const child of Array.from(el.childNodes)) {
+    for (const child of Array.from(el2.childNodes)) {
       if (child.nodeType === 3) {
         textRun += child.textContent || "";
       } else if (child.nodeType === 1) {
@@ -443,8 +1120,8 @@
       }
     }
     if (textRun.trim()) entries.push({ kind: "text", text: textRun.trim() });
-    if (el.shadowRoot) {
-      for (const shadowChild of Array.from(el.shadowRoot.children)) {
+    if (el2.shadowRoot) {
+      for (const shadowChild of Array.from(el2.shadowRoot.children)) {
         if (shadowChild.nodeType === 1 && shadowChild.tagName !== "STYLE") {
           entries.push({ kind: "el", el: shadowChild });
         }
@@ -452,14 +1129,14 @@
     }
     return entries;
   }
-  function buildChildNodes(el, cs, parentNode, win, depth) {
+  function buildChildNodes(el2, cs, parentNode, win, depth) {
     const children = [];
-    const beforeNode = extractPseudoElement(el, win, "::before");
+    const beforeNode = extractPseudoElement(el2, win, "::before");
     if (beforeNode) children.push(beforeNode);
     const display = cs.display;
     const sizingDir = parentNode.layoutMode === "GRID" ? "HORIZONTAL" : parentNode.layoutMode;
     const parentAlignItems = cs.alignItems || "stretch";
-    const entries = collectOrderedEntries(el);
+    const entries = collectOrderedEntries(el2);
     const hasTextRuns = entries.some((e) => e.kind === "text");
     const hasElementEntries = entries.some((e) => e.kind === "el");
     if (hasTextRuns && hasElementEntries) {
@@ -482,7 +1159,7 @@
     }
     for (const entry of entries) {
       if (entry.kind === "text") {
-        children.push(buildDirectTextNode(el, win, entry.text));
+        children.push(buildDirectTextNode(el2, win, entry.text));
         continue;
       }
       const childEl = entry.el;
@@ -554,7 +1231,7 @@
       }
       children.push(childNode);
     }
-    const afterNode = extractPseudoElement(el, win, "::after");
+    const afterNode = extractPseudoElement(el2, win, "::after");
     if (afterNode) children.push(afterNode);
     return children;
   }
@@ -588,10 +1265,10 @@
     }
     return count;
   }
-  function deriveComputedNodeName(el) {
-    const ariaLabel = el.getAttribute("aria-label");
+  function deriveComputedNodeName(el2) {
+    const ariaLabel = el2.getAttribute("aria-label");
     if (ariaLabel) return ariaLabel;
-    const id = el.getAttribute("id");
+    const id = el2.getAttribute("id");
     if (id) return id;
     const tagNames = {
       NAV: "Navigation",
@@ -608,14 +1285,14 @@
       TABLE: "Table",
       BUTTON: "Button"
     };
-    if (tagNames[el.tagName]) return tagNames[el.tagName];
-    const classes = (el.getAttribute("class") || "").split(/\s+/).filter(Boolean);
+    if (tagNames[el2.tagName]) return tagNames[el2.tagName];
+    const classes = (el2.getAttribute("class") || "").split(/\s+/).filter(Boolean);
     const meaningfulClass = classes.find((c) => !c.startsWith("flex") && !c.startsWith("grid") && !c.startsWith("p-") && !c.startsWith("m-") && !c.startsWith("w-") && !c.startsWith("h-") && !c.startsWith("bg-") && !c.startsWith("text-") && !c.startsWith("rounded") && !c.startsWith("border") && !c.startsWith("shadow") && !c.startsWith("gap") && !c.startsWith("items-") && !c.startsWith("justify-") && !c.startsWith("space-") && !c.startsWith("overflow") && !c.startsWith("relative") && !c.startsWith("absolute") && !c.startsWith("min-") && !c.startsWith("max-") && c !== "inline-flex");
     if (meaningfulClass) return meaningfulClass;
     return "Frame";
   }
-  function buildFrameNode(el, cs, win, depth) {
-    const node = { type: "FRAME", name: deriveComputedNodeName(el) };
+  function buildFrameNode(el2, cs, win, depth) {
+    const node = { type: "FRAME", name: deriveComputedNodeName(el2) };
     const display = cs.display;
     const flexDir = cs.flexDirection;
     if (display.includes("flex") || display === "inline-flex") {
@@ -670,7 +1347,7 @@
       if (rowGap > 0 && rowGap !== colGap) node.counterAxisSpacing = Math.round(rowGap);
     }
     if (!node.itemSpacing || node.itemSpacing === 0) {
-      const childEls = Array.from(el.children).filter((c) => c.nodeType === 1);
+      const childEls = Array.from(el2.children).filter((c) => c.nodeType === 1);
       if (childEls.length >= 2) {
         const isVertical = node.layoutMode === "VERTICAL";
         const margins = [];
@@ -712,20 +1389,20 @@
     if (overflow === "hidden" || overflow === "clip" || overflow === "scroll" || overflow === "auto") {
       node.clipsContent = true;
     }
-    const rect = el.getBoundingClientRect();
-    const width = rect.width || el.offsetWidth;
-    const height = rect.height || el.offsetHeight;
+    const rect = el2.getBoundingClientRect();
+    const width = rect.width || el2.offsetWidth;
+    const height = rect.height || el2.offsetHeight;
     if (width > 0) node.width = Math.round(width);
     if (height > 0) node.height = Math.round(height);
     if (cs.position === "absolute" || cs.position === "fixed") {
       node.absolutePosition = true;
-      const parentRect = el.parentElement?.getBoundingClientRect();
+      const parentRect = el2.parentElement?.getBoundingClientRect();
       if (parentRect) {
         node.x = Math.round(rect.left - parentRect.left);
         node.y = Math.round(rect.top - parentRect.top);
       } else {
-        node.x = el.offsetLeft;
-        node.y = el.offsetTop;
+        node.x = el2.offsetLeft;
+        node.y = el2.offsetTop;
       }
     }
     if (cs.marginLeft === "auto" && cs.marginRight === "auto") {
@@ -874,17 +1551,17 @@
         }];
       }
     }
-    const children = buildChildNodes(el, cs, node, win, depth);
+    const children = buildChildNodes(el2, cs, node, win, depth);
     const textOnlyChildren = children.length > 0 && children.every((c) => c.type === "TEXT");
     if (textOnlyChildren) {
       const flexLike = display.includes("flex");
       const pillShape = (node.cornerRadius !== void 0 || node.cornerRadii !== void 0) && ((node.paddingLeft || 0) > 0 || (node.paddingRight || 0) > 0);
-      if (flexLike || pillShape || el.tagName === "BUTTON") {
+      if (flexLike || pillShape || el2.tagName === "BUTTON") {
         const squareTile = node.width !== void 0 && node.width > 0 && node.width === node.height;
         if (squareTile) {
           node.layoutSizingHorizontal = "FIXED";
           node.layoutSizingVertical = "FIXED";
-        } else if (!hasExplicitDimension(el, "width", win)) {
+        } else if (!hasExplicitDimension(el2, "width", win)) {
           node.layoutSizingHorizontal = "HUG";
           node.layoutSizingVertical = "HUG";
           node.primaryAxisSizingMode = "AUTO";
@@ -909,21 +1586,21 @@
     }
     return result;
   }
-  function computedElementToNode(el, win, depth) {
-    if (RENDERED_SKIP_TAGS.has(el.tagName)) return null;
+  function computedElementToNode(el2, win, depth) {
+    if (RENDERED_SKIP_TAGS.has(el2.tagName)) return null;
     if (depth > 20) return null;
-    const cs = win.getComputedStyle(el);
-    const tag = el.tagName;
+    const cs = win.getComputedStyle(el2);
+    const tag = el2.tagName;
     if (cs.display === "none") return null;
     if (cs.visibility === "hidden") return null;
     if (tag === "IMG") {
-      const img = el;
+      const img = el2;
       return {
         type: "IMAGE",
         name: img.getAttribute("alt") || "Image",
         imageUrl: img.currentSrc || img.getAttribute("src") || "",
-        width: el.offsetWidth || 200,
-        height: el.offsetHeight || 200
+        width: el2.offsetWidth || 200,
+        height: el2.offsetHeight || 200
       };
     }
     if (tag === "HR") {
@@ -931,42 +1608,42 @@
       return {
         type: "RECTANGLE",
         name: "Divider",
-        width: el.offsetWidth || 200,
-        height: Math.max(parseFloat(cs.borderTopWidth) || 1, el.offsetHeight || 1),
+        width: el2.offsetWidth || 200,
+        height: Math.max(parseFloat(cs.borderTopWidth) || 1, el2.offsetHeight || 1),
         fills: hrColor && hrColor.a > 0 ? [{ type: "SOLID", color: hrColor }] : [{ type: "SOLID", color: { r: 0.8, g: 0.8, b: 0.8, a: 1 } }]
       };
     }
     if (tag === "VIDEO") {
-      const videoEl = el;
+      const videoEl = el2;
       return {
         type: "IMAGE",
         name: "Video",
         imageUrl: videoEl.poster || videoEl.getAttribute("poster") || "",
-        width: el.offsetWidth || 320,
-        height: el.offsetHeight || 180
+        width: el2.offsetWidth || 320,
+        height: el2.offsetHeight || 180
       };
     }
     if (tag === "svg" || tag === "SVG") {
-      const rawSvg = el.outerHTML;
-      const w = el.clientWidth || parseInt(el.getAttribute("width") || "24") || 24;
-      const h = el.clientHeight || parseInt(el.getAttribute("height") || "24") || 24;
+      const rawSvg = el2.outerHTML;
+      const w = el2.clientWidth || parseInt(el2.getAttribute("width") || "24") || 24;
+      const h = el2.clientHeight || parseInt(el2.getAttribute("height") || "24") || 24;
       const computedColor = parseCssColor(cs.color);
       return {
         type: "IMAGE",
-        name: el.closest("[data-lucide]")?.getAttribute("data-lucide") || "Icon",
+        name: el2.closest("[data-lucide]")?.getAttribute("data-lucide") || "Icon",
         svgContent: prepareSvgContent(rawSvg, computedColor),
         width: w,
         height: h,
         fills: computedColor ? [{ type: "SOLID", color: computedColor }] : void 0
       };
     }
-    if (tag === "I" && el.hasAttribute("data-lucide")) {
-      const svg = el.querySelector("svg");
+    if (tag === "I" && el2.hasAttribute("data-lucide")) {
+      const svg = el2.querySelector("svg");
       const iconColor = parseCssColor(cs.color);
       if (svg) {
         return {
           type: "IMAGE",
-          name: el.getAttribute("data-lucide") || "Icon",
+          name: el2.getAttribute("data-lucide") || "Icon",
           svgContent: prepareSvgContent(svg.outerHTML, iconColor),
           width: svg.clientWidth || parseInt(svg.getAttribute("width") || "24") || 24,
           height: svg.clientHeight || parseInt(svg.getAttribute("height") || "24") || 24,
@@ -975,13 +1652,13 @@
       }
       return {
         type: "RECTANGLE",
-        name: el.getAttribute("data-lucide") || "Icon",
+        name: el2.getAttribute("data-lucide") || "Icon",
         width: parseInt(cs.width) || 16,
         height: parseInt(cs.height) || 16,
         fills: iconColor ? [{ type: "SOLID", color: iconColor }] : [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4, a: 1 } }]
       };
     }
-    if (tag === "I" && el.children.length === 0) {
+    if (tag === "I" && el2.children.length === 0) {
       const iconColor = parseCssColor(cs.color);
       return {
         type: "RECTANGLE",
@@ -994,13 +1671,13 @@
     if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") {
       const bgColor = parseCssColor(cs.backgroundColor);
       const borderColor = parseCssColor(cs.borderTopColor);
-      const inputEl = el;
+      const inputEl = el2;
       const placeholder = inputEl.placeholder || inputEl.value || "";
       const node = {
         type: "FRAME",
         name: placeholder || (tag === "INPUT" ? "Input" : tag === "SELECT" ? "Select" : "Textarea"),
-        width: el.offsetWidth || 200,
-        height: el.offsetHeight || 36,
+        width: el2.offsetWidth || 200,
+        height: el2.offsetHeight || 36,
         layoutMode: "HORIZONTAL",
         primaryAxisSizingMode: "AUTO",
         counterAxisSizingMode: "FIXED",
@@ -1031,28 +1708,28 @@
           opacity: isPlaceholder ? 0.4 : 1
         }];
       }
-      return attachMotion(el, node);
+      return attachMotion(el2, node);
     }
-    if (isRenderedTextNode(el, win)) {
-      const textNode = buildTextNode(el, cs, win);
+    if (isRenderedTextNode(el2, win)) {
+      const textNode = buildTextNode(el2, cs, win);
       if (cs.position === "absolute" || cs.position === "fixed") {
         textNode.absolutePosition = true;
-        const rect = el.getBoundingClientRect();
-        const parentRect = el.parentElement?.getBoundingClientRect();
+        const rect = el2.getBoundingClientRect();
+        const parentRect = el2.parentElement?.getBoundingClientRect();
         if (parentRect) {
           textNode.x = Math.round(rect.left - parentRect.left);
           textNode.y = Math.round(rect.top - parentRect.top);
         } else {
-          textNode.x = el.offsetLeft;
-          textNode.y = el.offsetTop;
+          textNode.x = el2.offsetLeft;
+          textNode.y = el2.offsetTop;
         }
       }
-      return attachMotion(el, textNode);
+      return attachMotion(el2, textNode);
     }
-    return attachMotion(el, buildFrameNode(el, cs, win, depth));
+    return attachMotion(el2, buildFrameNode(el2, cs, win, depth));
   }
-  function attachMotion(el, node) {
-    const raw = el.getAttribute("data-fa-motion");
+  function attachMotion(el2, node) {
+    const raw = el2.getAttribute("data-fa-motion");
     if (raw) {
       try {
         node.motion = JSON.parse(raw);
@@ -1061,27 +1738,27 @@
     }
     return node;
   }
-  function isRenderedTextNode(el, win) {
-    const tag = el.tagName;
+  function isRenderedTextNode(el2, win) {
+    const tag = el2.tagName;
     const hasContainerStyling = () => {
-      const cs = win.getComputedStyle(el);
+      const cs = win.getComputedStyle(el2);
       const bgColor = parseCssColor(cs.backgroundColor);
       const hasBg = !!(bgColor && bgColor.a > 0);
       const hasBorder = (parseFloat(cs.borderTopWidth) || 0) > 0 && parseCssColor(cs.borderTopColor)?.a !== void 0 && (parseCssColor(cs.borderTopColor)?.a || 0) > 0;
       const hasPadding = (parseFloat(cs.paddingTop) || 0) > 8 || (parseFloat(cs.paddingLeft) || 0) > 8;
       return hasBg || hasBorder || hasPadding;
     };
-    if (el.children.length === 0 && (el.textContent || "").trim()) {
+    if (el2.children.length === 0 && (el2.textContent || "").trim()) {
       return !hasContainerStyling();
     }
     if (/^H[1-6]$/.test(tag) || tag === "P" || tag === "SPAN" || tag === "LABEL" || tag === "A" || tag === "BUTTON") {
       if (hasContainerStyling()) return false;
-      if (el.children.length === 0) return true;
-      for (const child of Array.from(el.children)) {
+      if (el2.children.length === 0) return true;
+      for (const child of Array.from(el2.children)) {
         if (!["SPAN", "STRONG", "B", "EM", "I", "U", "A", "SMALL", "MARK", "CODE", "LABEL", "BR", "SVG", "IMG"].includes(child.tagName)) {
           return false;
         }
-        if (inlineChildBreaksMerge(child, el, win)) return false;
+        if (inlineChildBreaksMerge(child, el2, win)) return false;
       }
       return true;
     }
@@ -1155,16 +1832,16 @@
     let count = 0;
     const els = doc.querySelectorAll("*");
     for (let i = 0; i < els.length; i++) {
-      const el = els[i];
+      const el2 = els[i];
       try {
-        const cs = win.getComputedStyle(el);
+        const cs = win.getComputedStyle(el2);
         const name = cs.animationName;
         if (!name || name === "none") continue;
         const firstName = name.split(",")[0].trim();
         const steps = resolveKeyframeSteps(firstName, doc.styleSheets);
         const motion = buildMotionSpec(steps, parseAnimDurationSec(cs.animationDuration), cs.animationTimingFunction);
         if (motion) {
-          el.setAttribute("data-fa-motion", JSON.stringify(motion));
+          el2.setAttribute("data-fa-motion", JSON.stringify(motion));
           count++;
         }
       } catch {
@@ -1335,11 +2012,11 @@
     doc.body.style.overflowY = "visible";
     const revealSelectors = [".reveal", ".reveal-left", ".reveal-right", ".reveal-scale", ".reveal-hero", ".reveal-stagger"];
     for (const selector of revealSelectors) {
-      doc.querySelectorAll(selector).forEach((el) => el.classList.add("active"));
+      doc.querySelectorAll(selector).forEach((el2) => el2.classList.add("active"));
     }
     void doc.body.offsetHeight;
-    doc.querySelectorAll("*").forEach((el) => {
-      const htmlEl = el;
+    doc.querySelectorAll("*").forEach((el2) => {
+      const htmlEl = el2;
       if (!htmlEl.style) return;
       const cs = win.getComputedStyle(htmlEl);
       if (cs.opacity === "0") htmlEl.style.opacity = "1";
@@ -1462,6 +2139,17 @@
   var connState = "disconnected";
   var fileInfo = {};
   var chunkBuffers = /* @__PURE__ */ new Map();
+  var activityStart = /* @__PURE__ */ new Map();
+  function emitActivity(id, ok) {
+    const started = activityStart.get(id);
+    if (!started) return;
+    activityStart.delete(id);
+    const detail = { tool: started.cmd, ok, ms: Date.now() - started.at, at: started.at };
+    try {
+      window.dispatchEvent(new CustomEvent("figma-agent:activity", { detail }));
+    } catch {
+    }
+  }
   function renderStatusDom(p) {
     const statusEl = document.getElementById("status");
     const detailEl = document.getElementById("detail");
@@ -1480,10 +2168,10 @@
   }
   function transition(event, extra = {}) {
     connState = reduceConnState(connState, event);
-    const payload = makeStatePayload(connState, { since: Date.now(), ...extra });
-    renderStatusDom(payload);
+    const payload2 = makeStatePayload(connState, { since: Date.now(), ...extra });
+    renderStatusDom(payload2);
     try {
-      window.dispatchEvent(new CustomEvent("figma-agent:conn-state", { detail: payload }));
+      window.dispatchEvent(new CustomEvent("figma-agent:conn-state", { detail: payload2 }));
     } catch {
     }
   }
@@ -1552,21 +2240,23 @@
     handleWireData(buf.join(""));
   }
   async function handleRequest(req) {
+    activityStart.set(req.id, { cmd: req.cmd, at: Date.now() });
     try {
       if (req.cmd === "HTML_TO_FIGMA") {
         const p = req.params ?? {};
         if (!p.html) {
           sendErr(req.id, "E_INVALID_ARGS", "HTML_TO_FIGMA requires params.html");
+          emitActivity(req.id, false);
           return;
         }
         setStatusText("rendering html\u2026", "ok");
-        const payload = await renderHtmlToPayload(p.html, p.width ?? 1280, p.name ?? "HTML Import");
+        const payload2 = await renderHtmlToPayload(p.html, p.width ?? 1280, p.name ?? "HTML Import");
         setStatusText("connected", "ok");
         parent.postMessage({
           pluginMessage: {
             requestId: req.id,
             cmd: "IMPORT_PAYLOAD",
-            params: { payload, x: p.x, y: p.y, parentId: p.parentId, replaceId: p.replaceId }
+            params: { payload: payload2, x: p.x, y: p.y, parentId: p.parentId, replaceId: p.replaceId }
           }
         }, "*");
       } else {
@@ -1575,6 +2265,7 @@
     } catch (err) {
       setStatusText("connected", "ok");
       sendErr(req.id, "E_PLUGIN_ERROR", err instanceof Error ? err.message : String(err));
+      emitActivity(req.id, false);
     }
   }
   window.addEventListener("message", (ev) => {
@@ -1592,6 +2283,7 @@
         error: pm.error ?? { code: "E_PLUGIN_ERROR", message: "main thread returned no error detail" }
       };
       wsSend(reply);
+      emitActivity(pm.requestId, pm.ok === true);
     }
   });
   function stopHeartbeat() {
@@ -1714,4 +2406,7 @@
   }
   void connectLoop();
 })();
+
 </script>
+</body>
+</html>

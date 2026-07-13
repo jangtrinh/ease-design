@@ -19,7 +19,19 @@ import {
   opSetAutoLayout, opSetConstraints, opSetText, opExportPng, opExecJs,
 } from './executor-ops';
 
-figma.showUI(__html__, { visible: true, width: 280, height: 140 });
+figma.showUI(__html__, { visible: true, width: 340, height: 480 }); // P2 panel chrome
+
+// Announce scene identity to the UI iframe so the P2 panel's Connection details can
+// show File/Page; ui-relay also forwards this to the broker (enriches PLUGIN_HELLO /
+// `figma-agent status`). Re-announce on page change so the panel stays current.
+function announceFileInfo(): void {
+  figma.ui.postMessage({
+    type: 'FILE_INFO',
+    data: { fileName: figma.root.name, page: figma.currentPage.name },
+  });
+}
+announceFileInfo();
+figma.on('currentpagechange', announceFileInfo);
 
 type Params = Record<string, unknown>;
 

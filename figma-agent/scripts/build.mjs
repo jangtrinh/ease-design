@@ -44,18 +44,16 @@ async function buildPluginUi() {
     write: false,
   });
   const js = res.outputFiles[0].text;
-  // ui.html is a single self-contained file: minimal status UI + inlined bundle.
-  const html = `<!doctype html>
-<meta charset="utf-8">
-<style>
-  body{font:12px/1.5 -apple-system,sans-serif;margin:8px;color:#333}
-  #status{padding:6px 8px;border-radius:6px;background:#eee}
-  #status.ok{background:#d9f2df}
-  #status.err{background:#fde2e2}
-</style>
-<div id="status">figma-agent: starting…</div>
-<div id="detail"></div>
-<script>${js}</script>`;
+  // The panel chrome is authored in plugin/src/ui/panel.html — the SOURCE the P2
+  // 4-linter gate lints (tests/figma-plugin-panel.test.ts). The build only inlines
+  // the compiled relay+panel bundle at the marker so ui.html stays one self-contained
+  // file. A function replacer avoids `$`-pattern interpretation in the bundle text.
+  const MARKER = '/*__FIGMA_AGENT_UI_BUNDLE__*/';
+  const template = readFileSync(resolve(root, 'plugin/src/ui/panel.html'), 'utf8');
+  if (!template.includes(MARKER)) {
+    throw new Error(`plugin/src/ui/panel.html is missing the ${MARKER} bundle marker`);
+  }
+  const html = template.replace(MARKER, () => js);
   mkdirSync(resolve(root, 'plugin'), { recursive: true });
   writeFileSync(resolve(root, 'plugin/ui.html'), html);
 }

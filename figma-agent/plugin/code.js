@@ -1336,7 +1336,15 @@
   }
 
   // plugin/src/main/main.ts
-  figma.showUI(__html__, { visible: true, width: 280, height: 140 });
+  figma.showUI(__html__, { visible: true, width: 340, height: 480 });
+  function announceFileInfo() {
+    figma.ui.postMessage({
+      type: "FILE_INFO",
+      data: { fileName: figma.root.name, page: figma.currentPage.name }
+    });
+  }
+  announceFileInfo();
+  figma.on("currentpagechange", announceFileInfo);
   figma.ui.onmessage = async (msg) => {
     const req = msg;
     if (!req || typeof req.requestId !== "string" || typeof req.cmd !== "string") return;

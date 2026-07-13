@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Figma Design Agent</title>
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design tokens — DOGFOODED from ease-design's own DS pipeline, NOT hand-picked.
+   Same persona as EaseUI (saas-aurora-minimal) so the panel is one product identity.
+   Do NOT edit the :root block by hand; regenerate it (run from the repo root):
+
+     ui ds init figma-panel --persona saas-aurora-minimal \
+       --intent "compact tool chrome for the Figma bridge panel" \
+       --dir <tmp> --persona-data knowledge/personas/personas.json
+     ui tokens compile <tmp>/design/design.tokens.json --target css
+
+   Persona family: functional-saas · 160 tokens · compiled 2026-07-14.
+   Rule: no hex outside this :root — every color in the chrome below goes through a var().
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  --base-black: #000000;
+  --base-white: #FFFFFF;
+  --chart-1: #727CD9;
+  --chart-2: #C25F93;
+  --chart-3: #C16F0E;
+  --chart-4: #639737;
+  --chart-5: #0098A5;
+  --color-accent: #EAEDFF;
+  --color-accent-foreground: #040026;
+  --color-background: #F2F5FC;
+  --color-border: #C5CBD6;
+  --color-card: #E4E8F0;
+  --color-card-foreground: #0B0D13;
+  --color-chart-1: #727CD9;
+  --color-chart-2: #C25F93;
+  --color-chart-3: #C16F0E;
+  --color-chart-4: #639737;
+  --color-chart-5: #0098A5;
+  --color-danger: #CB262C;
+  --color-danger-foreground: #FFFFFF;
+  --color-foreground: #0B0D13;
+  --color-info: #2367D3;
+  --color-info-foreground: #FFFFFF;
+  --color-input: #A5ABB8;
+  --color-muted: #C5CBD6;
+  --color-muted-foreground: #4F5662;
+  --color-popover: #E4E8F0;
+  --color-popover-foreground: #0B0D13;
+  --color-primary: #6366F1;
+  --color-primary-foreground: #000000;
+  --color-primary-hover: #7D87FF;
+  --color-ring: #6366F1;
+  --color-scrim: #020306;
+  --color-secondary: #C5CBD6;
+  --color-secondary-foreground: #0B0D13;
+  --color-sidebar: #E4E8F0;
+  --color-sidebar-accent: #EAEDFF;
+  --color-sidebar-accent-foreground: #040026;
+  --color-sidebar-border: #C5CBD6;
+  --color-sidebar-foreground: #0B0D13;
+  --color-sidebar-primary: #6366F1;
+  --color-sidebar-primary-foreground: #000000;
+  --color-sidebar-ring: #6366F1;
+  --color-success: #007B54;
+  --color-success-foreground: #FFFFFF;
+  --color-warning: #A66900;
+  --color-warning-foreground: #FFFFFF;
+  --danger-50: #FFF1EF;
+  --danger-100: #FFDEDB;
+  --danger-200: #FFB3AC;
+  --danger-300: #FF7C74;
+  --danger-400: #EF4444;
+  --danger-500: #CB262C;
+  --danger-600: #A00A19;
+  --danger-700: #73000B;
+  --danger-800: #480003;
+  --danger-900: #250000;
+  --danger-950: #110000;
+  --duration-base: 200ms;
+  --duration-fast: 150ms;
+  --duration-slow: 300ms;
+  --elevation-card-blur: 2px;
+  --elevation-card-color: #080D17;
+  --elevation-card-offset-x: 0px;
+  --elevation-card-offset-y: 1px;
+  --elevation-card-spread: 0px;
+  --elevation-overlay-blur: 24px;
+  --elevation-overlay-color: #080D17;
+  --elevation-overlay-offset-x: 0px;
+  --elevation-overlay-offset-y: 12px;
+  --elevation-overlay-spread: 0px;
+  --font-family-body: Inter, system-ui, sans-serif;
+  --font-family-display: Inter, system-ui, sans-serif;
+  --font-size-2xl: 25px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 32px;
+  --font-size-lg: 20px;
+  --font-size-md: 18px;
+  --font-size-sm: 16px;
+  --font-size-xl: 22px;
+  --font-size-xs: 14px;
+  --font-weight-bold: 700;
+  --font-weight-medium: 500;
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --info-50: #EAF2FF;
+  --info-100: #D5E5FF;
+  --info-200: #A5C8FF;
+  --info-300: #6FA6FF;
+  --info-400: #3B82F6;
+  --info-500: #2367D3;
+  --info-600: #104BA7;
+  --info-700: #043279;
+  --info-800: #001B4D;
+  --info-900: #000927;
+  --info-950: #000114;
+  --motion-base: 200ms;
+  --motion-fast: 150ms;
+  --neutral-50: #F2F5FC;
+  --neutral-100: #E4E8F0;
+  --neutral-200: #C5CBD6;
+  --neutral-300: #A5ABB8;
+  --neutral-400: #868D9B;
+  --neutral-500: #6B7280;
+  --neutral-600: #4F5662;
+  --neutral-700: #363B45;
+  --neutral-800: #1E222A;
+  --neutral-900: #0B0D13;
+  --neutral-950: #020306;
+  --primary-50: #FAFBFF;
+  --primary-100: #EAEDFF;
+  --primary-200: #C6CFFF;
+  --primary-300: #A0ACFF;
+  --primary-400: #7D87FF;
+  --primary-500: #6366F1;
+  --primary-600: #4946C9;
+  --primary-700: #322A9A;
+  --primary-800: #1D126A;
+  --primary-900: #0C023E;
+  --primary-950: #040026;
+  --radius-button: 6px;
+  --radius-card: 10px;
+  --radius-full: 9999px;
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --shadow-lg-blur: 24px;
+  --shadow-lg-color: #080D17;
+  --shadow-lg-offset-x: 0px;
+  --shadow-lg-offset-y: 12px;
+  --shadow-lg-spread: 0px;
+  --shadow-md-blur: 8px;
+  --shadow-md-color: #080D17;
+  --shadow-md-offset-x: 0px;
+  --shadow-md-offset-y: 4px;
+  --shadow-md-spread: 0px;
+  --shadow-sm-blur: 2px;
+  --shadow-sm-color: #080D17;
+  --shadow-sm-offset-x: 0px;
+  --shadow-sm-offset-y: 1px;
+  --shadow-sm-spread: 0px;
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-component: 16px;
+  --space-inline: 8px;
+  --space-section: 40px;
+  --success-50: #AFFFD8;
+  --success-100: #87F7C4;
+  --success-200: #54DAA2;
+  --success-300: #10B981;
+  --success-400: #009868;
+  --success-500: #007B54;
+  --success-600: #005C3E;
+  --success-700: #003F29;
+  --success-800: #002415;
+  --success-900: #000E06;
+  --success-950: #000401;
+  --text-body-font-family: Inter, system-ui, sans-serif;
+  --text-body-font-size: 18px;
+  --text-body-font-weight: 400;
+  --text-body-letter-spacing: 0px;
+  --text-body-line-height: 1.5;
+  --text-caption-font-family: Inter, system-ui, sans-serif;
+  --text-caption-font-size: 16px;
+  --text-caption-font-weight: 400;
+  --text-caption-letter-spacing: 0px;
+  --text-caption-line-height: 1.4;
+  --text-heading-font-family: Inter, system-ui, sans-serif;
+  --text-heading-font-size: 25px;
+  --text-heading-font-weight: 600;
+  --text-heading-letter-spacing: 0px;
+  --text-heading-line-height: 1.2;
+  --warning-50: #FFFBF7;
+  --warning-100: #FFECD6;
+  --warning-200: #FFC785;
+  --warning-300: #F59E0B;
+  --warning-400: #CB8100;
+  --warning-500: #A66900;
+  --warning-600: #7E4E00;
+  --warning-700: #593500;
+  --warning-800: #371E00;
+  --warning-900: #1A0C00;
+  --warning-950: #0A0300;
+}
+
+/* Panel override (spec P2 §Tokens): the plugin iframe cannot load a webfont, so
+   the display/body families fall back to the host system stack — self-contained. */
+:root {
+  --font-family-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Panel chrome ─────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-foreground);
+  background: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  min-height: 100%;
+}
+
+/* Header: title · version · docs link */
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.brand-title {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+.brand-version {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+.docs-link {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+.docs-link:hover { background: var(--color-accent); color: var(--color-accent-foreground); }
+.docs-link:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+
+/* Status hero */
+.status-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm-offset-x) var(--shadow-sm-offset-y) var(--shadow-sm-blur) var(--shadow-sm-spread) var(--color-scrim);
+}
+.status-row { display: flex; align-items: center; gap: var(--space-3); }
+.status-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-foreground);
+}
+.status-dot[data-tone="success"] { background: var(--color-success); }
+.status-dot[data-tone="warning"] { background: var(--color-warning); }
+.status-dot[data-tone="info"]    { background: var(--color-info); }
+.status-dot[data-tone="muted"]   { background: var(--color-muted-foreground); }
+.status-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  background: inherit;
+  opacity: 0;
+}
+.status-dot.is-pulsing::after { animation: fga-ping 1.6s ease-out infinite; }
+
+.status-pill {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+.status-sentence { margin: 0; color: var(--color-muted-foreground); }
+.status-sentence:empty { display: none; }
+.status-meta {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.status-meta:empty { display: none; }
+
+/* Onboarding (first-run only; JS toggles [hidden]) */
+.onboarding {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent);
+  border-radius: var(--radius-md);
+}
+.onboarding-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-accent-foreground);
+}
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--font-size-xs);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-foreground);
+}
+
+/* Section label (activity heading + details summary) */
+.section-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  color: var(--color-muted-foreground);
+}
+
+/* Activity log */
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 168px;
+  overflow-y: auto;
+}
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--font-size-xs);
+}
+.log-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+}
+.log-dot[data-ok="false"] { background: var(--color-danger); }
+.log-tool { font-weight: var(--font-weight-medium); color: var(--color-foreground); }
+.log-meta {
+  margin-left: auto;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.activity-empty { font-size: var(--font-size-xs); color: var(--color-muted-foreground); }
+
+/* Troubleshoot hint */
+.hint { margin: 0; font-size: var(--font-size-xs); color: var(--color-muted-foreground); }
+.hint:empty { display: none; }
+
+/* Connection details */
+.conn-details {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+.conn-details > summary {
+  cursor: pointer;
+  list-style: revert;
+}
+.conn-details > summary:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+.detail-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-xs);
+}
+.detail-grid dt { color: var(--color-muted-foreground); }
+.detail-grid dd { margin: 0; color: var(--color-foreground); font-variant-numeric: tabular-nums; }
+
+.ghost-btn {
+  margin-top: var(--space-3);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+.ghost-btn:hover { background: var(--color-card); border-color: var(--color-input); }
+.ghost-btn:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+
+/* Motion — the probing dot pings outward. Guarded below for reduced motion. */
+@keyframes fga-ping {
+  0%   { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0;    transform: scale(2.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.is-pulsing::after { animation: none; }
+  .docs-link, .ghost-btn { transition: none; }
+}
+</style>
+</head>
+<body>
+<main class="panel">
+  <header class="app-header">
+    <h1 class="brand-title">Figma Design Agent</h1>
+    <span class="brand-version" id="fga-version">v0.1.0</span>
+    <a class="docs-link" id="fga-docs" href="https://github.com/jangtrinh/ease-design/blob/main/figma-agent/README.md"
+       target="_blank" rel="noopener" aria-label="Open the figma-agent documentation in a new tab">Docs&nbsp;↗</a>
+  </header>
+
+  <section class="status-hero" id="fga-hero" aria-live="polite" aria-label="Connection status">
+    <div class="status-row">
+      <span class="status-dot" id="fga-dot" data-tone="muted"></span>
+      <span class="status-pill" id="fga-pill" data-tone="muted">Starting…</span>
+    </div>
+    <p class="status-sentence" id="fga-sentence">The broker starts automatically on your first CLI command.</p>
+    <p class="status-meta" id="fga-meta"></p>
+  </section>
+
+  <section class="onboarding" id="fga-onboarding" aria-label="Getting started">
+    <ul class="onboarding-list">
+      <li>This panel bridges the figma-agent CLI to this file.</li>
+      <li>Verify from a terminal: <code>figma-agent status</code></li>
+      <li>Keep this panel open while agents work.</li>
+    </ul>
+  </section>
+
+  <section class="activity" aria-label="Activity log">
+    <h2 class="section-label">Activity</h2>
+    <ul class="activity-list" id="fga-activity" aria-live="polite">
+      <li class="activity-empty">No activity yet — run a figma-agent command.</li>
+    </ul>
+  </section>
+
+  <p class="hint" id="fga-hint" aria-live="polite"></p>
+
+  <details class="conn-details">
+    <summary class="section-label">Connection details</summary>
+    <dl class="detail-grid">
+      <dt>Port</dt><dd id="fga-d-port">—</dd>
+      <dt>Protocol</dt><dd id="fga-d-proto">—</dd>
+      <dt>Heartbeat</dt><dd id="fga-d-heartbeat">—</dd>
+      <dt>Reconnect attempts</dt><dd id="fga-d-attempts">—</dd>
+      <dt>File</dt><dd id="fga-d-file">—</dd>
+      <dt>Page</dt><dd id="fga-d-page">—</dd>
+    </dl>
+    <button class="ghost-btn" id="fga-copy" type="button">Copy status</button>
+  </details>
+</main>
+<script>
+/*__FIGMA_AGENT_UI_BUNDLE__*/
+</script>
+</body>
+</html>

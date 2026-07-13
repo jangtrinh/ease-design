@@ -7,12 +7,16 @@
 // > CHUNK_LIMIT). No Figma Plugin API — this iframe only has DOM + WebSocket +
 // parent.postMessage.
 
+// Side-effect import FIRST: the P2 panel controller attaches its conn-state /
+// activity listeners at module-eval time, before this file's connectLoop fires
+// its opening transition below — otherwise the panel would miss the first PROBE.
+import './panel-ui';
 import {
   CHUNK_LIMIT, PLUGIN_HEARTBEAT_INTERVAL_MS, PLUGIN_PONG_TIMEOUT_MS,
   PORT_RANGE_END, PORT_RANGE_START, PROTOCOL_VERSION,
   RECONNECT_BACKOFF_MAX_MS, RECONNECT_BACKOFF_MIN_MS,
   makeStatePayload, nextBackoff, reduceConnState,
-  type ChunkMsg, type ConnectionEvent, type ConnectionState, type ConnectionStatePayload,
+  type ChunkMsg, type CommandName, type ConnectionEvent, type ConnectionState, type ConnectionStatePayload,
   type ErrorCode, type ReplyMsg, type RequestMsg,
 } from '../../../shared/protocol';
 import { renderHtmlToPayload } from './render-host';
@@ -28,6 +32,21 @@ let lastPongAt = 0;
 let connState: ConnectionState = 'disconnected';
 let fileInfo: Record<string, unknown> = {}; // FILE_INFO from main (fileName, fileKey…)
 const chunkBuffers = new Map<string, string[]>(); // requestId → chunk slices
+
+// ─── Activity telemetry → UI (P2) ───────────────────────────────────────────
+// Each request that reaches handleRequest is timed; on completion the relay
+// dispatches a `figma-agent:activity` {tool, ok, ms, at} CustomEvent that the P2
+// panel renders in its activity log. Lives here (not in main) because the relay
+// owns the request lifecycle on the UI side — same place conn-state is emitted.
+const activityStart = new Map<string, { cmd: CommandName; at: number }>();
+
+function emitActivity(id: string, ok: boolean): void {
+  const started = activityStart.get(id);
+  if (!started) return;
+  activityStart.delete(id);
+  const detail = { tool: started.cmd, ok, ms: Date.now() - started.at, at: started.at };
+  try { window.dispatchEvent(new CustomEvent('figma-agent:activity', { detail })); } catch { /* no DOM event support */ }
+}
 
 // ─── Connection state machine → UI ──────────────────────────────────
 // Every transition posts a ConnectionStatePayload as the `figma-agent:conn-state`
@@ -131,11 +150,13 @@ interface HtmlToFigmaParams {
 }
 
 async function handleRequest(req: RequestMsg): Promise<void> {
+  activityStart.set(req.id, { cmd: req.cmd, at: Date.now() }); // timed until completion
   try {
     if (req.cmd === 'HTML_TO_FIGMA') {
       const p = (req.params ?? {}) as HtmlToFigmaParams;
       if (!p.html) {
         sendErr(req.id, 'E_INVALID_ARGS', 'HTML_TO_FIGMA requires params.html');
+        emitActivity(req.id, false);
         return;
       }
       setStatusText('rendering html…', 'ok');
@@ -155,6 +176,7 @@ async function handleRequest(req: RequestMsg): Promise<void> {
   } catch (err) {
     setStatusText('connected', 'ok');
     sendErr(req.id, 'E_PLUGIN_ERROR', err instanceof Error ? err.message : String(err));
+    emitActivity(req.id, false);
   }
 }
 
@@ -181,6 +203,7 @@ window.addEventListener('message', (ev: MessageEvent) => {
             ?? { code: 'E_PLUGIN_ERROR', message: 'main thread returned no error detail' },
         };
     wsSend(reply);
+    emitActivity(pm.requestId, pm.ok === true); // request round-trip completed
   }
 });
 

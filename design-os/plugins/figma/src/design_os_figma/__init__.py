@@ -102,7 +102,18 @@ def _call_hand(
 
 
 def _status_text(result: dict[str, Any]) -> str:
-    return f"figma status: broker={result.get('broker', '?')} plugin={result.get('plugin', '?')}\n"
+    plugin = result.get("plugin", "?")
+    # The hand sends `plugin` as an object ({connected, state, …}); a stub/older hand may send a
+    # string. When the plugin isn't connected, point the user at the P2 panel — the CLI can only
+    # drive the file while that panel is open (its own onboarding says the same).
+    connected = plugin.get("connected") is True if isinstance(plugin, dict) else plugin == "connected"
+    line = f"figma status: broker={result.get('broker', '?')} plugin={plugin}\n"
+    if not connected:
+        line += (
+            "hint: no plugin connected — open the Ease Design Figma Agent panel in Figma Desktop "
+            "(Plugins → Development) and keep it open.\n"
+        )
+    return line
 
 
 def _scan_text(out: Path) -> str:

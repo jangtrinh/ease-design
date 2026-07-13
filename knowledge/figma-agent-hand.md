@@ -30,6 +30,16 @@ $FA status   # spawns the broker if absent; needs the plugin open in Figma
   the literal tokens `dist`/`build` — if you hit that while driving this CLI, call via a
   scratchpad wrapper script or a concatenation trick (`D="di""st"`).
 - Broker daemon owns ports 9410–9419; log at `/tmp/figma-agent-broker.log`.
+- **Panel (P2):** the plugin opens a 340×480 status panel — pill states `No broker yet`
+  (muted idle, NOT an error) → `Looking for broker…` (probing, pulsing) → `Handshaking…`
+  → `Connected` (shows port + uptime), plus a live activity log (tool·ms·time-ago) and a
+  collapsible Connection details + Copy status. Keep it open; closing it drops the bridge.
+  Tokens are dogfooded from `ui ds init` (persona `saas-aurora-minimal`); the template
+  clears the 4 core linters (root `tests/figma-plugin-panel.test.ts`).
+- **`status` shape:** `{ broker:{port,pid,uptimeMs,protocolVersion},
+  plugin:{connected,state,lastHeartbeatAge,fileName,page,…}, protocolVersion }` — an absent
+  plugin is `plugin.connected:false` (never `E_NO_PLUGIN`), so `status` stays a diagnosis.
+  `design-os figma status` text now hints to open the panel when it isn't connected.
 
 ## Commands (all print one JSON to stdout)
 
