@@ -556,6 +556,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         flags: [
           { name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd, else discovered)" },
           { name: "out", type: "string", summary: "Output HTML path (default: <project>/design/preview/specimen.html)" },
+          { name: "split", type: "string", summary: "Emit one page per component into this dir (+ index.json) instead of one specimen" },
         ],
         errorCodes: ["UNKNOWN_FLAG", "DS_NOT_FOUND", "DS_TAMPERED", "BAD_MANIFEST", "WRITE_ERROR"],
       },

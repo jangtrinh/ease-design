@@ -27,7 +27,7 @@ Usage:
   ui ds diff <base-dir> <head-dir> [--format markdown|json|pr-comment] [--base-version <v>]
   ui ds docs [--dir <project>] [--out <file>] [--format markdown|json]
   ui ds a11y [--dir <project>] [--pairs "text:surface,..."] [--json]
-  ui ds preview [--dir <project>] [--out <file>] [--json]
+  ui ds preview [--dir <project>] [--out <file>] [--split <dir>] [--json]
 
 Subcommands:
   init           Compile a project-scoped design system from a persona + intent
@@ -85,6 +85,9 @@ Subcommands:
 'ds preview' options:
   --dir <path>       Project directory holding design/ (default: cwd, else discovered)
   --out <file>       Output HTML path (default: <project>/design/preview/specimen.html)
+  --split <dir>      Emit one self-contained page per component into <dir> (+ a deterministic
+                     index.json), instead of one whole-DS specimen. One page per registry
+                     record with markup; each reuses the specimen chrome + :root tokens.
   Renders the compiled design system as ONE self-contained page: :root tokens, colour
   paired roles (each swatch renders its own declared foreground), the type ramp,
   radius/elevation/duration chips, and one block per registered component (markup comes

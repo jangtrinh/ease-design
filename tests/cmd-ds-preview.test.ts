@@ -8,7 +8,7 @@
  * on a double run) and the --bare foundations-only path.
  */
 import { describe, expect, it, beforeEach } from "vitest";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { run } from "../src/cli.js";
@@ -147,5 +147,91 @@ describe("ui ds preview", () => {
     const r = capture(["ds", "preview", "--dir", dir, "--nope", "--json"]);
     expect(r.code).toBe(1);
     expect(JSON.parse(r.out).error.code).toBe("UNKNOWN_FLAG");
+  });
+});
+
+interface IndexShape {
+  pages: Array<{ name: string; status: string | null; file: string }>;
+  total: number;
+}
+
+describe("ui ds preview --split", () => {
+  it("emits one page per markup component + a deterministic index.json", () => {
+    initKit(dir);
+    const splitDir = join(dir, "split");
+    const r = capture(["ds", "preview", "--dir", dir, "--split", splitDir, "--json"]);
+    expect(r.code).toBe(0);
+    const data = JSON.parse(r.out).data as { mode: string; out: string; pages: number };
+    expect(data.mode).toBe("split");
+    expect(data.out).toBe(splitDir);
+    expect(data.pages).toBe(27); // 27 kit components, all markup-bearing
+
+    const index = JSON.parse(readFileSync(join(splitDir, "index.json"), "utf8")) as IndexShape;
+    expect(index.total).toBe(27);
+    expect(index.pages).toHaveLength(27);
+    // every declared page file was actually written
+    for (const p of index.pages) expect(existsSync(join(splitDir, p.file)), `missing ${p.file}`).toBe(true);
+    // pages carry the full kit, keyed by canonical name
+    expect(new Set(index.pages.map((p) => p.name))).toEqual(new Set(KIT_NAMES));
+    // slug rule + status shape (kit components are all "stable")
+    const button = index.pages.find((p) => p.name === "Control/Button");
+    expect(button).toEqual({ name: "Control/Button", status: "stable", file: "control-button.html" });
+    // deterministic order: index is sorted by file name
+    const files = index.pages.map((p) => p.file);
+    expect(files).toEqual([...files].sort());
+  });
+
+  it("a split page passes validate-layout / a11y-lint / content-lint / taste-lint with 0 errors", () => {
+    initKit(dir);
+    const splitDir = join(dir, "split");
+    capture(["ds", "preview", "--dir", dir, "--split", splitDir]);
+    // Control/Button carries a spinner animation — the hardest single-page taste-lint case.
+    const html = readFileSync(join(splitDir, "control-button.html"), "utf8");
+    expect(html).toContain(":root {");            // reuses the :root token block
+    expect(html).toContain("Control/Button");     // renders exactly this component
+    expect(lintLayout(html).errorCount, "layout errors").toBe(0);
+    expect(lintA11y(html).errorCount, "a11y errors").toBe(0);
+    expect(contentErrors(html), "content errors").toBe(0);
+    expect(lintTaste(html).errorCount, "taste errors").toBe(0);
+  });
+
+  it("is deterministic: two --split runs are byte-identical", () => {
+    initKit(dir);
+    const a = join(dir, "split-a");
+    const b = join(dir, "split-b");
+    capture(["ds", "preview", "--dir", dir, "--split", a]);
+    capture(["ds", "preview", "--dir", dir, "--split", b]);
+    const index = JSON.parse(readFileSync(join(a, "index.json"), "utf8")) as IndexShape;
+    expect(readFileSync(join(b, "index.json"), "utf8")).toBe(readFileSync(join(a, "index.json"), "utf8"));
+    for (const p of index.pages) {
+      expect(readFileSync(join(b, p.file), "utf8"), `page ${p.file} differs`).toBe(
+        readFileSync(join(a, p.file), "utf8"),
+      );
+    }
+  });
+
+  it("--split does not disturb single-page mode (byte-identical to a no-split run)", () => {
+    initKit(dir);
+    const single = join(dir, "one.html");
+    capture(["ds", "preview", "--dir", dir, "--out", single]);
+    const before = readFileSync(single, "utf8");
+    // A split run in between must not change what single-page mode emits.
+    capture(["ds", "preview", "--dir", dir, "--split", join(dir, "split")]);
+    capture(["ds", "preview", "--dir", dir, "--out", single]);
+    expect(readFileSync(single, "utf8")).toBe(before);
+  });
+
+  it("--bare DS → 0 pages + a note + an empty index.json", () => {
+    initKit(dir, true);
+    const splitDir = join(dir, "split");
+    const r = capture(["ds", "preview", "--dir", dir, "--split", splitDir, "--json"]);
+    expect(r.code).toBe(0);
+    expect(JSON.parse(r.out).data.pages).toBe(0);
+    const index = JSON.parse(readFileSync(join(splitDir, "index.json"), "utf8")) as IndexShape;
+    expect(index.total).toBe(0);
+    expect(index.pages).toEqual([]);
+    // text mode carries the empty-registry note
+    const t = capture(["ds", "preview", "--dir", dir, "--split", splitDir]);
+    expect(t.out).toMatch(/0 component page/);
   });
 });

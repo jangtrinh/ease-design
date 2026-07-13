@@ -24,6 +24,7 @@ import {
 } from "./ds-preview-sections.js";
 import type { DesignSystem } from "./design-system.js";
 import type { ResolvedToken } from "./token-model.js";
+import type { ComponentRecord, ComponentStatus } from "./registry-store.js";
 
 export interface SpecimenModel {
   html: string;
@@ -91,4 +92,75 @@ export function buildSpecimenPage(ds: DesignSystem): SpecimenModel {
     `</html>\n`;
 
   return { html, components: comps.rendered, pairs: a11y.checkedPairs, bytes: Buffer.byteLength(html, "utf8") };
+}
+
+// ─── Split mode: one self-contained page per component ──────────────────────────
+
+/** Namespaced component name → stable slug, e.g. "Control/Button" → "control-button". */
+export function componentSlug(name: string): string {
+  return name.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+}
+
+/** One emitted per-component page: its metadata + full self-contained HTML. */
+export interface ComponentPage {
+  /** Canonical component name, e.g. "Control/Button". */
+  name: string;
+  /** Registry lifecycle status when declared, else null. */
+  status: ComponentStatus | null;
+  /** Page filename within the split dir, e.g. "control-button.html". */
+  file: string;
+  /** Full self-contained HTML document for the page. */
+  html: string;
+}
+
+export interface SplitModel {
+  pages: ComponentPage[];
+}
+
+/**
+ * One self-contained page for a single component: the SAME head, `:root` token block and
+ * specimen chrome as the whole-page specimen (so it clears the same 4 core linters), with a
+ * body of exactly one component section (the registry is the only component source). Pure
+ * string transform — deterministic for a given DS.
+ */
+function buildComponentPage(ds: DesignSystem, component: ComponentRecord): string {
+  const m = ds.manifest;
+  const section = componentsSection([component]).html;
+  return (
+    `<!doctype html>\n` +
+    `<html lang="en">\n` +
+    `<head>\n` +
+    `<meta charset="utf-8">\n` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1">\n` +
+    `<title>${esc(component.name)} &mdash; ${esc(m.name)} specimen</title>\n` +
+    `<style>\n` +
+    emitCss(ds.resolved) +
+    SPECIMEN_CHROME_CSS +
+    `</style>\n` +
+    `</head>\n` +
+    `<body>\n` +
+    `<main>\n` +
+    section + `\n` +
+    `</main>\n` +
+    `</body>\n` +
+    `</html>\n`
+  );
+}
+
+/**
+ * Build one page per registry record WITH markup (name-only records are skipped — there is
+ * nothing to render). Pages are sorted by file name so the emitted set + its index.json are
+ * deterministic; identical DS input yields byte-identical pages.
+ */
+export function buildComponentPages(ds: DesignSystem): SplitModel {
+  const pages: ComponentPage[] = ds.registry.components
+    .filter((c) => c.markup.trim() !== "")
+    .map((c) => ({
+      name: c.name,
+      status: c.status ?? null,
+      file: `${componentSlug(c.name)}.html`,
+      html: buildComponentPage(ds, c),
+    }));
+  pages.sort((a, b) => a.file.localeCompare(b.file));
+  return { pages };
 }

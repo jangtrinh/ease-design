@@ -17,15 +17,16 @@ import {
   pathsForDir,
   DSError,
 } from "../core/design-system.js";
+import type { DesignSystem } from "../core/design-system.js";
 import { DSManifestError } from "../core/ds-manifest.js";
-import { buildSpecimenPage } from "../core/ds-preview.js";
+import { buildSpecimenPage, buildComponentPages } from "../core/ds-preview.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
 const CMD = "ds preview";
 
 /** Long flags `ui ds preview` accepts (globals --help/--json handled separately). */
-const KNOWN_FLAGS = ["dir", "out"] as const;
+const KNOWN_FLAGS = ["dir", "out", "split"] as const;
 
 export function runPreview(parsed: ParsedArgs): CommandResult {
   const useJson = parsed.json;
@@ -56,6 +57,9 @@ export function runPreview(parsed: ParsedArgs): CommandResult {
     return err(code, e instanceof Error ? e.message : String(e));
   }
 
+  const splitFlag = parsed.flags["split"];
+  if (typeof splitFlag === "string") return runSplit(ds, resolve(splitFlag), useJson, err);
+
   const model = buildSpecimenPage(ds);
 
   const outFlag = parsed.flags["out"];
@@ -78,4 +82,39 @@ export function runPreview(parsed: ParsedArgs): CommandResult {
     `ds preview: ${model.components} component(s), ${model.pairs} pair(s), ${model.bytes} bytes\n` +
       `wrote ${out}\n`,
   );
+}
+
+/**
+ * `--split <dir>` mode: emit one self-contained page per markup-bearing component into <dir>,
+ * plus a deterministic `<dir>/index.json` ({ pages: [{name, status, file}], total }). The
+ * single-page path above is left byte-for-byte untouched. Envelope: { mode, out, pages }.
+ */
+function runSplit(
+  ds: DesignSystem,
+  outDir: string,
+  useJson: boolean,
+  err: (code: string, msg: string) => CommandResult,
+): CommandResult {
+  const model = buildComponentPages(ds);
+  const index = {
+    pages: model.pages.map((p) => ({ name: p.name, status: p.status, file: p.file })),
+    total: model.pages.length,
+  };
+  try {
+    mkdirSync(outDir, { recursive: true });
+    for (const p of model.pages) writeFileSync(join(outDir, p.file), p.html, "utf8");
+    writeFileSync(join(outDir, "index.json"), JSON.stringify(index, null, 2) + "\n", "utf8");
+  } catch (e) {
+    return err(
+      "WRITE_ERROR",
+      `cannot write split pages to '${outDir}': ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  if (useJson) return okJson(CMD, { mode: "split", out: outDir, pages: model.pages.length });
+  const note =
+    model.pages.length === 0
+      ? "ds preview: 0 component page(s) — registry has no components with preview markup\n"
+      : `ds preview: ${model.pages.length} component page(s)\n`;
+  return ok(note + `wrote ${outDir}\n`);
 }
