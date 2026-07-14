@@ -1,5 +1,5 @@
 /**
- * The five hallmark-derived taste checks (Motion ×2, Typography ×2, Depth ×1).
+ * The five slop-gate taste checks (Motion ×2, Typography ×2, Depth ×1).
  * Each check gets a positive fixture plus the mandated negatives from
  * phase-01-kernel-gates.md Bước 2. The final block drives them end-to-end through
  * lintTaste() to prove wiring + axis-order sorting, not just the unit functions.
@@ -159,7 +159,7 @@ describe("z-index-inflation", () => {
 
 // ─── lintTaste end-to-end (wiring + axis-order sort) ─────────────────────────────
 
-describe("lintTaste — hallmark checks wired + axis-sorted", () => {
+describe("lintTaste — slop-gate checks wired + axis-sorted", () => {
   it("surfaces all five checks and sorts axes Typography < Motion < Depth/Surface", () => {
     const bad = [
       "<style>",

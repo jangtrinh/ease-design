@@ -1,11 +1,5 @@
 # Page Structures — shape before dress
 
-> Provenance: distilled from Hallmark (github.com/Nutlope/hallmark, MIT,
-> © 2026 Hallmark contributors), evaluated 2026-07-14. We adopt the structural-
-> variety layer and honesty rules; we do NOT adopt its themes (personas cover
-> that), its verbs, or its model-self-checked gates (our linters are machine
-> gates — see the checkId pointers below).
-
 A persona decides how a page *looks*; a macrostructure decides how it is *shaped*. Two
 surfaces can share a persona and still be different pages — or share nothing and read as
 the same generated template. This file is the shape layer that sits between persona

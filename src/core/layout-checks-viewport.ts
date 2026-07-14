@@ -1,5 +1,5 @@
 /**
- * Viewport/overflow layout checks — the two hallmark-derived horizontal-overflow
+ * Viewport/overflow layout checks — the two horizontal-overflow
  * tells the existing layout checks do not cover: a `100vw` width inside a
  * `<style>` rule (the scrollbar-gutter overflow trap) and `overflow-x: hidden` on
  * a root element (which silently breaks `position: sticky` descendants).

@@ -37,7 +37,7 @@ import {
   checkKeyframesLayoutProps,
   checkRawHexWhenTokenExists,
 } from "./taste-checks.js";
-// Hallmark-derived checks live in their own modules (taste-checks.ts is over the
+// The slop-gate checks live in their own modules (taste-checks.ts is over the
 // 200-line guideline, so we import these directly rather than via that barrel).
 import { checkOvershootEasing, checkFocusRingAnimatesIn } from "./taste-checks-motion-state.js";
 import { checkItalicDisplayHeading, checkUppercaseTightLineHeight } from "./taste-checks-typography.js";

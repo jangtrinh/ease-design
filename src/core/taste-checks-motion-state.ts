@@ -1,7 +1,7 @@
 /**
  * Motion-axis state-transition checks for the deterministic taste linter — the
  * machine floor under knowledge/taste-rubric.md Axis 4 ("Rules of motion"). These
- * catch two hallmark-derived "generated-UI" tells that the existing motion module
+ * catch two "generated-UI" tells that the existing motion module
  * (taste-checks-motion.ts) does not: overshoot/bounce easing on state changes and
  * focus rings that animate into existence instead of appearing instantly.
  *

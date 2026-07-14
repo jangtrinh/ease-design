@@ -1,6 +1,6 @@
 /**
  * Typography-axis checks for the deterministic taste linter — the machine floor
- * under knowledge/taste-rubric.md Axis 2 ("Scale guidance"). Two hallmark-derived
+ * under knowledge/taste-rubric.md Axis 2 ("Scale guidance"). Two
  * "generated-UI" tells the existing Typography check (tiny-body-text) does not
  * cover: italic display/heading type, and all-caps text set below a 1.0
  * line-height (cap-tops collide on wrap).
