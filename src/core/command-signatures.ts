@@ -494,7 +494,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         flags: [
           { name: "strict", type: "boolean", summary: "Prepend the registered-components-only enforcement preamble" },
           { name: "with-theme", type: "boolean", summary: "Also emit the compiled Tailwind v4 @theme block (full token map, immune to --max-bytes)" },
-          { name: "include", type: "string", summary: "Comma-separated sections: tokens,registry,naming,anti-patterns" },
+          { name: "include", type: "string", summary: "Comma-separated sections: tokens,registry,naming,anti-patterns,soul" },
           { name: "format", type: "string", values: ["markdown", "json"], summary: "Output format (default markdown)" },
           { name: "max-bytes", type: "string", summary: "Truncate the context block to fit n bytes (default 4096)" },
           { name: "dir", type: "string", summary: "Override the project directory" },
@@ -559,6 +559,15 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
           { name: "split", type: "string", summary: "Emit one page per component into this dir (+ index.json) instead of one specimen" },
         ],
         errorCodes: ["UNKNOWN_FLAG", "DS_NOT_FOUND", "DS_TAMPERED", "BAD_MANIFEST", "WRITE_ERROR"],
+      },
+      soul: {
+        summary: "Scaffold + structure-lint the declared design stance (design/soul.md)",
+        positionals: [{ name: "<init|check>", required: true, summary: "init writes the scaffold; check structure-lints the file (exit 1 on errors)" }],
+        flags: [
+          { name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd)" },
+          { name: "force", type: "boolean", summary: "'soul init' only: overwrite an existing soul.md" },
+        ],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "EXISTS", "WRITE_ERROR", "READ_ERROR"],
       },
     },
   },
@@ -709,6 +718,63 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         positionals: [],
         flags: [{ name: "dir", type: "string", summary: "Project directory (default: cwd)" }],
         errorCodes: ["UNKNOWN_FLAG"],
+      },
+    },
+  },
+
+  taste: {
+    summary: "Vote-driven taste corpus: ingest, pairwise Elo ranking, study verdicts",
+    subcommands: {
+      ingest: {
+        summary: "Scan taste/inbox/<genre>/ (+ optional --dir sources), dedup by sha256/dHash, move/copy into corpus/",
+        positionals: [],
+        flags: [
+          { name: "root", type: "string", summary: "Store root (default: DESIGN_OS_TASTE_ROOT env, else <cwd>/taste)" },
+          { name: "dir", type: "string", summary: "Extra source directory outside inbox/ (comma-separated for more than one)" },
+          { name: "genre", type: "string", summary: "Genre tag for files pulled in via --dir (required whenever --dir is given)" },
+          { name: "source-url", type: "string", summary: "Provenance URL recorded on every item ingested this run" },
+        ],
+        errorCodes: ["E_TASTE_BAD_FLAGS", "E_TASTE_LEDGER", "UNKNOWN_FLAG"],
+      },
+      next: {
+        summary: "Propose the next pair (--mode pair) or study item (--mode study); read-only",
+        positionals: [],
+        flags: [
+          { name: "root", type: "string", summary: "Store root (default: DESIGN_OS_TASTE_ROOT env, else <cwd>/taste)" },
+          { name: "mode", type: "string", required: true, values: ["pair", "study"], summary: "pair or study" },
+          { name: "genre", type: "string", summary: "Restrict to one genre" },
+        ],
+        errorCodes: ["E_TASTE_ROOT", "E_TASTE_BAD_FLAGS", "E_TASTE_NO_ITEMS", "UNKNOWN_FLAG"],
+      },
+      record: {
+        summary: "Append one validated pair vote (--mode pair) or study verdict (--mode study)",
+        positionals: [],
+        flags: [
+          { name: "root", type: "string", summary: "Store root (default: DESIGN_OS_TASTE_ROOT env, else <cwd>/taste)" },
+          { name: "mode", type: "string", required: true, values: ["pair", "study"], summary: "pair or study" },
+          { name: "a", type: "string", summary: "Item id (required with --mode pair)" },
+          { name: "b", type: "string", summary: "Item id, must differ from --a (required with --mode pair)" },
+          { name: "winner", type: "string", values: ["a", "b", "tie", "skip"], summary: "Which item won (required with --mode pair)" },
+          { name: "reasons", type: "string", summary: "Comma-separated reason tags (--mode pair)" },
+          { name: "note", type: "string", summary: "Free-text note" },
+          { name: "swapped", type: "boolean", summary: "Echo the display order 'taste next' returned (--mode pair)" },
+          { name: "repeat-of", type: "string", summary: "ts of the original vote this repeats (--mode pair)" },
+          { name: "ms", type: "string", summary: "Time-to-decide, milliseconds (--mode pair)" },
+          { name: "item", type: "string", summary: "Item id (required with --mode study)" },
+          { name: "verdict", type: "string", values: ["LEARN", "PARTIAL", "SKIP"], summary: "Required with --mode study" },
+          { name: "blind-verdict", type: "string", values: ["LEARN", "PARTIAL", "SKIP"], summary: "Verdict recorded before seeing the known lesson (--mode study)" },
+          { name: "lesson-ref", type: "string", summary: "Path to the knowledge/ entry this verdict folds into (--mode study)" },
+        ],
+        errorCodes: ["E_TASTE_ROOT", "E_TASTE_BAD_FLAGS", "E_TASTE_UNKNOWN_ITEM", "E_TASTE_BAD_VOTE", "E_TASTE_LEDGER", "UNKNOWN_FLAG"],
+      },
+      status: {
+        summary: "Ledger counts, top-Elo per genre, self-consistency from repeat votes",
+        positionals: [],
+        flags: [
+          { name: "root", type: "string", summary: "Store root (default: DESIGN_OS_TASTE_ROOT env, else <cwd>/taste)" },
+          { name: "genre", type: "string", summary: "Restrict counts/top-Elo/consistency to one genre" },
+        ],
+        errorCodes: ["E_TASTE_ROOT", "E_TASTE_LEDGER", "UNKNOWN_FLAG"],
       },
     },
   },

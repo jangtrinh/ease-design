@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cwd } from "node:process";
 
-import { errJson, errText, okJson } from "../core/output.js";
+import { errJson, errText, ok, okJson } from "../core/output.js";
 import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import { pathsForDir } from "../core/design-system.js";
 import { canonicalStringify, canonicalHash, newManifest, appendChangelog, loadManifest, saveManifest } from "../core/ds-manifest.js";
@@ -20,6 +20,7 @@ import { resolveTokens } from "../core/token-resolve.js";
 import { saveRegistry, registerComponent, validateComponentRecord } from "../core/registry-store.js";
 import { COMPONENT_KIT } from "../core/component-kit/index.js";
 import { countTokens } from "../core/design-system.js";
+import { writeSoulScaffold } from "../core/ds-soul.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -243,7 +244,12 @@ export function runInit(parsed: ParsedArgs): CommandResult {
 
   const tokenCount = countTokens(tokens);
 
-  return okJson(CMD, {
+  // Scaffold the declared-stance file alongside the compiled DS. Never overwritten
+  // here — writeSoulScaffold only writes when soul.md doesn't already exist, so a
+  // re-init (even with --force) never clobbers an owner's edited stance.
+  const soul = writeSoulScaffold(paths.dir);
+
+  const data = {
     name,
     paths: {
       dir:      paths.dir,
@@ -256,5 +262,14 @@ export function runInit(parsed: ParsedArgs): CommandResult {
     tokenCount,
     compiledHash,
     registryHash,
-  });
+    soul,
+  };
+
+  if (useJson) return okJson(CMD, data);
+  return ok(
+    `ds init: compiled '${name}' (generation ${manifest.generation}, persona ${persona.slug}/${persona.family})\n` +
+    `tokens:   ${tokenCount}\n` +
+    `manifest: ${paths.manifest}\n` +
+    `soul: ${soul.path} (draft — edit then set status: ratified)\n`,
+  );
 }

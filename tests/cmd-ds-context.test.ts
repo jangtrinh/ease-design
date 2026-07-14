@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -160,5 +160,50 @@ describe("ui ds context", () => {
     expect(after.stdout, "the new literal value must be visible to the host model").toContain(
       "#FF0066",
     );
+  });
+});
+
+// ─── ds context — soul section (P1 soul kernel) ───────────────────────────────
+
+describe("ui ds context — soul section", () => {
+  const SOUL_HEADING = "## Soul (declared stance — precedence: brief > soul > memory > floors)";
+
+  it("--include soul emits the section when design/soul.md exists", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-soul-"));
+    initDs(tmp); // ds init writes the soul scaffold alongside the DS
+    const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain(SOUL_HEADING);
+    expect(r.stdout).toContain("# Design Soul");
+  });
+
+  it("the default include carries soul automatically", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-soul-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain(SOUL_HEADING);
+  });
+
+  it("a project without soul.md just omits the section — never an error", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-soul-"));
+    initDs(tmp);
+    rmSync(join(tmp, "design", "soul.md"));
+    const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("## Soul");
+  });
+
+  it("--format json: structured soul is the capped text, or null when absent", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-soul-"));
+    initDs(tmp);
+    const withSoul = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(withSoul.exitCode).toBe(0);
+    expect(JSON.parse(withSoul.stdout).data.soul).toContain("# Design Soul");
+
+    rmSync(join(tmp, "design", "soul.md"));
+    const noSoul = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(noSoul.exitCode).toBe(0);
+    expect(JSON.parse(noSoul.stdout).data.soul).toBeNull();
   });
 });

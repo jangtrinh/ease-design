@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -267,5 +267,60 @@ describe("ui ds init — ships the component kit (P2a + P2b)", () => {
     // 23 of the 27 declare >=1 normalized state; Avatar/Separator/Kbd/Breadcrumb are static
     // primitives (State=Static → no normalized state) so they do not join the state contract.
     expect(data.stateful).toBe(23);
+  });
+});
+
+// ─── ds init — soul scaffold (P1 soul kernel) ─────────────────────────────────
+
+describe("ui ds init — writes the soul scaffold", () => {
+  it("fresh init writes design/soul.md (draft) and reports data.soul", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-init-soul-"));
+    const r = capture([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "test",
+      "--dir", tmp, "--persona-data", PERSONA_DATA, "--json",
+    ]);
+    expect(r.exitCode).toBe(0);
+    const soul = JSON.parse(r.stdout).data.soul as { path: string; written: boolean };
+    const path = join(tmp, "design", "soul.md");
+    expect(soul).toEqual({ path, written: true });
+    expect(existsSync(path)).toBe(true);
+    const text = readFileSync(path, "utf8");
+    expect(text.startsWith("---\nstatus: draft\n---")).toBe(true);
+    expect(text).toContain("## Never");
+    expect(text).toContain("## Always");
+    expect(text).toContain("## Voice");
+  });
+
+  it("text mode prints the soul line", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-init-soul-"));
+    const r = capture([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "test",
+      "--dir", tmp, "--persona-data", PERSONA_DATA,
+    ]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("soul: ");
+    expect(r.stdout).toContain("draft — edit then set status: ratified");
+  });
+
+  it("re-init --force never overwrites an edited soul.md", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-init-soul-"));
+    capture([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "test",
+      "--dir", tmp, "--persona-data", PERSONA_DATA,
+    ]);
+    const path = join(tmp, "design", "soul.md");
+    const edited = "---\nstatus: ratified\n---\n\n## Never\n\n- purple gradients\n\n## Always\n\n- big type\n\n## Voice\n\n- direct\n";
+    writeFileSync(path, edited, "utf8");
+    const r = capture([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "second",
+      "--dir", tmp, "--persona-data", PERSONA_DATA, "--force", "--json",
+    ]);
+    expect(r.exitCode).toBe(0);
+    expect(JSON.parse(r.stdout).data.soul.written).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(edited);
   });
 });

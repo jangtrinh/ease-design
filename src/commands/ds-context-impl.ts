@@ -4,13 +4,15 @@
  * Emits the active design system as a compact, model-readable context block.
  * Read-only: never modifies any artifact on disk.
  */
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { errJson, errText, ok, okJson } from "../core/output.js";
 import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import { discoverDesignSystem, loadDesignSystem, pathsForDir, DSError } from "../core/design-system.js";
 import { DSManifestError } from "../core/ds-manifest.js";
 import { formatMarkdown, formatStructured, parseInclude } from "../core/ds-context.js";
+import { SOUL_FILENAME } from "../core/ds-soul.js";
 import { emitTailwind } from "../core/token-emit.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
@@ -108,7 +110,20 @@ export function runContext(parsed: ParsedArgs): CommandResult {
     return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
   }
 
-  const opts = { include, strict, maxBytes };
+  // The soul file is read HERE (command layer) and handed to the pure formatter
+  // as text — the core never touches the filesystem. Absence is not an error:
+  // the soul is optional everywhere except an explicit `ui ds soul check`.
+  const soulPath = join(paths.dir, SOUL_FILENAME);
+  let soul: string | undefined;
+  if (include.includes("soul") && existsSync(soulPath)) {
+    try {
+      soul = readFileSync(soulPath, "utf8");
+    } catch {
+      soul = undefined; // unreadable soul degrades to "no soul", never an error
+    }
+  }
+
+  const opts = { include, strict, maxBytes, ...(soul !== undefined && { soul }) };
 
   // The `@theme` block is compiled from the FULL resolved token map (same bytes
   // as `ui tokens compile … --target tailwind`), so `--with-theme` folds the

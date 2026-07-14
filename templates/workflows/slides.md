@@ -37,6 +37,12 @@ Open and keep in context:
 - `knowledge/taste-rubric.md` — the 6+1 axes the deck will be scored on.
 - `knowledge/persona-index.md` — for persona selection when `--persona` is not set.
 
+**Soul gate.** If `design/soul.md` exists, read it FIRST (it also appears as the
+`soul` section of `ui ds context`). It is the project's declared stance. Precedence:
+**brief > soul > memory prior > knowledge floors** — the soul biases every choice
+below it and never overrides the explicit brief. Never propose choices that violate
+a `## Never` clause; prefer choices that express `## Always`.
+
 ### 2. Ensure a design system exists
 
 Same gate as every generation workflow:

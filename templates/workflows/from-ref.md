@@ -129,6 +129,12 @@ Pick exactly one of **replicate**, **enhance**, **adapt** from
 If `--prompt-mode` is set, use it verbatim and skip the inference. Record the chosen
 mode and a one-sentence justification in the working notes.
 
+**Soul gate.** If `design/soul.md` exists, read it FIRST (it also appears as the
+`soul` section of `ui ds context`). It is the project's declared stance. Precedence:
+**brief > soul > memory prior > knowledge floors** — the soul biases every choice
+below it and never overrides the explicit brief. Never propose choices that violate
+a `## Never` clause; prefer choices that express `## Always`.
+
 ### 5. Infer a persona from the brief
 
 Using `knowledge/persona-index.md`:

@@ -63,6 +63,12 @@ contract the redesign must respect:
 Save this inventory as a `<!-- IA: ... -->` comment block; the generation step
 will quote it back as the preservation contract.
 
+**Soul gate.** If `design/soul.md` exists, read it FIRST (it also appears as the
+`soul` section of `ui ds context`). It is the project's declared stance. Precedence:
+**brief > soul > memory prior > knowledge floors** — the soul biases every choice
+below it and never overrides the explicit brief. Never propose choices that violate
+a `## Never` clause; prefer choices that express `## Always`.
+
 ### 3. Identify the parent persona's family
 
 Resolve the current persona's family from the manifest:

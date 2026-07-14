@@ -12,6 +12,7 @@ import { runStatus } from "./ds-status-impl.js";
 import { runImport } from "./ds-import-impl.js";
 import { runSpecimen } from "./ds-specimen-impl.js";
 import { runPreview } from "./ds-preview-impl.js";
+import { runSoul } from "./ds-soul-impl.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -28,6 +29,8 @@ Usage:
   ui ds docs [--dir <project>] [--out <file>] [--format markdown|json]
   ui ds a11y [--dir <project>] [--pairs "text:surface,..."] [--json]
   ui ds preview [--dir <project>] [--out <file>] [--split <dir>] [--json]
+  ui ds soul init  [--dir <project>] [--force]
+  ui ds soul check [--dir <project>] [--json]
 
 Subcommands:
   init           Compile a project-scoped design system from a persona + intent
@@ -40,6 +43,7 @@ Subcommands:
   a11y           Token-pair contrast audit (text×surface ≥ AA, incl. hover/active state pairs); exit 1 on a fail. Declared tokens only — not a conformance claim.
   specimen       Report each component's variant×state matrix + applicable-state gaps (missing disabled/empty)
   preview        Generate a self-contained specimen.html from the compiled tokens + registry
+  soul           Scaffold + structure-lint the declared design stance (design/soul.md)
 
 'ds a11y' options:
   --dir <path>       Project directory holding design/ (default: cwd)
@@ -104,10 +108,23 @@ Subcommands:
                  immune to --max-bytes) — folds context + 'tokens compile' into one
                  read-only call. Markdown: appended as a fenced section; JSON: a
                  sibling 'theme' string field.
-  --include <s>  Comma-separated sections: tokens,registry,naming,anti-patterns
+  --include <s>  Comma-separated sections: tokens,registry,naming,anti-patterns,soul
   --format <f>   markdown (default) | json
   --max-bytes <n>  Truncate the context block to fit n bytes (default 4096)
   --dir <path>   Override the project directory
+  The 'soul' section emits design/soul.md (the declared stance, capped at 150
+  lines) when that file exists; a project without a soul just omits the section.
+
+'ds soul' options:
+  init           Write the design/soul.md scaffold (status: draft)
+  check          Structure-lint design/soul.md; exit 1 on error-severity findings
+  --dir <path>   Project directory holding design/ (default: cwd)
+  --force        'soul init' only: overwrite an existing soul.md
+  Checks (structure only — content taste stays a model judgment):
+  soul-missing-section / soul-empty-section / soul-placeholder-copy   (errors)
+  soul-draft-status / soul-scaffold-untouched / soul-too-long         (warnings)
+  A missing file is the error finding 'soul-missing' (an explicit check expects
+  a soul). Everywhere else the soul is OPTIONAL — absence is never an error.
 
 Project layout (all under <project-dir>/design/):
   design.tokens.json       DTCG two-tier tokens
@@ -165,6 +182,9 @@ Error codes:
   READ_ERROR         'ds diff' input could not be read
   REGISTRY_NOT_FOUND 'ds docs' found no component-registry.json
   BAD_REGISTRY       'ds docs' registry file is malformed
+  EXISTS             'ds soul init' target soul.md exists (use --force)
+  WRITE_ERROR        'ds soul init' could not write the scaffold
+  READ_ERROR         'ds soul check' could not read soul.md
 `;
 // 'ds a11y' error codes (DS_NOT_FOUND / BAD_ARG / BAD_JSON / UNKNOWN_FLAG) are shared with the above.
 
@@ -186,6 +206,7 @@ export const dsCommand = {
       case "a11y":         return runA11y(parsed);
       case "specimen":     return runSpecimen(parsed);
       case "preview":      return runPreview(parsed);
+      case "soul":         return runSoul(parsed);
       case undefined: {
         const msg = "ui ds requires a subcommand. Run 'ui ds --help'.";
         return parsed.json

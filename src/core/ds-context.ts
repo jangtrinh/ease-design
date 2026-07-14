@@ -6,17 +6,24 @@
  * blocks concise and model-friendly.
  */
 import { isAlias } from "./token-model.js";
+import { soulSectionForContext } from "./ds-soul.js";
 import type { DesignSystem } from "./design-system.js";
 import type { ResolvedToken } from "./token-model.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ContextSection = "tokens" | "registry" | "naming" | "anti-patterns";
+export type ContextSection = "tokens" | "registry" | "naming" | "anti-patterns" | "soul";
 
 export interface ContextOptions {
   include: ContextSection[];
   strict: boolean;
   maxBytes: number;
+  /**
+   * Raw text of design/soul.md, read by the COMMAND layer (ds-context-impl.ts)
+   * and passed in — this formatter stays pure (no fs). Undefined when the
+   * project has no soul.md; the section is then simply omitted, never an error.
+   */
+  soul?: string;
 }
 
 export interface StructuredContext {
@@ -24,6 +31,8 @@ export interface StructuredContext {
   generation: number;
   persona: { slug: string; family: string };
   intent: string;
+  /** design/soul.md content (capped), or null when absent / not included. */
+  soul: string | null;
   semantic: { path: string; value: string }[];
   registry: { name: string; category: string; tokensUsed: string[] }[];
   naming: { rule: string }[];
@@ -173,7 +182,7 @@ function applyTruncation(
 
 /** Format the design system as a markdown context block. */
 export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
-  const { include, strict, maxBytes } = opts;
+  const { include, strict, maxBytes, soul } = opts;
   const sem = semanticTokens(ds);
   const regRows = ds.registry.components.map((c) => ({
     name: c.name,
@@ -201,6 +210,17 @@ export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
 
     if (strict) {
       lines.push(STRICT_PREAMBLE);
+    }
+
+    // The soul is the declared stance every flow reads BEFORE personas/tokens,
+    // so it leads the sections. Absent soul.md → no section, never an error.
+    if (include.includes("soul") && soul !== undefined) {
+      lines.push(
+        "## Soul (declared stance — precedence: brief > soul > memory > floors)",
+        "",
+        soulSectionForContext(soul),
+        "",
+      );
     }
 
     if (include.includes("tokens")) {
@@ -273,6 +293,7 @@ export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
 function buildStructured(
   ds: DesignSystem,
   include: ContextSection[],
+  soul: string | null,
   ap: string[],
   reg: { name: string; category: string; tokensUsed: string[] }[],
   tok: ResolvedToken[],
@@ -282,6 +303,7 @@ function buildStructured(
     generation: ds.manifest.generation,
     persona: ds.manifest.persona,
     intent: ds.manifest.intent,
+    soul: include.includes("soul") ? soul : null,
     semantic: include.includes("tokens")
       ? tok.map((t) => ({ path: t.path, value: formatValue(t) }))
       : [],
@@ -295,8 +317,10 @@ function buildStructured(
 
 /** Format the design system as a structured JSON-serialisable object.
  *
- * Truncation drops whole rows deterministically (anti-patterns → registry → tokens)
- * so the result is always a valid object — no mid-string slicing.
+ * Truncation drops whole rows deterministically (anti-patterns → registry → tokens),
+ * then — only if zero-row versions still exceed the budget — drops the soul text
+ * (the declared stance outranks token rows, so it is dropped LAST), so the result
+ * is always a valid object — no mid-string slicing.
  * If even the minimal object exceeds maxBytes, rows are dropped until it fits or
  * all variable rows are exhausted (fixed header fields are never trimmed).
  */
@@ -310,35 +334,39 @@ export function formatStructured(ds: DesignSystem, opts: ContextOptions): Struct
   }));
   // Anti-patterns are persisted in the manifest at ds init time.
   const antiPatterns: string[] = ds.manifest.persona.antiPatterns ?? [];
+  const soulText = opts.soul !== undefined ? soulSectionForContext(opts.soul) : null;
 
   // Try progressively more aggressive truncation — drop rows, never mid-string slice
+  const soulVariants: (string | null)[] = soulText !== null ? [soulText, null] : [null];
   const apLimits = [antiPatterns.length, 5, 0];
   const regLimits = [regRows.length, 10, 5, 0];
   const tokLimits = [sem.length, 30, 15, 5, 0];
 
-  for (const apLimit of apLimits) {
-    for (const regLimit of regLimits) {
-      for (const tokLimit of tokLimits) {
-        const ctx = buildStructured(
-          ds, include,
-          antiPatterns.slice(0, apLimit),
-          regRows.slice(0, regLimit),
-          sem.slice(0, tokLimit),
-        );
-        if (Buffer.byteLength(JSON.stringify(ctx), "utf8") <= maxBytes) {
-          return ctx;
+  for (const soulVariant of soulVariants) {
+    for (const apLimit of apLimits) {
+      for (const regLimit of regLimits) {
+        for (const tokLimit of tokLimits) {
+          const ctx = buildStructured(
+            ds, include, soulVariant,
+            antiPatterns.slice(0, apLimit),
+            regRows.slice(0, regLimit),
+            sem.slice(0, tokLimit),
+          );
+          if (Buffer.byteLength(JSON.stringify(ctx), "utf8") <= maxBytes) {
+            return ctx;
+          }
         }
       }
     }
   }
 
   // Budget is too small even for zero rows — return the minimal header-only object
-  return buildStructured(ds, include, [], [], []);
+  return buildStructured(ds, include, null, [], [], []);
 }
 
 // ─── Include parser ───────────────────────────────────────────────────────────
 
-const ALL_SECTIONS: ContextSection[] = ["tokens", "registry", "naming", "anti-patterns"];
+const ALL_SECTIONS: ContextSection[] = ["tokens", "registry", "naming", "anti-patterns", "soul"];
 const VALID_SECTIONS = new Set<string>(ALL_SECTIONS);
 
 /**

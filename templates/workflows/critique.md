@@ -80,6 +80,15 @@ against a single fixed setpoint.
 
 ### Step 2 — Run the deterministic taste floor, then score the 6 craft axes
 
+**Soul gate.** If `design/soul.md` exists, read it FIRST (it also appears as the
+`soul` section of `ui ds context`). It is the project's declared stance. Precedence:
+**brief > soul > memory prior > knowledge floors** — the soul biases every choice
+below it and never overrides the explicit brief. Never propose choices that violate
+a `## Never` clause; prefer choices that express `## Always`.
+
+Score the Specificity axis against the soul's clauses when a soul exists — "đúng
+brief này" means "đúng soul này".
+
 **First, run the deterministic taste linter** — the machine-checkable floor
 under the model's self-scoring. It catches unambiguous rubric breaches the
 model might score leniently or miss:

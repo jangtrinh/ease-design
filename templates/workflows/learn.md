@@ -46,6 +46,12 @@ If `verdict` is already `ds-present`, tell the user a compiled DS exists and sto
 unless they explicitly want to re-learn (e.g. after a major redesign);
 re-learning replaces the system via `--force` inside the routed flow.
 
+**Soul gate.** If `design/soul.md` exists, read it FIRST (it also appears as the
+`soul` section of `ui ds context`). It is the project's declared stance. Precedence:
+**brief > soul > memory prior > knowledge floors** — the soul biases every choice
+below it and never overrides the explicit brief. Never propose choices that violate
+a `## Never` clause; prefer choices that express `## Always`.
+
 ### Step 2 — Ask ONE question (source of truth)
 
 Ask the user a **single** question with exactly four options — never more than
@@ -174,6 +180,14 @@ ui memory record harvested --data '{"source":"<url-or-path>","what":"<tokens/com
 `ds status` must exit 0 (not `DS_TAMPERED`); `ds context --strict --with-theme`
 must emit the context block and the compiled `@theme` block. A `DS_TAMPERED`
 exit is terminal — surface it and stop.
+
+### Draft the soul from evidence
+
+After the DS compiles, DRAFT `design/soul.md` from what you measured — never from
+imagination. Each `## Never` / `## Always` bullet cites its evidence inline
+(`— evidence: 5/5 captured pages use display ≥ 44px; 0 gradients found`). Keep
+`status: draft` in the frontmatter and tell the owner: review, edit, then set
+`status: ratified`. Run `ui ds soul check` and report its findings.
 
 ### Step 5 — Readiness report
 

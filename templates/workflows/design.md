@@ -43,6 +43,12 @@ hardcode) — `knowledge/figma-agent-hand.md` → "Bridge selection":
 figma-agent seat        # → {seat, bridge, reason}; free → figma-agent CLI, paid → official Figma MCP
 ```
 
+**Soul gate.** If `design/soul.md` exists, read it FIRST (it also appears as the
+`soul` section of `ui ds context`). It is the project's declared stance. Precedence:
+**brief > soul > memory prior > knowledge floors** — the soul biases every choice
+below it and never overrides the explicit brief. Never propose choices that violate
+a `## Never` clause; prefer choices that express `## Always`.
+
 You also need the onboarded design system (C0) so a design reuses real vocabulary:
 - **registry** — the component registry (`ui registry list --json` / `design/component-registry.json`).
 - **tokens** — the DS token file (`ui ds context --format json` / the project DS).
