@@ -2,7 +2,7 @@
 // AuditReport. No I/O, no transport, no live Figma — every rule is unit-tested on
 // hand-written fixtures; this is where ALL judgment lives (the plugin only gathers facts).
 //
-// v2 first SEGMENTS every master into ds / icon / screen (classifyKind) — the real fix for
+// v2 first SEGMENTS every master into ds / icon / screen (classifyAll) — the real fix for
 // v1's inflation (1469 vector icons + screen frames drowned ~120 DS masters). Only ds masters
 // run the ten detectors below; icons/screens are summarised separately in `segments`.
 // The ten detectors (unused / junk-name / deprecated / duplicate-name / duplicate-structure /
@@ -10,7 +10,7 @@
 // inline at each push().
 import type { AuditComponentFact, AuditDsFacts } from '../../../shared/audit-types.ts';
 import { detectFamilies } from './audit-ds-families.ts';
-import { classifyKind, detectStructure, type MasterKind } from './audit-ds-structure.ts';
+import { classifyAll, detectStructure, type MasterKind } from './audit-ds-structure.ts';
 
 export interface AuditFlag {
   id: string;
@@ -118,10 +118,9 @@ export function detectAudit(facts: AuditDsFacts, opts: DetectOpts = {}): AuditRe
   const dsMasters: AuditComponentFact[] = [];
   const iconMasters: AuditComponentFact[] = [];
   const screenMasters: AuditComponentFact[] = [];
-  const kindById = new Map<string, MasterKind>();
+  const kindById: Map<string, MasterKind> = classifyAll(facts.components);
   for (const c of facts.components) {
-    const kind = classifyKind(c);
-    kindById.set(c.id, kind);
+    const kind = kindById.get(c.id) ?? 'ds';
     (kind === 'ds' ? dsMasters : kind === 'icon' ? iconMasters : screenMasters).push(c);
   }
 

@@ -37,9 +37,16 @@ function unit(over: Partial<AuditUnitFact> & { id: string; name: string }): Audi
   };
 }
 
-/** A vector-only unit (no text) so its owner classifies as an `icon`. */
+/** A vector-only unit (no text) — icon material. */
 function iconUnit(id: string, name: string): AuditUnitFact {
   return unit({ id, name, structure: [`0:COMPONENT::16x16`, `1:VECTOR:Vector:16x16`] });
+}
+
+/** Vector-only masters only count as icons INSIDE a ≥20-strong same-prefix family
+ *  (classifyAll) — this pads a fixture's 'Icon /' family up to the threshold. */
+function iconFamilyPadding(n: number): AuditComponentFact[] {
+  return Array.from({ length: n }, (_, i) =>
+    comp({ id: `pad${i}`, name: `Icon / pad-${i}`, units: [iconUnit(`pad${i}u`, `Icon / pad-${i}`)] }));
 }
 
 function makeFacts(
@@ -203,15 +210,20 @@ describe('detectAudit — segmentation, sort, summary, counts', () => {
         comp({ id: 'ds', name: 'Button', type: 'COMPONENT_SET', variantCount: 2, units: [unit({ id: 'b', name: 'Size=S', texts: ['Go'] })] }),
         comp({ id: 'ic1', name: 'Icon / star', units: [iconUnit('ic1u', 'Icon / star')] }),
         comp({ id: 'ic2', name: 'Icon / heart', units: [iconUnit('ic2u', 'Icon / heart')] }),
+        ...iconFamilyPadding(18), // brings the 'Icon /' family to the ≥20 icon threshold
         comp({ id: 'scr1', name: 'Home Screen', width: 1440, height: 1024 }),
         comp({ id: 'scr2', name: 'Big Board', section: '01 · A', width: 1200, height: 800 }),
       ],
-      { byMainId: { ds: 1, ic2: 4 } }, // ic2 used, ic1 unused
+      { byMainId: { ds: 1, ic2: 4 } }, // ic2 used, ic1 + padding unused
     ));
     const ids = r.components.map((c) => c.id);
     expect(ids).toEqual(['ds']); // ONLY the ds master survives into components[]
     expect(r.summary.total).toBe(1);
-    expect(r.segments.icons).toEqual({ total: 2, used: 1, unused: 1, unusedNames: ['Icon / star'] });
+    expect(r.segments.icons.total).toBe(20);
+    expect(r.segments.icons.used).toBe(1);
+    expect(r.segments.icons.unused).toBe(19);
+    expect(r.segments.icons.unusedNames).toContain('Icon / star');
+    expect(r.segments.icons.unusedNames).not.toContain('Icon / heart');
     expect(r.segments.screens).toEqual({ total: 2, names: ['Big Board', 'Home Screen'] });
     expect(r.components[0].kind).toBe('ds');
   });
@@ -252,6 +264,7 @@ describe('detectAudit — segmentation, sort, summary, counts', () => {
       [
         comp({ id: 'a', name: 'A', type: 'COMPONENT_SET', variantCount: 2, units: [unit({ id: 'au', name: 'X=1', texts: ['t'] })] }),
         comp({ id: 'ic', name: 'Icon / x', units: [iconUnit('icu', 'Icon / x')] }),
+        ...iconFamilyPadding(19), // 'Icon /' family reaches the ≥20 icon threshold
         comp({ id: 'sc', name: 'Screen 1', width: 1440, height: 1024 }),
       ],
       { unresolved: 4 },
@@ -259,7 +272,7 @@ describe('detectAudit — segmentation, sort, summary, counts', () => {
     ));
     expect(r.file.pages).toEqual(['Page 1', 'Cover']);
     expect(r.counts).toEqual({
-      masters: 3, sets: 1, standalone: 2, icons: 1, screens: 1, variants: 2, instancesTallied: 0, unresolvedUsage: 4,
+      masters: 22, sets: 1, standalone: 21, icons: 20, screens: 1, variants: 2, instancesTallied: 0, unresolvedUsage: 4,
     });
   });
 });

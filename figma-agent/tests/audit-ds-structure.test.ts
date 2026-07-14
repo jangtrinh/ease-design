@@ -3,7 +3,7 @@
 // the shape the plugin emits (nameless root entry, `${depth}:${type}:${name}:${w}x${h}`).
 import { describe, it, expect } from 'vitest';
 import {
-  classifyKind, comparable, detectStructure, type CrossMasterGroup,
+  classifyAll, comparable, detectStructure, type CrossMasterGroup,
 } from '../cli/src/commands/audit-ds-structure.ts';
 import type { AuditComponentFact, AuditUnitFact } from '../shared/audit-types.ts';
 
@@ -42,27 +42,50 @@ function textUnit(id: string, name: string): AuditUnitFact {
   return unit({ id, name, texts: ['Label'], structure: ['0:COMPONENT::40x20', '1:TEXT:Label:30x12'] });
 }
 
-describe('classifyKind', () => {
-  it('icon (vector-only, no text), screen (viewport size), ds (text-bearing / no units)', () => {
-    // standalone vector-only → icon
-    expect(classifyKind(comp({ id: 'i', name: 'Icon/star', units: [unit({ id: 'iu', name: 'Icon/star', structure: ['0:COMPONENT::16x16', '1:VECTOR:Vector:16x16'] })] }))).toBe('icon');
-    // a SET whose variants are ALL vector-only → icon
-    expect(classifyKind(comp({
-      id: 'is', name: 'Icons', type: 'COMPONENT_SET', variantCount: 2,
+/** A vector-only (icon-candidate) master named `name`. */
+function vectorMaster(id: string, name: string): ReturnType<typeof comp> {
+  return comp({ id, name, units: [unit({ id: `${id}u`, name, structure: ['0:COMPONENT::16x16', '1:VECTOR:Vector:16x16'] })] });
+}
+
+describe('classifyAll', () => {
+  it('icon = vector-only INSIDE a big same-prefix family; screen = viewport size; ds otherwise', () => {
+    // A bulk-imported icon library: 20 same-prefix vector-only masters (MIN_ICON_FAMILY).
+    const library = Array.from({ length: 20 }, (_, i) => vectorMaster(`ic${i}`, `Icon / glyph-${i}`));
+    // A SET of vector-only variants under the same prefix joins the family too.
+    const iconSet = comp({
+      id: 'is', name: 'Icon / Arrows', type: 'COMPONENT_SET', variantCount: 2,
       units: [
         unit({ id: 'a', name: 'N=1', structure: ['0:COMPONENT::16x16', '1:VECTOR:Vector:16x16'] }),
         unit({ id: 'b', name: 'N=2', structure: ['0:COMPONENT::16x16', '1:ELLIPSE:Ellipse:16x16'] }),
       ],
-    }))).toBe('icon');
-    // viewport size → screen
-    expect(classifyKind(comp({ id: 's2', name: 'Board', width: 1200, height: 800 }))).toBe('screen');
-    // a section literally named 'Screen' does NOT make a screen — on the real VSF file that
-    // section held true DS masters (Component 208 uses, Table status 151); size is the signal.
-    expect(classifyKind(comp({ id: 's1', name: 'Table status', section: 'Screen', units: [textUnit('su', 'Home')] }))).toBe('ds');
-    // text-bearing → ds
-    expect(classifyKind(comp({ id: 'd', name: 'Button', units: [textUnit('du', 'Button')] }))).toBe('ds');
-    // no units at all → ds (never the vacuous "icon")
-    expect(classifyKind(comp({ id: 'x', name: 'Empty' }))).toBe('ds');
+    });
+    const masters = [
+      ...library,
+      iconSet,
+      // LONE vector-only primitives (live VSF finding: Separator/Switch/StatusDot/Logo are
+      // text-free BY DESIGN) — no big family ⇒ ds, they keep their detector coverage.
+      vectorMaster('sep', 'Separator'),
+      vectorMaster('star', 'user-star'),
+      // viewport size → screen
+      comp({ id: 's2', name: 'Board', width: 1200, height: 800 }),
+      // a section literally named 'Screen' does NOT make a screen — on the real VSF file that
+      // section held true DS masters (Component 208 uses, Table status 151); size is the signal.
+      comp({ id: 's1', name: 'Table status', section: 'Screen', units: [textUnit('su', 'Home')] }),
+      // text-bearing → ds
+      comp({ id: 'd', name: 'Button', units: [textUnit('du', 'Button')] }),
+      // no units at all → ds (never the vacuous "icon")
+      comp({ id: 'x', name: 'Empty' }),
+    ];
+    const kinds = classifyAll(masters);
+    expect(kinds.get('ic0')).toBe('icon');
+    expect(kinds.get('ic19')).toBe('icon');
+    expect(kinds.get('is')).toBe('icon');
+    expect(kinds.get('sep')).toBe('ds');
+    expect(kinds.get('star')).toBe('ds');
+    expect(kinds.get('s2')).toBe('screen');
+    expect(kinds.get('s1')).toBe('ds');
+    expect(kinds.get('d')).toBe('ds');
+    expect(kinds.get('x')).toBe('ds');
   });
 });
 

@@ -1,6 +1,6 @@
 // Structural analysis for the DS-hygiene audit (pure — no I/O, no transport, no live Figma;
 // node:crypto sha1 for content hashing is allowed here, CLI-side). Three jobs:
-//   - classifyKind: split every master into ds / icon / screen (the v1 "inflation" fix — the
+//   - classifyAll: split every master into ds / icon / screen (the v1 "inflation" fix — the
 //     1469 vector-only icon masters + full-screen frames must NOT drown the real DS masters).
 //   - unitHash + comparable: content fingerprint of a unit, and whether it is DISTINCTIVE
 //     enough to compare (a bare vector/skeleton with default layer names is not — that class
@@ -57,18 +57,47 @@ function parseEntry(entry: string): { depth: number; type: string; name: string 
   };
 }
 
-/** ds / icon / screen. Screen wins first (viewport SIZE only — intrinsic); icon = a purely-vector unit.
- *  Deliberately NOT section-name-based: on the real VSF file a section literally named 'Screen'
- *  held true DS masters (Component 208 uses, Table status 151…) — a section name is user taxonomy
- *  (misfiled territory), not an intrinsic property. Sizes come from the node itself. */
-export function classifyKind(c: AuditComponentFact): MasterKind {
-  if (c.width >= SCREEN_MIN_W && c.height >= SCREEN_MIN_H) return 'screen';
-  // icon: has units, and EVERY unit is text-free and made only of vector-ish node types.
-  // (units.length>0 guard: a master with no units is never an "icon" — the vacuous-true trap.)
-  const iconish = c.units.length > 0 && c.units.every(
+// A vector-only master is an ICON only when it belongs to a big same-prefix family (an icon
+// LIBRARY is imported in bulk under one naming prefix — VSF: 'Icon / *' ×1469). A lone
+// vector-only master is a real DS primitive (live VSF finding: Separator, Switch, StatusDot,
+// ProgressBar, Logo… are text-free by design and must NOT lose their detector coverage).
+const MIN_ICON_FAMILY = 20;
+
+/** The grouping prefix for icon-family detection: text before the first '/', '' when none.
+ *  ('' groups flat-named libraries too — a file whose 25 assorted no-slash primitives are all
+ *  vector-only would over-group; accepted v2 trade-off, revisit on a real file that hits it.) */
+function iconPrefix(name: string): string {
+  const i = name.indexOf('/');
+  return i < 0 ? '' : name.slice(0, i).trim();
+}
+
+/** EVERY unit text-free and made only of vector-ish node types (units.length>0 guard:
+ *  a master with no units is never "vector-only" — the vacuous-true trap). */
+function vectorOnly(c: AuditComponentFact): boolean {
+  return c.units.length > 0 && c.units.every(
     (u) => u.texts.length === 0 && u.structure.every((e) => VECTORISH.has(parseEntry(e).type)),
   );
-  return iconish ? 'icon' : 'ds';
+}
+
+/** ds / icon / screen for EVERY master in one pass (icon needs cross-master context: the
+ *  same-prefix family size). Screen wins first, on viewport SIZE only — intrinsic; deliberately
+ *  NOT section-name-based: on the real VSF file a section literally named 'Screen' held true DS
+ *  masters (Component 208 uses, Table status 151…) — a section name is user taxonomy (misfiled
+ *  territory), not an intrinsic property. */
+export function classifyAll(masters: AuditComponentFact[]): Map<string, MasterKind> {
+  const kinds = new Map<string, MasterKind>();
+  const vectorCandidates: { id: string; prefix: string }[] = [];
+  for (const c of masters) {
+    if (c.width >= SCREEN_MIN_W && c.height >= SCREEN_MIN_H) kinds.set(c.id, 'screen');
+    else if (vectorOnly(c)) vectorCandidates.push({ id: c.id, prefix: iconPrefix(c.name) });
+    else kinds.set(c.id, 'ds');
+  }
+  const familySize = new Map<string, number>();
+  for (const v of vectorCandidates) familySize.set(v.prefix, (familySize.get(v.prefix) ?? 0) + 1);
+  for (const v of vectorCandidates) {
+    kinds.set(v.id, (familySize.get(v.prefix) ?? 0) >= MIN_ICON_FAMILY ? 'icon' : 'ds');
+  }
+  return kinds;
 }
 
 /** Content fingerprint of a unit — structure + texts + paints only (names/ids excluded). */
