@@ -8,7 +8,8 @@ commands. The host model writes the HTML; ease-design supplies the taste — per
 compiled design system, and a hard quality gate — so the output looks like a pro
 designer made it. **No API keys, no design tokens to hand-edit, no taste vocabulary to learn.**
 
-<sub>`v0.1.0` · Node ≥ 20 · MIT · zero runtime dependencies · 851 tests green</sub>
+<sub>`v0.1.0` · Node ≥ 20 · MIT · zero runtime dependencies in the `ui` kernel ·
+1,787 tests green across three surfaces (`ui` 1,525 · `figma-agent` 161 · `design-os` 101)</sub>
 
 > Distilled from EaseUI's design engine. The binary and slash-command namespace are
 > `ui` / `/ui:*`.
@@ -130,7 +131,13 @@ These surface as slash-commands in your agent CLI (Claude Code namespace shown).
 | `/ui:to-figma <intent>` | The inverse: **author idiomatic Figma** on the canvas (Figma Free) from intent — auto-layout, instances, token-bound variables. Needs the external figma-agent hand (see below). |
 | `/ui:extract`           | Inverse direction — pull a design system **out of** existing HTML. |
 | `/ui:slides <intent>`   | Generate a token-bound slide deck. |
+| `/ui:learn`             | Brownfield onboarding — compile the DS from the project's own evidence (code, URL, or Figma) instead of a persona default. |
+| `/ui:design <brief>`    | The AI-designer flow — scope-aware facet planning + curator scoring on a full brief. |
+| `/ui:audit <target>`    | Run the deterministic audit families against a produced design. |
+| `/ui:evidence`          | Intake user evidence (interviews, tickets, analytics) into the anti-fabrication ledger that grounds design decisions. |
 | `/ui:why <question>`    | Answer *why* a past design decision was made — traces picks, edits, verdicts, and token changes from the project's design memory, with provenance. |
+
+*(16 workflows total; `/ui:critique` runs inside every HTML-emitting flow as the gate.)*
 
 All HTML-emitting workflows defer to an internal **critique gate** (12th workflow): the
 model scores 6 craft axes + 1 consistency axis, and a deterministic `ui taste-lint` floor
@@ -145,13 +152,24 @@ the critique gate — plus a Figma **construction knowledge** core (`knowledge/f
 auto-layout / sizing mastery, components + variables over hardcoded values, and 14
 construction lints that keep the layer structure senior-grade.
 
-The **hands** are the `figma-agent` CLI, which drives a Figma Free plugin over a local
-broker. In keeping with ease-design's deterministic-binary principle it is deliberately kept
-*out* of the `ui` binary (it needs the network and a live plugin) and is not published with
-the `ease-design` npm package — but it now ships **in-repo** as an npm workspace at
+The **hands** are the `figma-agent` CLI, which drives a Figma plugin over a local
+self-healing broker (ports 9410–9419: reconnect back-off, heartbeats, a park queue that
+holds commands through a broker respawn, and a **multi-file registry** — several open Figma
+files stay connected at once; commands route to the most-recently-active file, pinnable via
+`FIGMA_AGENT_FILE`). The plugin panel is compact (300×170), brand-styled, and expands on
+demand. In keeping with ease-design's deterministic-binary principle the hand is deliberately
+kept *out* of the `ui` binary (it needs the network and a live plugin) and is not published
+with the `ease-design` npm package — but it ships **in-repo** as an npm workspace at
 `figma-agent/`. Build it once from the repo root with
 `npm run build --workspace=figma-agent`, then follow `knowledge/figma-agent-hand.md` to load
 the plugin. Fall back to `/ui:generate` (HTML) if the hand is unavailable.
+
+Beyond authoring, the hand also **reads and audits**: `figma-agent scan-design-system`
+exports the open file's components/variables/styles for `ui ingest-figma-ds`, and
+`figma-agent audit-ds` runs an automated **DS-hygiene audit** of the component library —
+nine deterministic detectors (unused, junk names, deprecated, duplicates by name and by
+structure, redundant families, empty sets, misfiled, unbound-paint token violations) over
+a raw one-pass scan that survives 160k-instance files.
 
 ### `/ui:from-url` output
 
@@ -185,18 +203,22 @@ envelope.
 | `ui doctor` | Verify an ease-design install (and, with `--cwd`, a project) is healthy |
 | `ui scan` | Detect existing design signals — routes brownfield projects to /ui:learn |
 | `ui init` | Write the ease-design manifest and per-runtime adapter tree |
-| `ui ds` | Compile, inspect, and mutate the project's design system (`init`/`import`/`context`/`change-token`/`status`/`diff`/`docs`/`a11y`/`specimen`). `import` onboards an existing flat tokens.json; `specimen` reports the component state/variant completeness matrix. |
+| `ui ds` | Compile, inspect, and mutate the project's design system (`init`/`import`/`context`/`change-token`/`status`/`diff`/`docs`/`a11y`/`specimen`/`preview`). `init` compiles the 27-component paired-token kit; `import` onboards an existing flat tokens.json; `specimen --strict` gates completeness; `preview [--split]` renders the machine-generated specimen page(s). |
 | `ui memory` | Per-project design-decision ledger → compiled graph → cross-project taste profile (`record`/`compile`/`context`/`query`/`consolidate`/`fingerprint`/`status`/`export-corpus`) |
 | `ui changelog` | Fold the design-system history (manifest changelog + recorded decisions) into a readable changelog |
 | `ui tokens` | Compile a DTCG token file to CSS / Tailwind / Figma variables |
 | `ui color` | OKLCH color math: convert, scale, contrast, semantic palette |
-| `ui taste-lint` | Deterministic taste-rubric floor for generated HTML (6 machine-checkable axes) |
+| `ui taste-lint` | Deterministic taste-rubric floor for generated HTML — 14 absolute checks across 6 axes (incl. the hallmark-derived slop gates) |
+| `ui audit` | Deterministic DS-violation audit of a structured node export (5 families) |
+| `ui critique-coverage` | Deterministic acceptance-criteria coverage of a produced design (the curator's goal axis) |
+| `ui ingest-figma-ds` | Onboard an existing Figma design system (`figma-agent scan-design-system` output → tokens + registry + DESIGN.md) |
+| `ui synthesize-conventions` | Learn applied conventions from real screens (usage-dna.json → CONVENTIONS.md) |
 | `ui flow` | Lint a multi-screen flow's IA graph — unreachable screens, dead ends, missing error/empty states, dangling refs (`flow lint`) |
 | `ui a11y-lint` | Static-HTML accessibility linter — Tier-1 WCAG checks (alt, lang, title, tabindex, zoom, unnamed icon/emoji controls, heading order). Not a conformance claim. |
 | `ui evidence` | User-evidence ledger with an anti-fabrication gate — a quote finding must be a verbatim substring of its committed source (the binary can't invent user words). Feeds `critique-coverage --evidence-dir`. (`add`/`list`/`verify`/`show`) |
 | `ui vr` | Deterministic visual-regression — diff two screenshots or gate a baseline dir against fresh renders (zero-dep PNG codec + pixelmatch, anti-aliasing detection, masks). The binary compares; the host renders. (`diff`/`gate`/`accept`) |
 | `ui content-lint` | Deterministic content / UX-writing floor — low-FP static checks (lorem-ipsum, placeholder copy, click-here links, bare error codes, `item(s)`, insensitive terms, text-in-image, all-caps). Voice/tone fit stays a model judgment. |
-| `ui validate-layout` | Static HTML structural/overflow linter (10 heuristic checks) |
+| `ui validate-layout` | Static HTML structural/overflow linter (12 heuristic checks, incl. 100vw-width and root `overflow-x: hidden`) |
 | `ui autofix` | Apply 5 deterministic HTML fix rules (viewport, imgs, Lucide, CDN, dup-ids) |
 | `ui registry` | Component registry store: register, lookup, list |
 | `ui edit-strategy` | Select edit strategy, number HTML lines, apply ln-diff patch |
@@ -249,6 +271,89 @@ the embedder — so the binary stays zero-dependency, no-network and no-LLM. See
 
 ---
 
+## The `design-os` conductor (Python/Typer umbrella)
+
+Where `ui` is the deterministic kernel and `figma-agent`/`a11y-audit`/`page-shot` are
+optional hands, **`design-os`** is the job-level conductor that composes them. It never
+reimplements a check — every result is the underlying tool's JSON envelope re-emitted
+verbatim, so there is exactly one source of truth per verdict.
+
+| Command | What it does |
+|---|---|
+| `design-os doctor [--versions]` | One health check across the whole toolchain (`ui`, hands, plugins). |
+| `design-os audit <dir>` | Orchestrate the full linter battery (validate-layout · a11y-lint · taste-lint · content-lint · `ui ds a11y`) over generated pages — one summarized verdict. |
+| `design-os reference add/list/rm` | Reference intake: capture a live site (pixelshot) into the reference store for DNA extraction and brand seeding. |
+| `design-os vr-matrix` | Per-component visual-regression gate over `ui ds preview --split` pages. |
+| `design-os figma status/scan/audit` | Drive the Figma hand: connection status (per open file), design-system export, and the automated DS-hygiene audit. |
+| `design-os update [--pull] [--check]` | One-command toolchain refresh on any machine (editable install discovers the repo, rebuilds every surface). |
+| `design-os plugins` | Entry-point plugin discovery diagnostics (`design_os.plugins`). |
+
+Install once (`uv tool install -e design-os --with-editable design-os/plugins/figma`,
+hands via `npm link`), then `design-os update` keeps every machine current from the repo.
+
+---
+
+## Workflow map — every way in, every way out
+
+Two maps: what the surfaces are, and every user journey across them.
+
+### The surfaces
+
+```mermaid
+flowchart LR
+    U["You — plain words"] --> HM["Host model<br/>Claude Code · Codex · Antigravity<br/>16 /ui:* workflows"]
+    HM -- reads --> K["knowledge/<br/>taste rubric · 23 personas · figma-craft<br/>page-structures · color science"]
+    HM -- shells out --> UI["ui kernel — 28 deterministic commands<br/>ds · tokens · color · 4 linters · vr · memory"]
+    HM -- orchestrates --> DOS["design-os conductor<br/>doctor · audit · reference · vr-matrix · update"]
+    DOS -- verbatim envelopes --> UI
+    DOS --> FA["figma-agent hand<br/>WS broker 9410 · multi-file"]
+    DOS --> AX["a11y-audit + page-shot<br/>axe over live Chrome · PNG renders"]
+    HM -. "recall query at job start" .-> RC["recall mind<br/>local embeddings, no network"]
+    RC -. "recall reflect at land" .-> HM
+    FA <--> FIG["Figma Desktop<br/>compact plugin panel"]
+    UI --> DS[("design/ store<br/>tokens · registry · manifest · evidence · memory")]
+```
+
+### The journeys — pick your entry, everything converges on the store, ships through the gates
+
+```mermaid
+flowchart TD
+    E1["Nothing yet — an intent"] --> GEN
+    E2["An existing codebase"] --> SCAN["ui scan"] --> LEARN["/ui:learn — DS from your own evidence"] --> STORE
+    E3["A live URL you admire"] --> FURL["/ui:from-url — spec + tokens + audit folder"] --> STORE
+    E4["A Figma file"] --> FSTAT["design-os figma scan"] --> ING["ui ingest-figma-ds"] --> STORE
+    E4 --> FAUD["design-os figma audit<br/>9 hygiene detectors"] --> CLEAN["cleanup plan:<br/>delete · dedupe · consolidate"] -.-> FSTAT
+    E5["A shadcn / DTCG token set"] --> IMP["ui ds import"] --> STORE
+    E6["Reference shots · brand mood"] --> RADD["design-os reference add"] --> DNA["DNA doc → persona seed"] --> DSINIT
+    E1 -.-> DSINIT["ui ds init — persona compiles a<br/>27-component, paired-token DS"]
+    DSINIT --> STORE[("design/ store")]
+    STORE --> GEN["Generate — /ui:generate · /ui:design · /ui:slides<br/>shape picked per page-structures, then dressed"]
+    GEN --> IT["Refine — /ui:iterate · /ui:refine<br/>surgical edits, hash-seal intact"]
+    IT --> GATES{"Quality gates"}
+    GATES -- static, every build --> SG["design-os audit<br/>validate-layout · a11y · taste · content · ds a11y"]
+    GATES -- rendered, at land --> RG["a11y-audit (axe) · page-shot<br/>ui vr gate · design-os vr-matrix"]
+    SG -- fail: fix and re-run --> IT
+    RG -- fail: fix and re-run --> IT
+    GATES -- pass --> SHIP
+    subgraph SHIP["Ship"]
+      O1["Production HTML / slide deck"]
+      O2["Idiomatic Figma canvas — /ui:to-figma"]
+      O3["Specimen + preview pages — ui ds preview"]
+      O4["Audit reports · VR baselines"]
+    end
+    GEN -. "ui memory record" .-> MEM["memory + recall<br/>recall query starts a job · recall reflect lands it"]
+    MEM -. "preference prior" .-> GEN
+    STORE --> OPS["Evolve the system:<br/>ds change-token · diff · docs · specimen --strict · lifecycle status"]
+    OPS --> STORE
+```
+
+Every path is composable with every other: a team can enter at **E4** (audit + clean a
+messy Figma library), exit with a specimen page, re-enter at **E2** on the app repo, and
+land both through the same gates — the store is the meeting point, the gates are the
+contract.
+
+---
+
 ## How it works
 
 ease-design ships two runtime-neutral **sources of truth** and a thin per-runtime adapter:
@@ -280,11 +385,15 @@ The happy path, mechanically:
 
 | Path | Purpose |
 |---|---|
-| `knowledge/` | Markdown knowledge core — taste rubric, personas, components, color science, token taxonomy, prompt modes |
+| `knowledge/` | Markdown knowledge core — taste rubric, personas, page structures, components, color science, token taxonomy, accessibility model, `figma-craft/` construction tree |
 | `src/cli.ts` | `ui` binary entrypoint + subcommand router |
 | `src/commands/` | one file per `ui` subcommand |
-| `src/core/` | shared deterministic logic — color math, tokens, registry, autofix, layout + taste linting |
+| `src/core/` | shared deterministic logic — color math, tokens, registry, the 4 linters, `component-kit/` (27 components), persona expansion, ds preview |
 | `src/adapters/` | per-runtime adapter generation for `ui init` |
+| `design-os/` | the Python/Typer conductor (+ `plugins/figma` entry-point plugin) |
+| `figma-agent/` | the Figma hand — CLI + WS broker + plugin (npm workspace) |
+| `a11y/` | rendered-tier hands — `a11y-audit` (axe) + `page-shot` (npm workspace) |
+| `recall/` | optional semantic-recall mind (local embeddings; npm workspace) |
 | `schemas/` | JSON Schemas — design tokens, component registry, DS manifest |
 | `templates/` | workflow + skill Markdown templates (source of truth for adapter generation) |
 | `examples/` | synthetic walkthrough + generation outputs |
@@ -294,25 +403,43 @@ The happy path, mechanically:
 
 ## Status
 
-**v0.1.0 — deterministic surface fully tested; publish-ready.**
+**v0.1.0 — deterministic surfaces fully tested; dogfooded on real projects.**
 
-- **`knowledge/` core:** a 6+1-axis taste rubric, 23 personas across 7 families, 32
-  components across 8 categories, color science, token taxonomy, prompt modes.
-- **`ui` binary:** 17 deterministic commands (see table above).
-- **Workflows:** 12 host-model workflows + 8 skills, adapter-generated per runtime by `ui init`.
-- **Critique gate:** a hard pass/fail loop — model-scored subjective axes + a deterministic
-  `ui taste-lint` floor (body ≥ 16px, on-grid spacing, one icon family, tinted shadows,
-  non-linear easing, token-bound colors).
-- **851 tests passing**; zero runtime dependencies; four CI gates green (typecheck, lint,
-  build, test).
+- **`knowledge/` core:** a 6+1-axis taste rubric, 23 personas across 7 families, the
+  page-structures shape layer (21 macrostructures + honest-copy + pre-emit self-critique),
+  a two-tier accessibility model, color science, token taxonomy, and the `figma-craft/`
+  construction tree (canvas ops, component design, curator facets).
+- **`ui` kernel:** 28 deterministic commands. `ds init` compiles a **27-component,
+  paired-token design system** out of the box (14 contrast-proven pairs across all 23
+  personas); `ds specimen --strict` and `ds preview --split` gate and render it.
+- **Four deterministic linters** as the machine floor: `taste-lint` (14 checks — incl.
+  the hallmark-derived slop gates: overshoot easing, italic display headings, uppercase
+  tight line-height, focus rings that fade in, z-index inflation), `validate-layout`
+  (12), `content-lint` (10 — incl. placeholder-name), `a11y-lint` (+ `ds a11y` token-pair
+  contrast). Rendered tier: axe via `a11y-audit`, pixel gates via `ui vr`.
+- **Workflows:** 16 host-model workflows + supporting skills, adapter-generated per
+  runtime by `ui init`.
+- **The conductor + hands:** `design-os` (Typer umbrella: doctor/audit/reference/
+  vr-matrix/figma/update, entry-point plugins), `figma-agent` (self-healing multi-file
+  broker, canvas authoring, DS scan + the 9-detector hygiene audit), `a11y-audit` +
+  `page-shot`, `recall`.
+- **1,787 tests green** across the three suites; the `ui` kernel stays
+  zero-runtime-dependency; four CI gates green (typecheck, lint, build, test).
+- **Dogfooded on real work, not fixtures:** a production Figma project (129-component
+  library scanned, audited, and reconciled), a full brand pipeline (reference intake →
+  DNA → compiled brand DS → plugin-panel reskin, contrast machine-corrected), and the
+  toolchain's own preview/specimen surfaces.
 
 **Known boundaries (honest):**
 
-- **Live dogfood** is partial — a token-bound `/ui:generate` proof exists at
-  `examples/generated/live-2026-05-30/`; a fuller multi-workflow sweep is pending.
+- **`figma-agent audit-ds` live acceptance** — unit-tested + fixture-proven; the
+  ground-truth comparison against the hand-classified 129-component audit runs on the
+  next plugin reload.
+- **`/ui:to-figma` canvas E2E** — the authoring pipeline is live-validated piecewise;
+  a full intent→canvas run on a fresh file is still owner-scheduled.
 - **Taste-rubric threshold calibration** — the ≥7 per-axis pass cutoff is a reasoned
-  default; tuning it against a labeled corpus is future work. The deterministic `taste-lint`
-  floor already removes the worst failure mode.
+  default; tuning it against a labeled corpus is future work. The deterministic
+  `taste-lint` floor already removes the worst failure mode.
 
 ---
 
