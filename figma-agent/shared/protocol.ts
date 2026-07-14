@@ -26,6 +26,7 @@ export const COMMANDS = [
   'STATUS',
   'GET_SELECTION',
   'SCAN_DESIGN_SYSTEM',
+  'AUDIT_DS',
   'CREATE_FRAME',
   'CREATE_INSTANCE',
   'SET_VARIANT',
@@ -120,6 +121,7 @@ export const COMMAND_TIMEOUTS: Partial<Record<CommandName, number>> = {
   HTML_TO_FIGMA: 60_000,
   IMPORT_PAYLOAD: 60_000,
   SCAN_DESIGN_SYSTEM: 30_000,
+  AUDIT_DS: 120_000, // usage scan traverses EVERY page's instances — heavier than the DS scan
   EXEC_JS: 30_000, // CLI --timeout may raise, capped at 120s
   BATCH: 60_000,
 };

@@ -14,6 +14,7 @@ import {
 import { createVariablesFromTokens, opCreateVariable, opBindVariable } from './executor-variables';
 import { createFigmaNode } from './executor-frame';
 import { serializeDesignSystem } from './serialize-node';
+import { auditDs } from './executor-audit';
 import {
   opStatus, opGetSelection, opCreateFrame, opCreateInstance, opSetVariant,
   opSetAutoLayout, opSetConstraints, opSetText, opExportPng, opExecJs,
@@ -70,6 +71,7 @@ async function dispatch(cmd: CommandName, params: Params): Promise<unknown> {
     case 'STATUS': return opStatus();
     case 'GET_SELECTION': return opGetSelection(params);
     case 'SCAN_DESIGN_SYSTEM': return serializeDesignSystem();
+    case 'AUDIT_DS': return auditDs();
     case 'CREATE_FRAME': return opCreateFrame(params);
     case 'CREATE_INSTANCE': return opCreateInstance(params);
     case 'SET_VARIANT': return opSetVariant(params);

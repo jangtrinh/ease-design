@@ -1112,6 +1112,140 @@
     };
   }
 
+  // plugin/src/main/executor-audit.ts
+  function countUnboundPaints(node, field) {
+    if (!(field in node)) return 0;
+    let paints;
+    try {
+      paints = node[field];
+    } catch {
+      return 0;
+    }
+    if (!Array.isArray(paints)) return 0;
+    let n = 0;
+    for (const p of paints) {
+      if (p.type === "SOLID" && !p.boundVariables?.color) n++;
+    }
+    return n;
+  }
+  function factForNode(n, pageName) {
+    let variantAxes = {};
+    try {
+      const defs = n.componentPropertyDefinitions;
+      for (const [prop, def] of Object.entries(defs)) {
+        if (def.type === "VARIANT") variantAxes[prop] = def.variantOptions ?? [];
+      }
+    } catch {
+      variantAxes = {};
+    }
+    const variantCount = n.type === "COMPONENT_SET" ? n.children.length : 0;
+    let section = null;
+    let p = n.parent;
+    while (p) {
+      if (p.type === "SECTION") {
+        section = p.name;
+        break;
+      }
+      p = p.parent;
+    }
+    const deprecatedData = n.getSharedPluginData("idp", "status") === "deprecated";
+    const rep = n.type === "COMPONENT_SET" ? n.children[0] : n;
+    const repChildren = rep && "children" in rep ? [...rep.children] : [];
+    const childTypeSignature = repChildren.map((c) => c.type);
+    let unboundFills = 0;
+    let unboundStrokes = 0;
+    for (const s of rep ? [rep, ...repChildren] : []) {
+      unboundFills += countUnboundPaints(s, "fills");
+      unboundStrokes += countUnboundPaints(s, "strokes");
+    }
+    return {
+      id: n.id,
+      key: n.key ?? null,
+      name: n.name,
+      type: n.type,
+      variantCount,
+      variantAxes,
+      pageName,
+      section,
+      deprecatedData,
+      childTypeSignature,
+      unboundFills,
+      unboundStrokes
+    };
+  }
+  function inventoryPage(page) {
+    const nodes = page.findAllWithCriteria({ types: ["COMPONENT", "COMPONENT_SET"] });
+    const facts = [];
+    for (const n of nodes) {
+      if (n.type === "COMPONENT" && n.parent && n.parent.type === "COMPONENT_SET") continue;
+      facts.push(factForNode(n, page.name));
+    }
+    return facts;
+  }
+  async function tallyUsagePage(page, usage) {
+    var _a, _b;
+    const cnt = {};
+    const reps = {};
+    page.findAll((node) => {
+      var _a2;
+      if (node.type === "INSTANCE") {
+        cnt[node.name] = (cnt[node.name] ?? 0) + 1;
+        reps[_a2 = node.name] ?? (reps[_a2] = node);
+      }
+      return false;
+    });
+    let tallied = 0;
+    for (const name of Object.keys(reps)) {
+      const c = cnt[name];
+      tallied += c;
+      let key = null;
+      try {
+        const main = await reps[name].getMainComponentAsync();
+        if (main) key = main.parent && main.parent.type === "COMPONENT_SET" ? main.parent : main;
+      } catch {
+        key = null;
+      }
+      if (key) {
+        usage.byMainId[key.id] = (usage.byMainId[key.id] ?? 0) + c;
+        const pages = (_a = usage.pagesById)[_b = key.id] ?? (_a[_b] = []);
+        if (!pages.includes(page.name)) pages.push(page.name);
+      } else {
+        usage.unresolved += c;
+      }
+    }
+    return tallied;
+  }
+  async function auditDs() {
+    const pages = figma.root.children;
+    const components = [];
+    const usage = { byMainId: {}, pagesById: {}, unresolved: 0 };
+    const skippedPages = [];
+    let instancesTallied = 0;
+    for (const page of pages) {
+      try {
+        await figma.setCurrentPageAsync(page);
+      } catch {
+        skippedPages.push(page.name);
+        continue;
+      }
+      components.push(...inventoryPage(page));
+      instancesTallied += await tallyUsagePage(page, usage);
+    }
+    const componentCount = components.filter((c) => c.type === "COMPONENT").length;
+    const sets = components.filter((c) => c.type === "COMPONENT_SET").length;
+    return {
+      // Only plain objects survive past a page boundary (C5) — no SceneNode is retained.
+      file: {
+        fileName: figma.root.name,
+        pages: pages.map((pg) => ({ id: pg.id, name: pg.name })),
+        skippedPages
+      },
+      components,
+      usage,
+      counts: { components: componentCount, sets, instancesTallied }
+    };
+  }
+
   // plugin/src/main/executor-ops.ts
   var PLUGIN_VERSION = "0.1.0";
   var LAYOUT_MODE_MAP = {
@@ -1378,6 +1512,8 @@
         return opGetSelection(params);
       case "SCAN_DESIGN_SYSTEM":
         return serializeDesignSystem();
+      case "AUDIT_DS":
+        return auditDs();
       case "CREATE_FRAME":
         return opCreateFrame(params);
       case "CREATE_INSTANCE":
