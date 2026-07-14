@@ -13,6 +13,8 @@ import { discoverDesignSystem, loadDesignSystem, pathsForDir, DSError } from "..
 import { DSManifestError } from "../core/ds-manifest.js";
 import { formatMarkdown, formatStructured, parseInclude } from "../core/ds-context.js";
 import { SOUL_FILENAME } from "../core/ds-soul.js";
+import { STUDIO_SOUL_FILENAME } from "../core/ds-soul-studio.js";
+import { easeHome } from "../core/memory-store.js";
 import { emitTailwind } from "../core/token-emit.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
@@ -123,7 +125,24 @@ export function runContext(parsed: ParsedArgs): CommandResult {
     }
   }
 
-  const opts = { include, strict, maxBytes, ...(soul !== undefined && { soul }) };
+  // The studio soul — the genealogy layer above every project soul — is read
+  // from the user-scope home the same optional, degrade-silently way. It rides
+  // the same `soul` include (one concept, two tiers; see ds-context.ts).
+  const studioSoulPath = join(easeHome(), STUDIO_SOUL_FILENAME);
+  let studioSoul: string | undefined;
+  if (include.includes("soul") && existsSync(studioSoulPath)) {
+    try {
+      studioSoul = readFileSync(studioSoulPath, "utf8");
+    } catch {
+      studioSoul = undefined; // unreadable studio soul degrades to "no studio soul", never an error
+    }
+  }
+
+  const opts = {
+    include, strict, maxBytes,
+    ...(soul !== undefined && { soul }),
+    ...(studioSoul !== undefined && { studioSoul }),
+  };
 
   // The `@theme` block is compiled from the FULL resolved token map (same bytes
   // as `ui tokens compile … --target tailwind`), so `--with-theme` folds the

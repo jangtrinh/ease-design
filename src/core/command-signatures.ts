@@ -566,6 +566,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         flags: [
           { name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd)" },
           { name: "force", type: "boolean", summary: "'soul init' only: overwrite an existing soul.md" },
+          { name: "studio", type: "boolean", summary: "Target $EASE_DESIGN_HOME/studio-soul.md instead of the project soul; conflicts with --dir" },
         ],
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "EXISTS", "WRITE_ERROR", "READ_ERROR"],
       },

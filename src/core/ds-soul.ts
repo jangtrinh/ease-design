@@ -106,8 +106,15 @@ function hasRealBullet(body: string): boolean {
   return false;
 }
 
+/** Derive a scaffold's placeholder HTML comments from its own text (emitter and
+ * linter never drift — the check set IS the scaffold's comments). Exported so
+ * scaffold variants (the studio soul, ds-soul-studio.ts) derive their own set. */
+export function derivePlaceholderComments(scaffold: string): readonly string[] {
+  return [...scaffold.matchAll(/<!--[\s\S]*?-->/g)].map((m) => m[0]);
+}
+
 /** The scaffold's own HTML-comment placeholders, derived from SOUL_SCAFFOLD so the two never drift apart. */
-const SCAFFOLD_PLACEHOLDERS: readonly string[] = [...SOUL_SCAFFOLD.matchAll(/<!--[\s\S]*?-->/g)].map((m) => m[0]);
+const SCAFFOLD_PLACEHOLDERS: readonly string[] = derivePlaceholderComments(SOUL_SCAFFOLD);
 
 /** The `status:` value from the `---`-delimited frontmatter block, or null when absent (block or key). */
 function frontmatterStatus(text: string): string | null {
@@ -123,8 +130,9 @@ function frontmatterStatus(text: string): string | null {
  * Lint a soul.md's STRUCTURE only — never its content taste. Pure function of
  * the file's text; the command layer decides what to do when the file is
  * missing entirely (that is not this function's concern — see ds-soul-impl.ts).
+ * `placeholderComments`: the scaffold-untouched match set (scaffold variants pass their own derived set).
  */
-export function checkSoul(text: string): SoulCheckResult {
+export function checkSoul(text: string, placeholderComments: readonly string[] = SCAFFOLD_PLACEHOLDERS): SoulCheckResult {
   const findings: SoulFinding[] = [];
 
   for (const name of REQUIRED_SECTIONS) {
@@ -159,7 +167,7 @@ export function checkSoul(text: string): SoulCheckResult {
     });
   }
 
-  if (SCAFFOLD_PLACEHOLDERS.some((p) => text.includes(p))) {
+  if (placeholderComments.some((p) => text.includes(p))) {
     findings.push({
       checkId: "soul-scaffold-untouched",
       severity: "warning",

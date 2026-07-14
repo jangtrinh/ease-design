@@ -16,6 +16,11 @@ import {
   writeSoulScaffold,
   soulSectionForContext,
 } from "../src/core/ds-soul.js";
+import {
+  STUDIO_SOUL_SCAFFOLD,
+  soulName,
+  checkStudioSoul,
+} from "../src/core/ds-soul-studio.js";
 
 /** A fully-edited, ratified soul — the 0-findings fixture. (Named "vela", NOT
  * "acme": Acme is in content-checks' placeholder-name set, so an "acme" soul
@@ -34,6 +39,27 @@ status: ratified
 ## Always
 
 - display type at 44px or larger
+
+## Voice
+
+- direct, no filler
+`;
+
+/** A fully-edited, ratified, NAMED studio soul — the 0-findings fixture for checkStudioSoul. */
+const STUDIO_RATIFIED = `---
+status: ratified
+name: JANG
+---
+
+# Design Soul — studio
+
+## Never
+
+- generic stock photography
+
+## Always
+
+- ship display type at 44px or larger
 
 ## Voice
 
@@ -220,5 +246,106 @@ describe("soulSectionForContext", () => {
     const body = out.split("\n\n…(")[0] ?? "";
     expect(body.split("\n")).toHaveLength(150);
     expect(out).toContain("truncated to 150 lines");
+  });
+});
+
+// ─── STUDIO_SOUL_SCAFFOLD — the genealogy layer above every project soul ──────
+
+describe("STUDIO_SOUL_SCAFFOLD", () => {
+  it("matches the phase-01 spec verbatim", () => {
+    expect(STUDIO_SOUL_SCAFFOLD).toBe(`---
+status: draft
+name: <studio>
+---
+
+# Design Soul — studio
+
+_The layer ABOVE every project soul: what stays true across ALL your products.
+A project's design/soul.md inherits this and overrides on conflict.
+\`name:\` above names your agents (e.g. name: JANG → agent jang-<project>)._
+
+## Never
+
+- <!-- điều studio KHÔNG BAO GIỜ làm, bất kể project -->
+
+## Always
+
+- <!-- điều mọi sản phẩm của studio LUÔN giữ -->
+
+## Voice
+
+- <!-- giọng chung của studio -->
+`);
+  });
+});
+
+// ─── soulName ──────────────────────────────────────────────────────────────────
+
+describe("soulName", () => {
+  it("parses a real name from frontmatter, trimmed", () => {
+    expect(soulName("---\nstatus: draft\nname:   JANG   \n---\n")).toBe("JANG");
+  });
+
+  it("returns null when the name key is absent", () => {
+    expect(soulName("---\nstatus: draft\n---\n")).toBeNull();
+  });
+
+  it("returns null on an empty name value", () => {
+    expect(soulName("---\nstatus: draft\nname:\n---\n")).toBeNull();
+  });
+
+  it("returns null on the untouched <studio> placeholder", () => {
+    expect(soulName(STUDIO_SOUL_SCAFFOLD)).toBeNull();
+  });
+
+  it("returns null when there is no frontmatter block at all", () => {
+    expect(soulName("# Design Soul — studio\n\n## Never\n\n- no gradients\n")).toBeNull();
+  });
+
+  it("finds a real name on the ratified fixture", () => {
+    expect(soulName(STUDIO_RATIFIED)).toBe("JANG");
+  });
+});
+
+// ─── checkStudioSoul ─────────────────────────────────────────────────────────────
+
+describe("checkStudioSoul", () => {
+  it("the untouched STUDIO_SOUL_SCAFFOLD reports soul-missing-name plus the P1 structure findings", () => {
+    const r = checkStudioSoul(STUDIO_SOUL_SCAFFOLD);
+    const found = r.findings.map((f) => f.checkId);
+    expect(found).toContain("soul-missing-name");
+    expect(found.filter((id) => id === "soul-empty-section")).toHaveLength(3);
+    expect(found).toContain("soul-draft-status");
+    expect(found).toContain("soul-scaffold-untouched");
+    // errors: 3x soul-empty-section + soul-missing-name; warnings: draft + untouched
+    // (soul-scaffold-untouched matches the STUDIO scaffold's own placeholder comments).
+    expect(r.errorCount).toBe(4);
+    expect(r.warningCount).toBe(2);
+  });
+
+  it("a ratified, named studio soul yields zero findings", () => {
+    const r = checkStudioSoul(STUDIO_RATIFIED);
+    expect(r.findings).toEqual([]);
+    expect(r.errorCount).toBe(0);
+    expect(r.warningCount).toBe(0);
+  });
+
+  it("does not fire soul-missing-name once a real name is set", () => {
+    const named = STUDIO_SOUL_SCAFFOLD.replace("name: <studio>", "name: JANG");
+    const found = checkStudioSoul(named).findings.map((f) => f.checkId);
+    expect(found).not.toContain("soul-missing-name");
+  });
+
+  it("fires soul-missing-name alone on an otherwise-ratified-but-unnamed soul", () => {
+    const unnamed = STUDIO_RATIFIED.replace("name: JANG\n", "");
+    const r = checkStudioSoul(unnamed);
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]?.checkId).toBe("soul-missing-name");
+    expect(r.findings[0]?.severity).toBe("error");
+  });
+
+  it("does not fire soul-scaffold-untouched on a clean ratified studio soul", () => {
+    const found = checkStudioSoul(STUDIO_RATIFIED).findings.map((f) => f.checkId);
+    expect(found).not.toContain("soul-scaffold-untouched");
   });
 });

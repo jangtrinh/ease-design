@@ -81,3 +81,18 @@ check explicitly means a soul is expected; everywhere else the soul stays option
   it is technically on-brief.
 - **The taste rubric / critique gate** — unchanged. The soul biases what gets
   *proposed*; the gate still scores what got *made*.
+
+## §6 Studio layer (genealogy)
+
+`$EASE_DESIGN_HOME/studio-soul.md` is the layer **above** every project soul — what
+stays true across ALL of a studio's products. `ui ds soul init/check --studio`
+scaffold and lint it exactly like a project soul, plus one field: frontmatter
+`name:` (e.g. `name: JANG`), which later genealogy tooling uses to name a studio's
+agents (`jang-<project>`); a missing or placeholder name is the error
+`soul-missing-name`.
+
+`ui ds context` emits the studio section AFTER the project section — the project
+is the more specific layer and wins on conflict; a project with no soul.md yet
+still gets the studio section, since the studio soul is useful before day one.
+Promote a studio soul by graduation, not invention: once the same clauses ratify
+across ≥2 real products, copy them up to `studio-soul.md` and add `name:`.

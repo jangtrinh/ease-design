@@ -29,8 +29,8 @@ Usage:
   ui ds docs [--dir <project>] [--out <file>] [--format markdown|json]
   ui ds a11y [--dir <project>] [--pairs "text:surface,..."] [--json]
   ui ds preview [--dir <project>] [--out <file>] [--split <dir>] [--json]
-  ui ds soul init  [--dir <project>] [--force]
-  ui ds soul check [--dir <project>] [--json]
+  ui ds soul init  [--dir <project>] [--force] [--studio]
+  ui ds soul check [--dir <project>] [--json] [--studio]
 
 Subcommands:
   init           Compile a project-scoped design system from a persona + intent
@@ -113,16 +113,28 @@ Subcommands:
   --max-bytes <n>  Truncate the context block to fit n bytes (default 4096)
   --dir <path>   Override the project directory
   The 'soul' section emits design/soul.md (the declared stance, capped at 150
-  lines) when that file exists; a project without a soul just omits the section.
+  lines) when that file exists, PLUS the studio-level soul from
+  $EASE_DESIGN_HOME/studio-soul.md (the genealogy layer above every project
+  soul — see 'ds soul --studio' below) when THAT file exists, rendered after
+  the project section since the project always wins on conflict. Either,
+  both, or neither may exist; a missing file just omits its section, never
+  an error.
 
 'ds soul' options:
   init           Write the design/soul.md scaffold (status: draft)
   check          Structure-lint design/soul.md; exit 1 on error-severity findings
   --dir <path>   Project directory holding design/ (default: cwd)
   --force        'soul init' only: overwrite an existing soul.md
+  --studio       Target $EASE_DESIGN_HOME/studio-soul.md instead — the
+                 genealogy layer above every project soul (its 'name:'
+                 frontmatter later names a studio's agents, e.g. name: JANG).
+                 Conflicts with --dir (BAD_ARG: a studio is user-scoped, not
+                 per-project).
   Checks (structure only — content taste stays a model judgment):
   soul-missing-section / soul-empty-section / soul-placeholder-copy   (errors)
   soul-draft-status / soul-scaffold-untouched / soul-too-long         (warnings)
+  --studio also checks soul-missing-name (error) — a studio soul additionally
+  needs frontmatter 'name:' set to something other than the placeholder.
   A missing file is the error finding 'soul-missing' (an explicit check expects
   a soul). Everywhere else the soul is OPTIONAL — absence is never an error.
 

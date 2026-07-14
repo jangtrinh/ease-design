@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -9,6 +9,22 @@ const PERSONA_DATA = new URL(
   "../knowledge/personas/personas.json",
   import.meta.url,
 ).pathname;
+
+// ── FILE-LEVEL EASE_DESIGN_HOME guard (invariant #5) ─────────────────────────
+// `ds context --include soul` reads $EASE_DESIGN_HOME/studio-soul.md, so a
+// developer machine with a real studio soul would otherwise leak a studio
+// section into every unguarded assertion in this file (e.g. the soul-absence
+// `not.toContain("## Soul")`). Pin the home to a fresh EMPTY tmp dir per test,
+// for every current AND future describe. The studio-layer describe below
+// overrides it locally (its inner beforeEach runs after this one and wins).
+const savedHomeFile = process.env["EASE_DESIGN_HOME"];
+beforeEach(() => {
+  process.env["EASE_DESIGN_HOME"] = mkdtempSync(join(tmpdir(), "ease-ctx-home-guard-"));
+});
+afterEach(() => {
+  if (savedHomeFile === undefined) delete process.env["EASE_DESIGN_HOME"];
+  else process.env["EASE_DESIGN_HOME"] = savedHomeFile;
+});
 
 function capture(args: string[]): { exitCode: number; stdout: string; stderr: string } {
   let stdout = "";
@@ -205,5 +221,111 @@ describe("ui ds context — soul section", () => {
     const noSoul = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
     expect(noSoul.exitCode).toBe(0);
     expect(JSON.parse(noSoul.stdout).data.soul).toBeNull();
+  });
+});
+
+// ─── ds context — studio soul layer (genealogy above every project soul) ─────
+// EASE_DESIGN_HOME MUST be overridden in tests (plan invariant #5 of memory-store).
+
+const STUDIO_SOUL_TEXT = `---
+status: ratified
+name: JANG
+---
+
+# Design Soul — studio
+
+## Never
+
+- generic stock photography
+
+## Always
+
+- ship display type at 44px or larger
+
+## Voice
+
+- direct, no filler
+`;
+
+describe("ui ds context — studio soul layer", () => {
+  const STUDIO_HEADING = "## Soul — studio (inherited base; the project soul above overrides it on conflict)";
+  const savedHome = process.env["EASE_DESIGN_HOME"];
+  let home: string;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), "ease-ctx-studio-home-"));
+    process.env["EASE_DESIGN_HOME"] = home;
+  });
+  afterEach(() => {
+    if (savedHome === undefined) delete process.env["EASE_DESIGN_HOME"];
+    else process.env["EASE_DESIGN_HOME"] = savedHome;
+  });
+
+  function writeStudioSoul(text: string): void {
+    mkdirSync(home, { recursive: true });
+    writeFileSync(join(home, "studio-soul.md"), text, "utf8");
+  }
+
+  it("project-only: no studio file → only the project soul section appears", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-studio-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("## Soul (declared stance");
+    expect(r.stdout).not.toContain(STUDIO_HEADING);
+  });
+
+  it("studio-only: project has no soul.md → the studio section still emits, with the 'no project soul yet' note", () => {
+    writeStudioSoul(STUDIO_SOUL_TEXT);
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-studio-"));
+    initDs(tmp, true);
+    rmSync(join(tmp, "design", "soul.md"));
+    const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("## Soul (declared stance");
+    expect(r.stdout).toContain(STUDIO_HEADING);
+    expect(r.stdout).toContain("no project soul yet");
+  });
+
+  it("both: the project section appears BEFORE the studio section", () => {
+    writeStudioSoul(STUDIO_SOUL_TEXT);
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-studio-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+    expect(r.exitCode).toBe(0);
+    const projectIdx = r.stdout.indexOf("## Soul (declared stance");
+    const studioIdx = r.stdout.indexOf(STUDIO_HEADING);
+    expect(projectIdx).toBeGreaterThan(-1);
+    expect(studioIdx).toBeGreaterThan(-1);
+    expect(projectIdx).toBeLessThan(studioIdx);
+    expect(r.stdout).not.toContain("no project soul yet");
+  });
+
+  it("neither: no studio file and no project soul.md → soul is omitted entirely, never an error", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-studio-"));
+    initDs(tmp, true);
+    rmSync(join(tmp, "design", "soul.md"));
+    const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("## Soul");
+  });
+
+  it("--format json: structured carries soul and studioSoul as two separate fields", () => {
+    writeStudioSoul(STUDIO_SOUL_TEXT);
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-studio-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout).data;
+    expect(data.soul).toContain("# Design Soul");
+    expect(data.studioSoul).toContain("# Design Soul — studio");
+  });
+
+  it("--format json: studioSoul is null when no studio-soul.md exists", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-studio-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    expect(JSON.parse(r.stdout).data.studioSoul).toBeNull();
   });
 });

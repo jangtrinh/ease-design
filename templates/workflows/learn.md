@@ -184,7 +184,10 @@ exit is terminal — surface it and stop.
 ### Draft the soul from evidence
 
 After the DS compiles, DRAFT `design/soul.md` from what you measured — never from
-imagination. Each `## Never` / `## Always` bullet cites its evidence inline
+imagination. If a studio soul exists (`$EASE_DESIGN_HOME/studio-soul.md`), read it
+first as a seed: a clause the project inherits unchanged from it cites
+`— inherited: studio` instead of a fresh evidence citation. Each `## Never` /
+`## Always` bullet cites its evidence inline
 (`— evidence: 5/5 captured pages use display ≥ 44px; 0 gradients found`). Keep
 `status: draft` in the frontmatter and tell the owner: review, edit, then set
 `status: ratified`. Run `ui ds soul check` and report its findings.

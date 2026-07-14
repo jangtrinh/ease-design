@@ -7,6 +7,7 @@
  */
 import { isAlias } from "./token-model.js";
 import { soulSectionForContext } from "./ds-soul.js";
+import { studioSoulSectionForContext } from "./ds-soul-studio.js";
 import type { DesignSystem } from "./design-system.js";
 import type { ResolvedToken } from "./token-model.js";
 
@@ -24,6 +25,14 @@ export interface ContextOptions {
    * project has no soul.md; the section is then simply omitted, never an error.
    */
   soul?: string;
+  /**
+   * Raw text of $EASE_DESIGN_HOME/studio-soul.md — the genealogy layer ABOVE
+   * every project soul — read by the command layer the same way as `soul`.
+   * Undefined when no studio soul exists; its section is then simply omitted,
+   * never an error. Rendered AFTER the project `soul` section: the project is
+   * the more specific, later-declared layer and wins on conflict.
+   */
+  studioSoul?: string;
 }
 
 export interface StructuredContext {
@@ -33,6 +42,8 @@ export interface StructuredContext {
   intent: string;
   /** design/soul.md content (capped), or null when absent / not included. */
   soul: string | null;
+  /** $EASE_DESIGN_HOME/studio-soul.md content (capped), or null when absent / not included. */
+  studioSoul: string | null;
   semantic: { path: string; value: string }[];
   registry: { name: string; category: string; tokensUsed: string[] }[];
   naming: { rule: string }[];
@@ -182,7 +193,7 @@ function applyTruncation(
 
 /** Format the design system as a markdown context block. */
 export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
-  const { include, strict, maxBytes, soul } = opts;
+  const { include, strict, maxBytes, soul, studioSoul } = opts;
   const sem = semanticTokens(ds);
   const regRows = ds.registry.components.map((c) => ({
     name: c.name,
@@ -221,6 +232,21 @@ export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
         soulSectionForContext(soul),
         "",
       );
+    }
+
+    // The studio soul is the genealogy layer ABOVE every project soul — it
+    // rides the same `soul` include (one concept, two tiers) and always
+    // renders AFTER the project section above, since project is the more
+    // specific, later-declared layer and wins on conflict.
+    if (include.includes("soul") && studioSoul !== undefined) {
+      lines.push(
+        "## Soul — studio (inherited base; the project soul above overrides it on conflict)",
+        "",
+      );
+      if (soul === undefined) {
+        lines.push("_no project soul yet — this is the only declared layer_", "");
+      }
+      lines.push(studioSoulSectionForContext(studioSoul), "");
     }
 
     if (include.includes("tokens")) {
@@ -294,6 +320,7 @@ function buildStructured(
   ds: DesignSystem,
   include: ContextSection[],
   soul: string | null,
+  studioSoul: string | null,
   ap: string[],
   reg: { name: string; category: string; tokensUsed: string[] }[],
   tok: ResolvedToken[],
@@ -304,6 +331,7 @@ function buildStructured(
     persona: ds.manifest.persona,
     intent: ds.manifest.intent,
     soul: include.includes("soul") ? soul : null,
+    studioSoul: include.includes("soul") ? studioSoul : null,
     semantic: include.includes("tokens")
       ? tok.map((t) => ({ path: t.path, value: formatValue(t) }))
       : [],
@@ -318,9 +346,12 @@ function buildStructured(
 /** Format the design system as a structured JSON-serialisable object.
  *
  * Truncation drops whole rows deterministically (anti-patterns → registry → tokens),
- * then — only if zero-row versions still exceed the budget — drops the soul text
+ * then — only if zero-row versions still exceed the budget — drops soul text
  * (the declared stance outranks token rows, so it is dropped LAST), so the result
- * is always a valid object — no mid-string slicing.
+ * is always a valid object — no mid-string slicing. The studio soul (the more
+ * expendable, inherited-base layer) drops before the project soul does — see
+ * `soulPairs` below — since the project soul is the more specific layer and
+ * wins on conflict everywhere else in this formatter too.
  * If even the minimal object exceeds maxBytes, rows are dropped until it fits or
  * all variable rows are exhausted (fixed header fields are never trimmed).
  */
@@ -335,19 +366,37 @@ export function formatStructured(ds: DesignSystem, opts: ContextOptions): Struct
   // Anti-patterns are persisted in the manifest at ds init time.
   const antiPatterns: string[] = ds.manifest.persona.antiPatterns ?? [];
   const soulText = opts.soul !== undefined ? soulSectionForContext(opts.soul) : null;
+  const studioSoulText = opts.studioSoul !== undefined ? studioSoulSectionForContext(opts.studioSoul) : null;
+
+  // Preference-ordered (soul, studioSoul) pairs — keep both as long as budget
+  // allows; sacrifice the studio layer first; drop the project soul only as
+  // the last resort before falling through to zero rows below. When there is
+  // no studio soul at all this reduces to the same 2-state ladder as before
+  // (byte-identical behaviour for every caller that never sets studioSoul).
+  const soulPairs: { soul: string | null; studio: string | null }[] =
+    soulText !== null && studioSoulText !== null
+      ? [
+          { soul: soulText, studio: studioSoulText },
+          { soul: soulText, studio: null },
+          { soul: null, studio: null },
+        ]
+      : soulText !== null
+      ? [{ soul: soulText, studio: null }, { soul: null, studio: null }]
+      : studioSoulText !== null
+      ? [{ soul: null, studio: studioSoulText }, { soul: null, studio: null }]
+      : [{ soul: null, studio: null }];
 
   // Try progressively more aggressive truncation — drop rows, never mid-string slice
-  const soulVariants: (string | null)[] = soulText !== null ? [soulText, null] : [null];
   const apLimits = [antiPatterns.length, 5, 0];
   const regLimits = [regRows.length, 10, 5, 0];
   const tokLimits = [sem.length, 30, 15, 5, 0];
 
-  for (const soulVariant of soulVariants) {
+  for (const pair of soulPairs) {
     for (const apLimit of apLimits) {
       for (const regLimit of regLimits) {
         for (const tokLimit of tokLimits) {
           const ctx = buildStructured(
-            ds, include, soulVariant,
+            ds, include, pair.soul, pair.studio,
             antiPatterns.slice(0, apLimit),
             regRows.slice(0, regLimit),
             sem.slice(0, tokLimit),
@@ -361,7 +410,7 @@ export function formatStructured(ds: DesignSystem, opts: ContextOptions): Struct
   }
 
   // Budget is too small even for zero rows — return the minimal header-only object
-  return buildStructured(ds, include, null, [], [], []);
+  return buildStructured(ds, include, null, null, [], [], []);
 }
 
 // ─── Include parser ───────────────────────────────────────────────────────────

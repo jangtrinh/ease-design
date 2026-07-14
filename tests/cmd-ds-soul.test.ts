@@ -3,13 +3,14 @@
  * exit codes, JSON envelopes, EXISTS/--force semantics, the soul-missing
  * finding on an absent file, and the per-action flag guard.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { run } from "../src/cli.js";
 import { SOUL_SCAFFOLD } from "../src/core/ds-soul.js";
+import { STUDIO_SOUL_SCAFFOLD } from "../src/core/ds-soul-studio.js";
 
 // Named "vela", not "acme" — Acme is in content-checks' placeholder-name set
 // and would (correctly) trip soul-placeholder-copy.
@@ -170,5 +171,128 @@ describe("ui ds soul — action routing", () => {
     const r = capture(["ds", "soul", "init", "--dir", tmp, "--json"]);
     expect(r.exitCode).toBe(0);
     expect(existsSync(join(tmp, "design", "soul.md"))).toBe(true);
+  });
+});
+
+// ─── ds soul --studio — the genealogy layer above every project soul ─────────
+// EASE_DESIGN_HOME MUST be overridden in tests (plan invariant #5 of memory-store).
+
+const STUDIO_RATIFIED = `---
+status: ratified
+name: JANG
+---
+
+# Design Soul — studio
+
+## Never
+
+- generic stock photography
+
+## Always
+
+- ship display type at 44px or larger
+
+## Voice
+
+- direct, no filler
+`;
+
+describe("ui ds soul --studio", () => {
+  const savedHome = process.env["EASE_DESIGN_HOME"];
+  let home: string;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), "ease-studio-home-"));
+    process.env["EASE_DESIGN_HOME"] = home;
+  });
+  afterEach(() => {
+    if (savedHome === undefined) delete process.env["EASE_DESIGN_HOME"];
+    else process.env["EASE_DESIGN_HOME"] = savedHome;
+  });
+
+  it("init writes the studio scaffold to $EASE_DESIGN_HOME/studio-soul.md", () => {
+    const r = capture(["ds", "soul", "init", "--studio", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const env = JSON.parse(r.stdout);
+    expect(env.ok).toBe(true);
+    expect(env.data.written).toBe(true);
+    const path = join(home, "studio-soul.md");
+    expect(env.data.path).toBe(path);
+    expect(readFileSync(path, "utf8")).toBe(STUDIO_SOUL_SCAFFOLD);
+  });
+
+  it("errors EXISTS on a second init without --force (file preserved)", () => {
+    capture(["ds", "soul", "init", "--studio"]);
+    const path = join(home, "studio-soul.md");
+    writeFileSync(path, STUDIO_RATIFIED, "utf8");
+    const r = capture(["ds", "soul", "init", "--studio", "--json"]);
+    expect(r.exitCode).toBe(1);
+    expect(JSON.parse(r.stdout).error.code).toBe("EXISTS");
+    expect(readFileSync(path, "utf8")).toBe(STUDIO_RATIFIED);
+  });
+
+  it("--force overwrites back to the scaffold", () => {
+    capture(["ds", "soul", "init", "--studio"]);
+    const path = join(home, "studio-soul.md");
+    writeFileSync(path, STUDIO_RATIFIED, "utf8");
+    const r = capture(["ds", "soul", "init", "--studio", "--force", "--json"]);
+    expect(r.exitCode).toBe(0);
+    expect(JSON.parse(r.stdout).data.written).toBe(true);
+    expect(readFileSync(path, "utf8")).toBe(STUDIO_SOUL_SCAFFOLD);
+  });
+
+  it("check on a missing studio soul → the soul-missing finding pointing at --studio, exit 1", () => {
+    const r = capture(["ds", "soul", "check", "--studio", "--json"]);
+    expect(r.exitCode).toBe(1);
+    const data = JSON.parse(r.stdout).data;
+    expect(data.errorCount).toBe(1);
+    expect(data.findings[0].checkId).toBe("soul-missing");
+    expect(data.findings[0].message).toContain("ui ds soul init --studio");
+  });
+
+  it("check on the untouched scaffold → soul-missing-name + P1 findings, exit 1", () => {
+    capture(["ds", "soul", "init", "--studio"]);
+    const r = capture(["ds", "soul", "check", "--studio", "--json"]);
+    expect(r.exitCode).toBe(1);
+    const data = JSON.parse(r.stdout).data;
+    const ids = data.findings.map((f: { checkId: string }) => f.checkId);
+    expect(ids).toContain("soul-missing-name");
+    expect(ids).toContain("soul-empty-section");
+  });
+
+  it("check on a ratified + named studio soul exits 0 with 0/0", () => {
+    mkdirSync(home, { recursive: true });
+    writeFileSync(join(home, "studio-soul.md"), STUDIO_RATIFIED, "utf8");
+    const r = capture(["ds", "soul", "check", "--studio", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout).data;
+    expect(data.errorCount).toBe(0);
+    expect(data.warningCount).toBe(0);
+  });
+
+  it("text mode lists findings with severity glyphs, same as the project path", () => {
+    capture(["ds", "soul", "init", "--studio"]);
+    const r = capture(["ds", "soul", "check", "--studio"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("error(s)");
+    expect(r.stdout).toContain("[soul-missing-name]");
+  });
+
+  it("--studio + --dir together on init → BAD_ARG", () => {
+    const r = capture(["ds", "soul", "init", "--studio", "--dir", "/tmp/whatever-pA", "--json"]);
+    expect(r.exitCode).toBe(1);
+    expect(JSON.parse(r.stdout).error.code).toBe("BAD_ARG");
+  });
+
+  it("--studio + --dir together on check → BAD_ARG", () => {
+    const r = capture(["ds", "soul", "check", "--studio", "--dir", "/tmp/whatever-pA", "--json"]);
+    expect(r.exitCode).toBe(1);
+    expect(JSON.parse(r.stdout).error.code).toBe("BAD_ARG");
+  });
+
+  it("init works standalone, with no project directory involved at all", () => {
+    const r = capture(["ds", "soul", "init", "--studio", "--json"]);
+    expect(r.exitCode).toBe(0);
+    expect(existsSync(join(home, "studio-soul.md"))).toBe(true);
   });
 });
