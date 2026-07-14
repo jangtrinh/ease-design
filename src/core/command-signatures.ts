@@ -722,6 +722,34 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
       },
     },
   },
+
+  agents: {
+    summary: "Generate + lint soul-bound, task-scoped project agents (Claude Code)",
+    subcommands: {
+      init: {
+        summary: "Generate one .claude/agents/<name>.md per roster role from the project DS + studio soul",
+        positionals: [],
+        flags: [
+          { name: "dir", type: "string", summary: "Project directory holding design/ (default: walk up from cwd)" },
+          { name: "roster", type: "string", summary: "Comma-separated roles to generate: designer,curator,figma-hand (default: all 3)" },
+          { name: "force", type: "boolean", summary: "Overwrite existing agent files" },
+        ],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "DS_NOT_FOUND", "BAD_MANIFEST", "EXISTS", "READ_ERROR", "WRITE_ERROR"],
+      },
+      list: {
+        summary: "List stamped design-os agents (role / name / hash / fresh)",
+        positionals: [],
+        flags: [{ name: "dir", type: "string", summary: "Project directory (default: the discovered DS project, else cwd)" }],
+        errorCodes: ["UNKNOWN_FLAG", "DS_NOT_FOUND", "BAD_MANIFEST", "READ_ERROR"],
+      },
+      check: {
+        summary: "Findings-linter over generated agents (agent-stale / agent-unknown-role / no-agents)",
+        positionals: [],
+        flags: [{ name: "dir", type: "string", summary: "Project directory (default: the discovered DS project, else cwd)" }],
+        errorCodes: ["UNKNOWN_FLAG", "DS_NOT_FOUND", "BAD_MANIFEST", "READ_ERROR"],
+      },
+    },
+  },
 };
 
 // ─── Lookup helper (shared by `ui schema` and the central flag guard) ─────────

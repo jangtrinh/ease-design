@@ -400,7 +400,11 @@ export const initCommand = {
         );
       })
       .join("\n");
-    const body = hint !== null ? `${lines}\n${hint.hintLine}` : lines;
+    let body = hint !== null ? `${lines}\n${hint.hintLine}` : lines;
+    // Agents are opt-in (never auto-generated) — Claude Code installs get one hint line.
+    if (runtimes.includes("claude")) {
+      body += "\noptional: `ui agents init` gives this project soul-bound task agents";
+    }
     return { exitCode: 0, stderr: body + "\n" };
   },
 };
