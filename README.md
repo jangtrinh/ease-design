@@ -242,6 +242,32 @@ Kept deliberately *out* of the `ui` binary (it needs a network and a live plugin
 in-repo as the `figma-agent/` workspace. Fall back to `/ui:generate` (HTML) any time the
 hand is unavailable.
 
+### Why a CLI hand, not (just) the Figma MCP
+
+The official Figma MCP is built to pull a design **into the conversation**; the hand is
+built to operate **on the file**. That difference is architectural, not cosmetic:
+
+- **Results are files, not context.** Every MCP tool result must pass through the model's
+  context window — a whole-file scan or a 160k-instance usage census doesn't fit, and what
+  does fit costs tokens again on every retry. The hand writes JSON to disk (`--out`); the
+  model reads the summary and queries the rest.
+- **Deterministic and scriptable.** One command → one JSON envelope → stable exit codes.
+  Pipe it to `jq`, gate CI on it, run it from cron, replay a captured scan offline. An MCP
+  call exists only inside a live model session.
+- **Engineered for heavy files.** Chunked transport, a park queue that holds commands
+  across broker respawns, warm retry, per-page representative resolution — the DS scan and
+  the hygiene audit finish on files that kill a single long round-trip.
+- **Multi-file and pinnable.** Several open files stay registered at once;
+  `FIGMA_AGENT_FILE` pins the target so a scan can't silently hit the wrong file.
+- **No seat, no OAuth, no rate limits.** A development plugin on Figma Free plus a local
+  broker.
+
+**When the Figma MCP is the right tool** — and we use it too: implementing a *selected
+frame* as code (`get_design_context` + Code Connect are built exactly for that), quick
+one-off reads (screenshot a node, list variables) with zero setup, and the richer
+paid-seat read surface. Rule of thumb: **MCP to bring a design to the model; the hand to
+bring changes, audits, and evidence to the file.**
+
 ---
 
 ## The surfaces

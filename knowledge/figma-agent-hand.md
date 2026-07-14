@@ -85,6 +85,22 @@ MCP seat is not probe-detectable. The probe positively confirms the free/editor-
 path and defaults there; select the official MCP with an explicit `--seat paid`. The
 `reason` field always states which path was taken and why.
 
+## Hand vs the official Figma MCP — decision rule
+
+The MCP brings a design INTO the model's context; this hand operates ON the file.
+Route by that line, not by preference:
+
+- **Use the hand** when the result is bigger than a context window (whole-file scans, the
+  usage census, `audit-ds`), when the op must be repeatable outside a model session
+  (CI, cron, `--out` files, offline `--from-facts` replay), when several files are open
+  (multi-file registry + `FIGMA_AGENT_FILE` pin), or when authoring at scale
+  (`html-to-figma`, `batch`, `exec-js`).
+- **Use the MCP** for selection→code (get_design_context + Code Connect are built for
+  exactly that), for one-off reads (screenshot a node, list variables) with zero setup,
+  and for the richer paid-seat read surface — the seat table above already routes this.
+- Never dump a large section through MCP into context — distill in the plugin (§ below,
+  ≈85× cheaper). If the answer needs the whole file, it is hand territory by definition.
+
 ## The loop (how a senior designer works)
 
 1. Build (`html-to-figma` or native commands) → 2. `export-png` + `Read` the image →
