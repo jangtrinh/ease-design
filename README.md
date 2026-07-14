@@ -275,7 +275,7 @@ bring changes, audits, and evidence to the file.**
 | Surface | Path | What it is | Tests |
 |---|---|---|---|
 | **`ui` kernel** | `src/` | 28 deterministic commands — DS compile/mutate/preview, tokens, OKLCH color math, the four linters, VR, memory, evidence. Zero runtime dependencies, no network, no model calls. | 1,525 |
-| **`design-os` conductor** | `design-os/` | Python/Typer umbrella that composes everything: `doctor` · `audit` · `reference` · `vr-matrix` · `figma status/scan/audit` · `update` (one-command toolchain refresh on any machine) · entry-point plugins. Re-emits every underlying envelope **verbatim** — one source of truth per verdict. | 101 |
+| **`design-os` conductor** | `design-os/` | Python/Typer umbrella that composes everything: `doctor` · `audit` · `heartbeat` (deterministic design-health rhythm — due/compare/notify, zero model calls) · `reference` · `vr-matrix` · `figma status/scan/audit` · `update` (one-command toolchain refresh on any machine) · entry-point plugins. Re-emits every underlying envelope **verbatim** — one source of truth per verdict. | 148 |
 | **`figma-agent` hand** | `figma-agent/` | CLI + WS broker + Figma plugin: canvas authoring, DS scan, the 9-detector hygiene audit, exec-js, capture. | 161 |
 | **rendered-tier hands** | `a11y/` | `a11y-audit` (axe-core over installed Chrome — wording never claims "compliant") + `page-shot` (deterministic full-page PNG). | — |
 | **`recall` mind** | `recall/` | Optional semantic memory: local embeddings (MiniLM/ONNX, nothing leaves the machine), hybrid RRF ranking, `query → …work… → reflect` loop. The kernel never imports it — a test fails the build if it does. | — |

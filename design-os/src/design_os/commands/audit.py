@@ -189,11 +189,14 @@ def _summarize(sections: list[dict[str, Any]]) -> dict[str, int]:
     return {"toolsRun": len(sections), "toolsFailed": failed, "errors": errors, "warnings": warnings}
 
 
-def _build_audit(target: Path, dir_: Path | None) -> tuple[list[dict[str, Any]], dict[str, int], int, int]:
+def build_audit(target: Path, dir_: Path | None) -> tuple[list[dict[str, Any]], dict[str, int], int, int]:
     """Run every applicable ``ui`` check over ``target``; return sections + summary + exit + count.
 
     Raises :class:`KernelNotFound` (caught by :func:`audit`) when the kernel is unresolvable —
     checked once up front so an empty target still aborts cleanly instead of a silent exit 0.
+
+    Public (was ``_build_audit``): this is the seam ``design-os heartbeat``'s ``audit-pages``
+    task type imports directly (no subprocess) — see commands/heartbeat.py.
     """
     if resolve_ui() is None:
         raise KernelNotFound(_KERNEL_MISSING_MSG)
@@ -214,6 +217,11 @@ def _build_audit(target: Path, dir_: Path | None) -> tuple[list[dict[str, Any]],
     summary = _summarize(sections)
     exit_code = 1 if any(s["exitCode"] != 0 for s in sections) else 0
     return sections, summary, exit_code, len(files)
+
+
+# Backward-compat alias — this function was private (`_build_audit`) before `design-os heartbeat`
+# needed to import it directly; behavior is unchanged, only the name is now public.
+_build_audit = build_audit
 
 
 def _render_text(sections: list[dict[str, Any]], summary: dict[str, int]) -> str:
@@ -242,7 +250,7 @@ def audit(
         emit(err_env(_COMMAND, "TARGET_NOT_FOUND", msg), json_mode=json_, text=f"audit: {msg}\n", exit_code=1)
         return
     try:
-        sections, summary, exit_code, n_files = _build_audit(target, dir_)
+        sections, summary, exit_code, n_files = build_audit(target, dir_)
     except KernelNotFound as e:
         emit(err_env(_COMMAND, "KERNEL_NOT_FOUND", str(e)), json_mode=json_, text=f"audit: {e}\n", exit_code=1)
         return
