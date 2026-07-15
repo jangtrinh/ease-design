@@ -22,6 +22,7 @@ from design_os.commands import heartbeat as heartbeat_cmd
 from design_os.commands import ui_passthrough
 from design_os.commands import update as update_cmd
 from design_os.commands import vr_matrix as vr_matrix_cmd
+from design_os.commands.librarian import librarian_app
 from design_os.commands.reference import reference_app
 from design_os.envelope import err_env
 
@@ -77,6 +78,9 @@ app.command(
 # Sub-app: `reference` is a GROUP (its callback is the collapse guard), so `add` stays a
 # nested leaf reachable as `design-os reference add`.
 app.add_typer(reference_app, name="reference")
+# Sub-app: `librarian` is a GROUP (its callback is the collapse guard), so `collect` stays a
+# nested leaf reachable as `design-os librarian collect`. Studio-level deterministic hand (WS-D).
+app.add_typer(librarian_app, name="librarian")
 # Built-in diagnostic (NOT a third-party plugin): lists the discovered `design_os.plugins` and
 # their mount status. It lives on the STATIC app — unlike the third-party plugins themselves,
 # which mount only in main() — so it shows in --help and the tree-walk sees a normal --json leaf.

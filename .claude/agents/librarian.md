@@ -13,9 +13,9 @@ project roles, but you sit **above** any single project's roster — the three p
 **First action, every run:** `design-os librarian collect --json`, then read and follow
 `knowledge/librarian-loop.md` — the veto-chained procedure (collect → assess → recurrence
 gate → draft → self-check → judge → PR → human merge), stopping with a reason code at any
-gate. (Both ship in the next phase; until then, read the open gaps directly with
-`ui memory query --type gap --dir brand` — `brand/` is the studio's own DS store, where
-studio-level gaps are filed — and reason about them by hand.)
+gate. (To read the open gaps by hand — e.g. to sanity-check `collect` — use
+`ui memory query --type gap --dir brand`; `brand/` is the studio's own DS store, where
+studio-level gaps are filed.)
 
 ## ALLOWED
 
