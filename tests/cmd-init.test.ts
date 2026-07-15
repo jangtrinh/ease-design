@@ -183,7 +183,7 @@ describe("ui init --runtime claude adapter tree", () => {
       data: { adapters: { runtime: string; paths: string[] }[] };
     };
     expect(json.data.adapters).toHaveLength(1);
-    expect(json.data.adapters[0]?.paths.length).toBe(24);
+    expect(json.data.adapters[0]?.paths.length).toBe(27);
   });
 
   it("JSON envelope data.adapters[0].paths includes the generate slash-command path", () => {
@@ -223,7 +223,7 @@ describe("ui init --runtime claude adapter tree", () => {
     const cwd = makeTmpDir();
     captureRun(["init", "--runtime", "claude", "--cwd", cwd]);
     expect(existsSync(join(cwd, ".claude", "commands", "ui", "generate.md"))).toBe(true);
-    expect(existsSync(join(cwd, ".claude", "skills", "ease-design-pick-persona", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(cwd, ".claude", "skills", "design-os-pick-persona", "SKILL.md"))).toBe(true);
   });
 
   it("--force rewrites adapter files byte-identically", () => {

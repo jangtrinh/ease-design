@@ -17,6 +17,7 @@
 import {
   WORKFLOW_VERBS,
   SKILL_NAMES,
+  JOURNEY_NAMES,
   resolveTemplatePath,
   hashTemplateFile,
 } from "../adapters/templates.js";
@@ -41,7 +42,11 @@ export interface ReadManifest {
 // ─── Live template hashes ───────────────────────────────────────────────────────
 
 /** resolveTemplatePath but returns null instead of throwing on a missing file. */
-function resolveTemplatePathSafe(root: string, kind: "workflow" | "skill", name: string): string | null {
+function resolveTemplatePathSafe(
+  root: string,
+  kind: "workflow" | "skill" | "journey",
+  name: string,
+): string | null {
   try {
     return resolveTemplatePath(root, kind, name);
   } catch {
@@ -49,7 +54,12 @@ function resolveTemplatePathSafe(root: string, kind: "workflow" | "skill", name:
   }
 }
 
-/** Build `{ "workflows/generate.md": sha256, "skills/pick-persona.md": sha256, … }` for the live package. */
+/**
+ * Build `{ "workflows/generate.md": sha256, "skills/pick-persona.md": sha256,
+ * "journeys/onboard.md": sha256, … }` for the live package. MUST enumerate the
+ * same registries as init.ts's manifest templateHashes builder (lockstep — an
+ * asymmetry makes template-drift false-fail/false-pass).
+ */
 function liveTemplateHashes(templatesRoot: string): Record<string, string> {
   const hashes: Record<string, string> = {};
   for (const verb of WORKFLOW_VERBS) {
@@ -60,6 +70,10 @@ function liveTemplateHashes(templatesRoot: string): Record<string, string> {
   for (const name of SKILL_NAMES) {
     const p = resolveTemplatePathSafe(templatesRoot, "skill", name);
     if (p !== null) hashes[`skills/${name}.md`] = hashTemplateFile(p);
+  }
+  for (const name of JOURNEY_NAMES) {
+    const p = resolveTemplatePathSafe(templatesRoot, "journey", name);
+    if (p !== null) hashes[`journeys/${name}.md`] = hashTemplateFile(p);
   }
   return hashes;
 }

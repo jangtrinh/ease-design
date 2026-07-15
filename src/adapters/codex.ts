@@ -10,6 +10,7 @@ import type { AdapterArtifact, AdapterInput } from "./index.js"; // AdapterInput
 import {
   WORKFLOW_VERBS,
   SKILL_NAMES,
+  JOURNEY_NAMES,
   resolveTemplatePath,
   hashTemplateFile,
 } from "./templates.js";
@@ -27,7 +28,7 @@ import {
 export function generateCodexAdapter(input: AdapterInput): AdapterArtifact[] {
   const { cwd, templatesRoot } = input;
 
-  // Build hash map over all non-init workflow templates + all skill templates.
+  // Build hash map over all non-init workflow templates + all skill + journey templates.
   const hashes: Record<string, string> = {};
 
   for (const verb of WORKFLOW_VERBS) {
@@ -42,6 +43,13 @@ export function generateCodexAdapter(input: AdapterInput): AdapterArtifact[] {
     const absPath = resolveTemplatePath(templatesRoot, "skill", name);
     if (absPath !== null) {
       hashes[`skills/${name}.md`] = hashTemplateFile(absPath);
+    }
+  }
+
+  for (const name of JOURNEY_NAMES) {
+    const absPath = resolveTemplatePath(templatesRoot, "journey", name);
+    if (absPath !== null) {
+      hashes[`journeys/${name}.md`] = hashTemplateFile(absPath);
     }
   }
 

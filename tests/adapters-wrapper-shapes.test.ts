@@ -59,8 +59,8 @@ describe("buildClaudeCommand", () => {
 
   it("includes skill-ref lines for each supplied skill", () => {
     const out = buildClaudeCommand("generate", FAKE_TPL, ["pick-persona", "score-taste"]);
-    expect(out).toContain("ease-design-pick-persona");
-    expect(out).toContain("ease-design-score-taste");
+    expect(out).toContain("design-os-pick-persona");
+    expect(out).toContain("design-os-score-taste");
   });
 
   it("synthetic init verb uses ui init shell instruction instead of template ref", () => {
@@ -93,9 +93,9 @@ describe("buildClaudeCommand", () => {
 // ─── buildClaudeSkill ─────────────────────────────────────────────────────────
 
 describe("buildClaudeSkill", () => {
-  it("contains the skill name prefixed with ease-design-", () => {
+  it("contains the skill name prefixed with design-os-", () => {
     const out = buildClaudeSkill("pick-persona", FAKE_SKILL_TPL);
-    expect(out).toContain("name: ease-design-pick-persona");
+    expect(out).toContain("name: design-os-pick-persona");
   });
 
   it("embeds the absolute template path", () => {

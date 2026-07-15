@@ -391,7 +391,10 @@ The recent wave, newest first — full history in [CHANGELOG.md](CHANGELOG.md).
 
 | Date | Change | Commit |
 |---|---|---|
-| 2026-07-14 | **Agents**: role-first naming (`designer-<studio>-<project>`) — generic prefix to delegate by, genealogy suffix for identity | *(this commit)* |
+| 2026-07-15 | **Journey skills** — `design-os-{onboard,daily,deliver}`: the full user journey as three installable skills (entry router, audit disambiguation, delivery playbook), all skills renamed `design-os-*`, command-consistency + drift linters | *(this commit)* |
+| 2026-07-15 | **Souls speak English** — character-over-cosmetics doctrine; scaffolds EN; factory→studio→project chain live on a real project | `cc1a56c` |
+| 2026-07-15 | **Factory soul** — the world-class baseline stance design:os ships day-0; user souls override clause-by-clause | `6183662` |
+| 2026-07-14 | **Agents**: role-first naming (`designer-<studio>-<project>`) — generic prefix to delegate by, genealogy suffix for identity | `f41dfb2` |
 | 2026-07-14 | **`ui agents`** — soul-bound, task-scoped project agents (designer · curator · figma-hand) with template-hash drift check | `fe1eda3` |
 | 2026-07-14 | **`ui taste`** — vote-driven taste corpus: ingest (sha256+dHash dedup), pairwise Elo ranking, study ledger | `8cf2bfd` |
 | 2026-07-14 | **`brand/`** — the studio's own DS store + the first evidence-cited design soul | `cf7c46b` |

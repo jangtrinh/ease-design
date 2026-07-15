@@ -46,6 +46,7 @@ import {
 import {
   WORKFLOW_VERBS,
   SKILL_NAMES,
+  JOURNEY_NAMES,
   resolveTemplatePath,
   hashTemplateFile,
 } from "../adapters/templates.js";
@@ -68,16 +69,16 @@ Options:
 
 Output paths:
   claude      → <cwd>/.claude/ease-design.json
-                <cwd>/.claude/commands/ui/*.md  (15 slash-commands)
-                <cwd>/.claude/skills/ease-design-*/SKILL.md  (8 skills)
+                <cwd>/.claude/commands/ui/*.md  (16 slash-commands)
+                <cwd>/.claude/skills/design-os-*/SKILL.md  (11 skills: 8 craft + 3 journey)
   antigravity → <cwd>/.agent/ease-design.json
-                <cwd>/.agent/workflows/ui-*.md  (15 workflows)
-                <cwd>/.agent/skills/ease-design-*/SKILL.md  (8 skills)
+                <cwd>/.agent/workflows/ui-*.md  (16 workflows)
+                <cwd>/.agent/skills/design-os-*/SKILL.md  (11 skills: 8 craft + 3 journey)
   codex       → <cwd>/AGENTS.ease-design.json
                 <cwd>/AGENTS.md  (sentinel block appended/upserted)
 
-Adapter tree: .claude/{commands/ui/,skills/ease-design-*/} |
-              .agent/{workflows/,skills/ease-design-*/} |
+Adapter tree: .claude/{commands/ui/,skills/design-os-*/} |
+              .agent/{workflows/,skills/design-os-*/} |
               AGENTS.md (sentinel block).
 
 Notes:
@@ -289,7 +290,9 @@ export const initCommand = {
       const entry = entries[i]!;
       const { artifacts } = runtimeAdapters[i]!;
 
-      // Build template hashes for the manifest (all non-init workflows + skills)
+      // Build template hashes for the manifest (all non-init workflows + skills + journeys).
+      // Keys here and adapter-lint.ts's liveTemplateHashes() MUST enumerate the same
+      // registries — an asymmetry makes `ui doctor` template-drift false-fail/false-pass.
       const templateHashes: Record<string, string> = {};
       for (const verb of WORKFLOW_VERBS) {
         if (verb === "init") continue;
@@ -302,6 +305,12 @@ export const initCommand = {
         const absPath = resolveTemplatePath(templatesRoot, "skill", name);
         if (absPath !== null) {
           templateHashes[`skills/${name}.md`] = hashTemplateFile(absPath);
+        }
+      }
+      for (const name of JOURNEY_NAMES) {
+        const absPath = resolveTemplatePath(templatesRoot, "journey", name);
+        if (absPath !== null) {
+          templateHashes[`journeys/${name}.md`] = hashTemplateFile(absPath);
         }
       }
 

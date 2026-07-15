@@ -2,10 +2,10 @@
  * Antigravity adapter — generates the adapter artifact list for the antigravity runtime.
  *
  * Emits:
- *   12 workflow files → <cwd>/.agent/workflows/ui-<verb>.md
- *   8 skill files     → <cwd>/.agent/skills/ease-design-<name>/SKILL.md
+ *   16 workflow files → <cwd>/.agent/workflows/ui-<verb>.md
+ *   11 skill files    → <cwd>/.agent/skills/design-os-<name>/SKILL.md  (8 craft + 3 journey)
  *
- * Total: 20 artifacts, all mode "write".
+ * Total: 27 artifacts, all mode "write".
  *
  * Antigravity uses the same YAML-frontmatter Markdown shape as Claude.
  * Shell blocks are preceded by `// turbo` to mark them as auto-executable.
@@ -15,10 +15,37 @@ import type { AdapterArtifact, AdapterInput } from "./index.js"; // AdapterInput
 import {
   WORKFLOW_VERBS,
   SKILL_NAMES,
+  JOURNEY_NAMES,
   resolveTemplatePath,
   readTemplateDescription,
 } from "./templates.js";
 import { buildAntigravityWorkflow, buildAntigravitySkill } from "./wrapper-shapes.js";
+
+/**
+ * Push one `.agent/skills/design-os-<name>/SKILL.md` artifact. Shared by the
+ * craft-skill loop (kind "skill") and the journey-skill loop (kind "journey")
+ * below — both emit through the identical wrapper shape.
+ */
+function pushSkillArtifact(
+  artifacts: AdapterArtifact[],
+  cwd: string,
+  templatesRoot: string,
+  knowledgeRoot: string,
+  kind: "skill" | "journey",
+  name: string,
+): void {
+  const templatePath = resolveTemplatePath(templatesRoot, kind, name);
+  if (templatePath === null) {
+    throw new Error(`${kind} template not found for "${name}" under ${templatesRoot}`);
+  }
+  const description = readTemplateDescription(templatePath) ?? undefined;
+  const content = buildAntigravitySkill(name, templatePath, knowledgeRoot, description);
+  artifacts.push({
+    mode: "write",
+    absPath: join(cwd, ".agent", "skills", `design-os-${name}`, "SKILL.md"),
+    content,
+  });
+}
 
 /**
  * Generate all Antigravity adapter artifacts for the given cwd + templatesRoot.
@@ -44,19 +71,14 @@ export function generateAntigravityAdapter(input: AdapterInput): AdapterArtifact
     });
   }
 
-  // ── Skill files ────────────────────────────────────────────────────────────
+  // ── Skill files (8 craft skills) ────────────────────────────────────────────
   for (const name of SKILL_NAMES) {
-    const templatePath = resolveTemplatePath(templatesRoot, "skill", name);
-    if (templatePath === null) {
-      throw new Error(`skill template not found for "${name}" under ${templatesRoot}`);
-    }
-    const description = readTemplateDescription(templatePath) ?? undefined;
-    const content = buildAntigravitySkill(name, templatePath, knowledgeRoot, description);
-    artifacts.push({
-      mode: "write",
-      absPath: join(cwd, ".agent", "skills", `ease-design-${name}`, "SKILL.md"),
-      content,
-    });
+    pushSkillArtifact(artifacts, cwd, templatesRoot, knowledgeRoot, "skill", name);
+  }
+
+  // ── Journey-skill files (3 journey skills: onboard/daily/deliver) ──────────
+  for (const name of JOURNEY_NAMES) {
+    pushSkillArtifact(artifacts, cwd, templatesRoot, knowledgeRoot, "journey", name);
   }
 
   return artifacts;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { generateAntigravityAdapter } from "../src/adapters/antigravity.js";
-import { WORKFLOW_VERBS, SKILL_NAMES } from "../src/adapters/templates.js";
+import { WORKFLOW_VERBS, SKILL_NAMES, JOURNEY_NAMES } from "../src/adapters/templates.js";
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const TEMPLATES_ROOT = join(REPO_ROOT, "templates");
@@ -13,8 +13,8 @@ function makeArtifacts() {
 }
 
 describe("generateAntigravityAdapter", () => {
-  it("returns exactly 24 artifacts (16 workflows + 8 skills)", () => {
-    expect(makeArtifacts()).toHaveLength(24);
+  it("returns exactly 27 artifacts (16 workflows + 8 craft skills + 3 journey skills)", () => {
+    expect(makeArtifacts()).toHaveLength(27);
   });
 
   it("all artifacts have mode 'write'", () => {
@@ -34,18 +34,23 @@ describe("generateAntigravityAdapter", () => {
     expect(workflows.some((w) => w.absPath.endsWith("/ui-from-url.md"))).toBe(true);
   });
 
-  it("8 artifacts are skill paths under .agent/skills/ease-design-*/SKILL.md", () => {
+  it("11 artifacts are skill paths under .agent/skills/design-os-*/SKILL.md (8 craft + 3 journey)", () => {
     const skills = makeArtifacts().filter((a) =>
-      a.absPath.includes(".agent/skills/ease-design-"),
+      a.absPath.includes(".agent/skills/design-os-"),
     );
-    expect(skills).toHaveLength(SKILL_NAMES.length);
+    expect(skills).toHaveLength(SKILL_NAMES.length + JOURNEY_NAMES.length);
     for (const name of SKILL_NAMES) {
       expect(
-        skills.some((s) => s.absPath.endsWith(`ease-design-${name}/SKILL.md`)),
+        skills.some((s) => s.absPath.endsWith(`design-os-${name}/SKILL.md`)),
+      ).toBe(true);
+    }
+    for (const name of JOURNEY_NAMES) {
+      expect(
+        skills.some((s) => s.absPath.endsWith(`design-os-${name}/SKILL.md`)),
       ).toBe(true);
     }
     expect(
-      skills.some((s) => s.absPath.endsWith("ease-design-designmd-emit/SKILL.md")),
+      skills.some((s) => s.absPath.endsWith("design-os-designmd-emit/SKILL.md")),
     ).toBe(true);
   });
 
@@ -79,9 +84,18 @@ describe("generateAntigravityAdapter", () => {
   it("each skill content references the absolute skill template path", () => {
     const arts = makeArtifacts();
     for (const name of SKILL_NAMES) {
-      const art = arts.find((a) => a.absPath.endsWith(`ease-design-${name}/SKILL.md`));
+      const art = arts.find((a) => a.absPath.endsWith(`design-os-${name}/SKILL.md`));
       expect(art, `skill '${name}' not found`).toBeDefined();
       expect(art!.content).toContain(`templates/skills/${name}.md`);
+    }
+  });
+
+  it("each journey-skill content references the absolute journey template path", () => {
+    const arts = makeArtifacts();
+    for (const name of JOURNEY_NAMES) {
+      const art = arts.find((a) => a.absPath.endsWith(`design-os-${name}/SKILL.md`));
+      expect(art, `journey skill '${name}' not found`).toBeDefined();
+      expect(art!.content).toContain(`templates/journeys/${name}.md`);
     }
   });
 

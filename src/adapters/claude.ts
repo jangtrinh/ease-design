@@ -2,21 +2,49 @@
  * Claude Code adapter — generates the adapter artifact list for the claude runtime.
  *
  * Emits:
- *   12 slash-command files → <cwd>/.claude/commands/ui/<verb>.md
- *   8 skill files          → <cwd>/.claude/skills/ease-design-<name>/SKILL.md
+ *   16 slash-command files → <cwd>/.claude/commands/ui/<verb>.md
+ *   11 skill files         → <cwd>/.claude/skills/design-os-<name>/SKILL.md  (8 craft + 3 journey)
  *
- * Total: 20 artifacts, all mode "write".
+ * Total: 27 artifacts, all mode "write".
  */
 import { join, resolve } from "node:path";
 import type { AdapterArtifact, AdapterInput } from "./index.js"; // AdapterInput: {cwd, templatesRoot}
 import {
   WORKFLOW_VERBS,
   SKILL_NAMES,
+  JOURNEY_NAMES,
   resolveTemplatePath,
   readTemplateDescription,
 } from "./templates.js";
 import { buildClaudeCommand, buildClaudeSkill } from "./wrapper-shapes.js";
 import { VERB_SKILL_REFS } from "./skill-refs.js";
+
+/**
+ * Push one `.claude/skills/design-os-<name>/SKILL.md` artifact. Shared by the
+ * craft-skill loop (kind "skill") and the journey-skill loop (kind "journey")
+ * below — both emit through the identical wrapper shape.
+ */
+function pushSkillArtifact(
+  artifacts: AdapterArtifact[],
+  cwd: string,
+  templatesRoot: string,
+  knowledgeRoot: string,
+  kind: "skill" | "journey",
+  name: string,
+): void {
+  const templatePath = resolveTemplatePath(templatesRoot, kind, name);
+  if (templatePath === null) {
+    // Skills/journeys always have a template file; null here indicates a registry/fs mismatch.
+    throw new Error(`${kind} template not found for "${name}" under ${templatesRoot}`);
+  }
+  const description = readTemplateDescription(templatePath) ?? undefined;
+  const content = buildClaudeSkill(name, templatePath, knowledgeRoot, description);
+  artifacts.push({
+    mode: "write",
+    absPath: join(cwd, ".claude", "skills", `design-os-${name}`, "SKILL.md"),
+    content,
+  });
+}
 
 /**
  * Generate all Claude Code adapter artifacts for the given cwd + templatesRoot.
@@ -44,20 +72,14 @@ export function generateClaudeAdapter(input: AdapterInput): AdapterArtifact[] {
     });
   }
 
-  // ── Skill files ────────────────────────────────────────────────────────────
+  // ── Skill files (8 craft skills) ────────────────────────────────────────────
   for (const name of SKILL_NAMES) {
-    const templatePath = resolveTemplatePath(templatesRoot, "skill", name);
-    if (templatePath === null) {
-      // Skills always have a template file; null here indicates a registry/fs mismatch.
-      throw new Error(`skill template not found for "${name}" under ${templatesRoot}`);
-    }
-    const description = readTemplateDescription(templatePath) ?? undefined;
-    const content = buildClaudeSkill(name, templatePath, knowledgeRoot, description);
-    artifacts.push({
-      mode: "write",
-      absPath: join(cwd, ".claude", "skills", `ease-design-${name}`, "SKILL.md"),
-      content,
-    });
+    pushSkillArtifact(artifacts, cwd, templatesRoot, knowledgeRoot, "skill", name);
+  }
+
+  // ── Journey-skill files (3 journey skills: onboard/daily/deliver) ──────────
+  for (const name of JOURNEY_NAMES) {
+    pushSkillArtifact(artifacts, cwd, templatesRoot, knowledgeRoot, "journey", name);
   }
 
   return artifacts;

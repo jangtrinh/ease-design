@@ -7,6 +7,15 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **Journey skills — the whole user journey as three installable skills.** `ui init` now
+  emits `design-os-onboard` (six entry routes, git + manifest-name STOP-gates, soul
+  layer selection, heartbeat schema), `design-os-daily` (the four-"audit"
+  disambiguation table, finding triage, Figma preflight, taste corpus loop) and
+  `design-os-deliver` (the ordered full-stack audit playbook, static-vs-rendered a11y
+  ship-guard, semver handoff) across all three runtimes — 11 skills total, every skill
+  now prefixed `design-os-*`. Paired linters: journey-command-consistency (every `ui`/
+  `design-os` command a template cites must exist) and journey template-drift coverage
+  in `ui doctor`.
 - **`ui ds soul factory` — the shipped design:os baseline stance.** A world-class
   product-design soul (Never / Always / Voice, ratified by the product itself) compiled
   into the binary as a new tier BELOW project and studio soul — so a mass user has a

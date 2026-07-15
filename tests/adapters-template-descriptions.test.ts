@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import {
   WORKFLOW_VERBS,
   SKILL_NAMES,
+  JOURNEY_NAMES,
   resolveTemplatePath,
   readTemplateDescription,
 } from "../src/adapters/templates.js";
@@ -45,6 +46,17 @@ describe("template frontmatter descriptions", () => {
     }
   });
 
+  it("every journey template has a description with a 'Use' trigger clause", () => {
+    for (const name of JOURNEY_NAMES) {
+      const p = resolveTemplatePath(TEMPLATES_ROOT, "journey", name);
+      expect(p).not.toBeNull();
+      const desc = readTemplateDescription(p as string);
+      expect(desc, `journey '${name}' is missing frontmatter description`).not.toBeNull();
+      expect((desc as string).length).toBeGreaterThan(40);
+      expect(desc, `journey '${name}' description must say when to use it`).toMatch(/Use /);
+    }
+  });
+
   it("returns null for a file without frontmatter", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-desc-"));
     const f = join(tmp, "plain.md");
@@ -70,7 +82,7 @@ describe("generated wrappers carry the sourced description", () => {
   it("no Claude skill wrapper ships a bare-slug description", () => {
     const artifacts = generateClaudeAdapter(input);
     const skills = artifacts.filter((a) => a.absPath.includes("/skills/"));
-    expect(skills.length).toBe(SKILL_NAMES.length);
+    expect(skills.length).toBe(SKILL_NAMES.length + JOURNEY_NAMES.length);
     for (const a of skills) {
       const descLine = a.content.split("\n").find((l) => l.startsWith("description:"));
       expect(descLine, `${a.absPath} has no description line`).toBeDefined();

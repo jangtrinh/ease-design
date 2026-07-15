@@ -1,9 +1,9 @@
 /**
  * Template path resolver and hash utility for the adapter generator.
  *
- * WORKFLOW_VERBS and SKILL_NAMES are the canonical registries. If a new
- * template file is added to templates/, these lists must be updated in the
- * same commit. The test suite asserts parity with the actual filesystem.
+ * WORKFLOW_VERBS, SKILL_NAMES, and JOURNEY_NAMES are the canonical registries.
+ * If a new template file is added to templates/, these lists must be updated
+ * in the same commit. The test suite asserts parity with the actual filesystem.
  *
  * The `init` verb is a special case: there is no `templates/workflows/init.md`
  * because the init slash-command wraps `ui init` itself, not a design workflow.
@@ -58,6 +58,20 @@ export const SKILL_NAMES = [
 
 export type SkillName = (typeof SKILL_NAMES)[number];
 
+/**
+ * All journey-skill names. Each corresponds to a file in templates/journeys/.
+ * Journeys are stage-level skills (onboard/daily/deliver) — cross-cutting
+ * sequencing + disambiguation knowledge, as opposed to SKILL_NAMES' single-verb
+ * craft skills. Emitted through the same per-runtime skill wrapper shape.
+ */
+export const JOURNEY_NAMES = [
+  "onboard",
+  "daily",
+  "deliver",
+] as const satisfies readonly string[];
+
+export type JourneyName = (typeof JOURNEY_NAMES)[number];
+
 // ─── Resolver ─────────────────────────────────────────────────────────────────
 
 /**
@@ -69,13 +83,13 @@ export type SkillName = (typeof SKILL_NAMES)[number];
  */
 export function resolveTemplatePath(
   templatesRoot: string,
-  kind: "workflow" | "skill",
+  kind: "workflow" | "skill" | "journey",
   name: string,
 ): string | null {
   if (kind === "workflow" && name === "init") {
     return null;
   }
-  const subdir = kind === "workflow" ? "workflows" : "skills";
+  const subdir = kind === "workflow" ? "workflows" : kind === "skill" ? "skills" : "journeys";
   const absPath = join(templatesRoot, subdir, `${name}.md`);
   if (!existsSync(absPath)) {
     throw new Error(`template not found at ${absPath}`);

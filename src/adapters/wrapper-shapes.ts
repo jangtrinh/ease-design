@@ -69,7 +69,7 @@ function buildKnowledgeAnchor(knowledgeRoot: string | undefined): string {
 function buildSkillRefLines(skillRefs: readonly string[]): string {
   if (skillRefs.length === 0) return "";
   const lines = skillRefs.map(
-    (s) => `When the workflow instructs it, invoke skill \`ease-design-${s}\`.`,
+    (s) => `When the workflow instructs it, invoke skill \`design-os-${s}\`.`,
   );
   return "\n" + lines.join("\n") + "\n";
 }
@@ -129,7 +129,7 @@ export function buildClaudeCommand(
 }
 
 /**
- * Build the body of a `.claude/skills/ease-design-<name>/SKILL.md` wrapper.
+ * Build the body of a `.claude/skills/design-os-<name>/SKILL.md` wrapper.
  *
  * @param name         The skill name (e.g. "pick-persona").
  * @param templatePath Absolute path to the skill template file.
@@ -145,7 +145,7 @@ export function buildClaudeSkill(
   const tplPath = toFwdSlash(templatePath);
   return [
     "---",
-    `name: ease-design-${name}`,
+    `name: design-os-${name}`,
     `description: ${yamlQuote(summary)}`,
     "---",
     "",
@@ -218,7 +218,7 @@ export function buildAntigravityWorkflow(
 }
 
 /**
- * Build the body of a `.agent/skills/ease-design-<name>/SKILL.md` wrapper.
+ * Build the body of a `.agent/skills/design-os-<name>/SKILL.md` wrapper.
  * Shape is byte-identical to the Claude skill wrapper.
  */
 export function buildAntigravitySkill(
@@ -239,7 +239,7 @@ export const CODEX_SENTINEL_END   = "<!-- END ease-design -->";
  * Build the sentinel-bracketed block appended/upserted into `AGENTS.md`.
  *
  * @param templatesRoot Absolute path to the templates/ directory.
- * @param hashes        sha256 per template file (key = verb or skill name).
+ * @param hashes        sha256 per template file (key = verb, skill, or journey name).
  */
 export function buildCodexBlock(
   templatesRoot: string,
@@ -262,13 +262,14 @@ export function buildCodexBlock(
     CODEX_SENTINEL_BEGIN,
     "## ease-design",
     "",
-    "This project uses ease-design. Workflows and skills live under",
-    `\`${tplRoot}/workflows/\` and \`${tplRoot}/skills/\`. Invoke them`,
-    "by following the relevant Markdown file when the user asks for design",
-    `work. ${knowledgeLine}The \`ui\` binary handles all non-LLM work (autofix, layout`,
-    "validation, token compilation, color math). Before forming a `ui`",
-    "invocation, run `ui schema --json` for the machine-readable signature",
-    "(positionals, flags, enums, error codes) of every (sub)command.",
+    "This project uses ease-design. Workflows, skills, and journeys live under",
+    `\`${tplRoot}/workflows/\`, \`${tplRoot}/skills/\`, and \`${tplRoot}/journeys/\`.`,
+    "Invoke them by following the relevant Markdown file when the user asks for",
+    `design work (journeys cover onboarding/daily/delivery sequencing across`,
+    `multiple commands). ${knowledgeLine}The \`ui\` binary handles all non-LLM`,
+    "work (autofix, layout validation, token compilation, color math). Before",
+    "forming a `ui` invocation, run `ui schema --json` for the machine-readable",
+    "signature (positionals, flags, enums, error codes) of every (sub)command.",
     "",
     "Available slash-commands when proxied:",
     `${WORKFLOW_VERBS.map((v) => `/ui:${v}`).join(" ")}.`,
