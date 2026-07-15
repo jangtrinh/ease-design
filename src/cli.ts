@@ -46,6 +46,7 @@ import { ingestFigmaDsCommand } from "./commands/ingest-figma-ds.js";
 import { synthesizeConventionsCommand } from "./commands/synthesize-conventions.js";
 import { tasteCommand } from "./commands/taste.js";
 import { agentsCommand } from "./commands/agents.js";
+import { knowledgeCommand } from "./commands/knowledge.js";
 
 // Keep in sync with package.json "version". A test (tests/cli-version.test.ts)
 // asserts these match, so drift fails CI rather than shipping silently.
@@ -93,6 +94,7 @@ COMMANDS[ingestFigmaDsCommand.name] = ingestFigmaDsCommand;
 COMMANDS[synthesizeConventionsCommand.name] = synthesizeConventionsCommand;
 COMMANDS[tasteCommand.name] = tasteCommand;
 COMMANDS[agentsCommand.name] = agentsCommand;
+COMMANDS[knowledgeCommand.name] = knowledgeCommand;
 
 // ─── Root help ────────────────────────────────────────────────────────────────
 

@@ -393,6 +393,31 @@ back through refine with the DNA value as the target quality bar.
 
 ---
 
+## Failure modes per axis
+
+Per `authoring-standard.md`, a rubric must name how each axis goes wrong so a judge has
+something to point at. These are the observable failure kinds — a reviewer can look at a
+rendered instance and say "that one".
+
+- **Layout** — every section the same width and rhythm (no pacing); three identical cards
+  as the only composition idea; no single focal point per viewport (the eye has nowhere to
+  land first).
+- **Typography** — sizes with no ratio behind them (hand-picked, unrelated); body below
+  16px or running text set in all-caps; headings and body at the same weight (no contrast).
+- **Spacing** — off-grid values (`13px`, `27px`) among on-grid ones; inner padding smaller
+  than outer margin so nesting reads inverted; touch targets under ~44px on a touch surface.
+- **Motion** — linear easing on UI transitions (reads mechanical); `width`/`height`/`top`
+  animated instead of `transform`/`opacity` (janky, layout-shifting); expressive motion with
+  no reduced-motion fallback.
+- **Iconography** — two or more icon families in one UI; inconsistent stroke weight across
+  line icons; emoji standing in for interface icons.
+- **Depth / Surface** — a unique one-off shadow per component (no ramp); pure-black harsh
+  shadows instead of background-tinted; shadow and heavy border doubled on one surface; a
+  `z-index: 9999` that admits the scale was never designed.
+- **Consistency** — a raw `#3b82f6` literal where `color-primary` already exists; a
+  registered component re-implemented inline with divergent markup; the same thing named two
+  ways (`cta-btn` here, `primary-button` there).
+
 ## Mapping the legacy 3-dial model into the 6-axis model
 
 Earlier versions of this taste system exposed only three dials — **variance**, **motion**,

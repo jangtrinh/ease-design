@@ -19,6 +19,10 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+      # The knowledge-core linter (spec 002 P2) — the "unit tier" for knowledge/.
+      # Runs the built binary against the repo's own knowledge/ so index/persona/
+      # xref/provenance drift fails CI. Free, deterministic, no model call.
+      - run: node dist/cli.js knowledge check
 
   # figma-agent is an in-repo npm workspace (the optional Figma authoring "hands").
   # Typecheck + build it on its own job so the workspace can't silently rot; the
