@@ -88,12 +88,22 @@ describe("ui ds context", () => {
     expect(r.stdout).not.toContain("## Naming rules");
   });
 
-  it("--max-bytes 600 truncates output to at most 600 bytes", () => {
+  it("small --max-bytes truncates the token tables but renders the soul chain whole", () => {
+    // NEW contract: --max-bytes bounds ONLY the variable data sections
+    // (token/registry/naming/anti-pattern tables). The soul chain (project +
+    // studio + factory baseline) is FIXED declared-stance prose, exempt from the
+    // budget — always rendered whole, never byte-sliced (like --with-theme).
     const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-"));
     initDs(tmp);
-    const r = capture(["ds", "context", "--dir", tmp, "--max-bytes", "600"]);
+    const r = capture(["ds", "context", "--dir", tmp, "--max-bytes", "512"]);
     expect(r.exitCode).toBe(0);
-    expect(Buffer.byteLength(r.stdout, "utf8")).toBeLessThanOrEqual(600);
+    // Factory section renders WHOLE and un-sliced: heading + its exact final line.
+    expect(r.stdout).toContain(
+      "## Soul — factory (design:os baseline; any project/studio soul above overrides it)",
+    );
+    expect(r.stdout).toContain("order, in the user's language, without blame.");
+    // The variable token table IS truncated under the tiny budget (U+2026 ellipsis).
+    expect(r.stdout).toContain("…(truncated)");
   });
 
   it("--format json --max-bytes 100 exits 0 with valid JSON", () => {
@@ -201,13 +211,17 @@ describe("ui ds context — soul section", () => {
     expect(r.stdout).toContain(SOUL_HEADING);
   });
 
-  it("a project without soul.md just omits the section — never an error", () => {
+  it("a project without soul.md falls back to the factory baseline section", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-soul-"));
     initDs(tmp);
     rmSync(join(tmp, "design", "soul.md"));
     const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
     expect(r.exitCode).toBe(0);
-    expect(r.stdout).not.toContain("## Soul");
+    expect(r.stdout).not.toContain("## Soul (declared stance");
+    expect(r.stdout).toContain(
+      "## Soul — factory (design:os baseline; any project/studio soul above overrides it)",
+    );
+    expect(r.stdout).toContain("no project or studio soul declared yet");
   });
 
   it("--format json: structured soul is the capped text, or null when absent", () => {
@@ -301,13 +315,18 @@ describe("ui ds context — studio soul layer", () => {
     expect(r.stdout).not.toContain("no project soul yet");
   });
 
-  it("neither: no studio file and no project soul.md → soul is omitted entirely, never an error", () => {
+  it("neither project nor studio soul → the factory baseline is the only stance section", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-studio-"));
     initDs(tmp, true);
     rmSync(join(tmp, "design", "soul.md"));
     const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
     expect(r.exitCode).toBe(0);
-    expect(r.stdout).not.toContain("## Soul");
+    expect(r.stdout).not.toContain("## Soul (declared stance");
+    expect(r.stdout).not.toContain(STUDIO_HEADING);
+    expect(r.stdout).toContain(
+      "## Soul — factory (design:os baseline; any project/studio soul above overrides it)",
+    );
+    expect(r.stdout).toContain("no project or studio soul declared yet");
   });
 
   it("--format json: structured carries soul and studioSoul as two separate fields", () => {
@@ -327,5 +346,164 @@ describe("ui ds context — studio soul layer", () => {
     const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
     expect(r.exitCode).toBe(0);
     expect(JSON.parse(r.stdout).data.studioSoul).toBeNull();
+  });
+});
+
+// ─── ds context — factory baseline (design:os shipped stance, always renders) ─
+
+describe("ui ds context — factory baseline", () => {
+  const FACTORY_HEADING =
+    "## Soul — factory (design:os baseline; any project/studio soul above overrides it)";
+  const STUDIO_HEADING = "## Soul — studio (inherited base; the project soul above overrides it on conflict)";
+
+  it("project soul present: the project section appears BEFORE the factory section", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-factory-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+    expect(r.exitCode).toBe(0);
+    const projectIdx = r.stdout.indexOf("## Soul (declared stance");
+    const factoryIdx = r.stdout.indexOf(FACTORY_HEADING);
+    expect(projectIdx).toBeGreaterThan(-1);
+    expect(factoryIdx).toBeGreaterThan(-1);
+    expect(projectIdx).toBeLessThan(factoryIdx);
+  });
+
+  describe("with a studio soul", () => {
+    const savedHome = process.env["EASE_DESIGN_HOME"];
+    let home: string;
+
+    beforeEach(() => {
+      home = mkdtempSync(join(tmpdir(), "ease-ctx-factory-home-"));
+      process.env["EASE_DESIGN_HOME"] = home;
+    });
+    afterEach(() => {
+      if (savedHome === undefined) delete process.env["EASE_DESIGN_HOME"];
+      else process.env["EASE_DESIGN_HOME"] = savedHome;
+    });
+
+    function writeStudioSoul(text: string): void {
+      mkdirSync(home, { recursive: true });
+      writeFileSync(join(home, "studio-soul.md"), text, "utf8");
+    }
+
+    it("project + studio + factory: order is project < studio < factory", () => {
+      writeStudioSoul(STUDIO_SOUL_TEXT);
+      const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-factory-"));
+      initDs(tmp);
+      const r = capture(["ds", "context", "--dir", tmp, "--include", "soul"]);
+      expect(r.exitCode).toBe(0);
+      const projectIdx = r.stdout.indexOf("## Soul (declared stance");
+      const studioIdx = r.stdout.indexOf(STUDIO_HEADING);
+      const factoryIdx = r.stdout.indexOf(FACTORY_HEADING);
+      expect(projectIdx).toBeGreaterThan(-1);
+      expect(studioIdx).toBeGreaterThan(-1);
+      expect(factoryIdx).toBeGreaterThan(-1);
+      expect(projectIdx).toBeLessThan(studioIdx);
+      expect(studioIdx).toBeLessThan(factoryIdx);
+    });
+  });
+
+  it("--include tokens (no soul): markdown omits '## Soul' entirely, JSON factorySoul is null", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-factory-"));
+    initDs(tmp);
+    const md = capture(["ds", "context", "--dir", tmp, "--include", "tokens"]);
+    expect(md.exitCode).toBe(0);
+    expect(md.stdout).not.toContain("## Soul");
+
+    const jsonR = capture([
+      "ds", "context", "--dir", tmp, "--include", "tokens", "--format", "json", "--json",
+    ]);
+    expect(jsonR.exitCode).toBe(0);
+    expect(JSON.parse(jsonR.stdout).data.factorySoul).toBeNull();
+  });
+
+  it("--format json with soul included: data.factorySoul is the factory baseline text", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-factory-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout).data;
+    expect(typeof data.factorySoul).toBe("string");
+    expect(data.factorySoul).toContain("# Design Soul — factory");
+  });
+});
+
+// ─── ds context — the soul chain is budget-exempt (the class-level guard) ─────
+// --max-bytes bounds ONLY the variable data (token/registry/naming/anti-pattern
+// tables). The WHOLE soul chain (project + studio + factory ~2.5KB baseline) is
+// fixed declared-stance prose, never byte-sliced — so a big soul chain must never
+// starve the token table. `initDs(tmp, true)` (bare) is used where the assertion
+// counts tokens, to isolate the token budget from the registry rows that would
+// otherwise compete for the same variable budget (unrelated to soul exemption).
+
+describe("ui ds context — soul chain budget exemption", () => {
+  const STUDIO_HEADING_TEXT = "# Design Soul — studio";
+
+  // A ~100-line ratified project soul: three sections, ~30 bullets each.
+  function bigProjectSoul(): string {
+    const bullets = Array.from({ length: 30 }, (_, i) => `- clause ${i}`).join("\n");
+    return `---\nstatus: ratified\n---\n\n# Design Soul — big\n\n## Never\n\n${bullets}\n\n## Always\n\n${bullets}\n\n## Voice\n\n${bullets}\n`;
+  }
+
+  it("default budget, factory only: tokens stay non-empty despite the ~2.5KB factory baseline", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-exempt-"));
+    initDs(tmp, true); // bare: isolate the token budget from registry rows
+    rmSync(join(tmp, "design", "soul.md"));
+    const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout).data;
+    expect(data.semantic.length).toBeGreaterThan(10);
+    expect(typeof data.factorySoul).toBe("string");
+    expect(data.factorySoul.length).toBeGreaterThan(0);
+    expect(data.soul).toBeNull();
+  });
+
+  describe("with a studio soul present", () => {
+    const savedHome = process.env["EASE_DESIGN_HOME"];
+    let home: string;
+
+    beforeEach(() => {
+      home = mkdtempSync(join(tmpdir(), "ease-ctx-exempt-home-"));
+      process.env["EASE_DESIGN_HOME"] = home;
+    });
+    afterEach(() => {
+      if (savedHome === undefined) delete process.env["EASE_DESIGN_HOME"];
+      else process.env["EASE_DESIGN_HOME"] = savedHome;
+    });
+
+    function writeStudioSoul(text: string): void {
+      mkdirSync(home, { recursive: true });
+      writeFileSync(join(home, "studio-soul.md"), text, "utf8");
+    }
+
+    it("default budget, big project soul + studio soul + factory all present: tokens STILL non-empty", () => {
+      const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-exempt-"));
+      initDs(tmp, true); // bare: isolate the token budget from registry rows
+      writeFileSync(join(tmp, "design", "soul.md"), bigProjectSoul(), "utf8");
+      writeStudioSoul(STUDIO_SOUL_TEXT);
+      const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+      expect(r.exitCode).toBe(0);
+      const data = JSON.parse(r.stdout).data;
+      expect(data.semantic.length).toBeGreaterThan(10);
+      expect(data.soul).toBeTruthy();
+      expect(data.studioSoul).toBeTruthy();
+      expect(data.factorySoul).toBeTruthy();
+      expect(data.studioSoul).toContain(STUDIO_HEADING_TEXT);
+    });
+  });
+
+  it("tiny --max-bytes 512 still returns valid JSON and keeps the full soul chain", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-exempt-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--max-bytes", "512", "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    expect(() => JSON.parse(r.stdout)).not.toThrow();
+    const data = JSON.parse(r.stdout).data;
+    // The factory baseline is rendered WHOLE and un-sliced even at the tiny budget.
+    expect(typeof data.factorySoul).toBe("string");
+    expect(data.factorySoul).toContain("# Design Soul — factory");
+    expect(data.factorySoul.trimEnd().endsWith("without blame.")).toBe(true);
+    // The variable token table may be reduced to fit — that is the whole point.
+    expect(Array.isArray(data.semantic)).toBe(true);
   });
 });

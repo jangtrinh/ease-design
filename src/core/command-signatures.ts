@@ -496,7 +496,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
           { name: "with-theme", type: "boolean", summary: "Also emit the compiled Tailwind v4 @theme block (full token map, immune to --max-bytes)" },
           { name: "include", type: "string", summary: "Comma-separated sections: tokens,registry,naming,anti-patterns,soul" },
           { name: "format", type: "string", values: ["markdown", "json"], summary: "Output format (default markdown)" },
-          { name: "max-bytes", type: "string", summary: "Truncate the context block to fit n bytes (default 4096)" },
+          { name: "max-bytes", type: "string", summary: "Budget for the variable sections (token/registry/naming/anti-pattern tables); the soul chain and --with-theme are fixed prose outside it (default 4096)" },
           { name: "dir", type: "string", summary: "Override the project directory" },
         ],
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "DS_NOT_FOUND", "DS_TAMPERED", "BAD_MANIFEST"],
@@ -561,8 +561,8 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         errorCodes: ["UNKNOWN_FLAG", "DS_NOT_FOUND", "DS_TAMPERED", "BAD_MANIFEST", "WRITE_ERROR"],
       },
       soul: {
-        summary: "Scaffold + structure-lint the declared design stance (design/soul.md)",
-        positionals: [{ name: "<init|check>", required: true, summary: "init writes the scaffold; check structure-lints the file (exit 1 on errors)" }],
+        summary: "Scaffold + structure-lint the declared design stance (design/soul.md); 'factory' prints the shipped design:os baseline",
+        positionals: [{ name: "<init|check|factory>", required: true, summary: "init writes the scaffold; check structure-lints the file (exit 1 on errors); factory prints the shipped design:os baseline stance" }],
         flags: [
           { name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd)" },
           { name: "force", type: "boolean", summary: "'soul init' only: overwrite an existing soul.md" },

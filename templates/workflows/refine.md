@@ -29,7 +29,7 @@ hint to weight that axis higher, but still run the full checklist.
 
 **Soul gate.** If `design/soul.md` exists, read it FIRST (it also appears as the
 `soul` section of `ui ds context`). It is the project's declared stance. Precedence:
-**brief > soul > memory prior > knowledge floors** — the soul biases every choice
+**brief > soul (project > studio > factory) > memory prior > knowledge floors** — the soul biases every choice
 below it and never overrides the explicit brief. Never propose choices that violate
 a `## Never` clause; prefer choices that express `## Always`.
 

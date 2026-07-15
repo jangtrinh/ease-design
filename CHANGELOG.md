@@ -7,6 +7,14 @@ All notable changes to ease-design are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **`ui ds soul factory` — the shipped design:os baseline stance.** A world-class
+  product-design soul (Never / Always / Voice, ratified by the product itself) compiled
+  into the binary as a new tier BELOW project and studio soul — so a mass user has a
+  top-tier stance day-0 with zero setup. It rides in every `ui ds context` as the
+  `## Soul — factory` section (always present; overridden clause-by-clause by any
+  project/studio soul above it, never merged), and prints on demand via `ui ds soul
+  factory`. Emitter+linter paired: a test enforces `checkSoul(FACTORY_SOUL)` returns
+  0 findings forever. Precedence: brief > project > studio > factory > memory > floors.
 - **`ui agents` — soul-bound, task-scoped project agents.** `agents init` writes Claude Code
   subagents into `.claude/agents/` — role-first names with a genealogy suffix
   (`designer-jang-vsf-pcp`), identity read at runtime via `ui ds context` (souls are never

@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { run } from "../src/cli.js";
 import { SOUL_SCAFFOLD } from "../src/core/ds-soul.js";
 import { STUDIO_SOUL_SCAFFOLD } from "../src/core/ds-soul-studio.js";
+import { FACTORY_SOUL } from "../src/core/ds-soul-factory.js";
 
 // Named "vela", not "acme" — Acme is in content-checks' placeholder-name set
 // and would (correctly) trip soul-placeholder-copy.
@@ -148,6 +149,32 @@ describe("ui ds soul check", () => {
   });
 });
 
+// ─── ds soul factory ──────────────────────────────────────────────────────────
+
+describe("ui ds soul factory", () => {
+  it("text mode prints FACTORY_SOUL verbatim, exit 0", () => {
+    const r = capture(["ds", "soul", "factory"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toBe(FACTORY_SOUL);
+  });
+
+  it("--json returns the envelope with text + lineCount", () => {
+    const r = capture(["ds", "soul", "factory", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const env = JSON.parse(r.stdout);
+    expect(env.ok).toBe(true);
+    expect(env.command).toBe("ds soul");
+    expect(env.data.text).toBe(FACTORY_SOUL);
+    expect(env.data.lineCount).toBe(FACTORY_SOUL.split("\n").length);
+  });
+
+  it("rejects --studio (not a valid flag for factory) with UNKNOWN_FLAG", () => {
+    const r = capture(["ds", "soul", "factory", "--studio", "--json"]);
+    expect(r.exitCode).toBe(1);
+    expect(JSON.parse(r.stdout).error.code).toBe("UNKNOWN_FLAG");
+  });
+});
+
 // ─── dispatcher edges ─────────────────────────────────────────────────────────
 
 describe("ui ds soul — action routing", () => {
@@ -163,6 +190,7 @@ describe("ui ds soul — action routing", () => {
     const env = JSON.parse(r.stdout);
     expect(env.error.code).toBe("BAD_ARG");
     expect(env.error.message).toContain("frobnicate");
+    expect(env.error.message).toContain("factory");
   });
 
   it("init works without a compiled DS (the soul is standalone)", () => {

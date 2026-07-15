@@ -8,6 +8,7 @@
 import { isAlias } from "./token-model.js";
 import { soulSectionForContext } from "./ds-soul.js";
 import { studioSoulSectionForContext } from "./ds-soul-studio.js";
+import { factorySoulSectionForContext } from "./ds-soul-factory.js";
 import type { DesignSystem } from "./design-system.js";
 import type { ResolvedToken } from "./token-model.js";
 
@@ -44,6 +45,12 @@ export interface StructuredContext {
   soul: string | null;
   /** $EASE_DESIGN_HOME/studio-soul.md content (capped), or null when absent / not included. */
   studioSoul: string | null;
+  /**
+   * The shipped design:os baseline stance (capped) — the tier BELOW every
+   * project/studio soul, compiled in (no fs), so it is present whenever the
+   * "soul" section is included. Null ONLY when "soul" is not in `include`.
+   */
+  factorySoul: string | null;
   semantic: { path: string; value: string }[];
   registry: { name: string; category: string; tokensUsed: string[] }[];
   naming: { rule: string }[];
@@ -204,50 +211,83 @@ export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
   // Anti-patterns are persisted in the manifest at ds init time.
   const antiPatterns: string[] = ds.manifest.persona.antiPatterns ?? [];
 
+  // ── Fixed prefix: header + strict preamble + the whole soul chain ────────────
+  // EXEMPT from `maxBytes`. That budget governs only the VARIABLE data dump (the
+  // token / registry / naming / anti-pattern tables, whose size scales with the
+  // system). The declared-stance prose — project soul, studio soul, factory
+  // baseline — is fixed and already has its OWN size mechanism: each runs through
+  // soulSectionForContext's 150-line cap. Budgeting the soul chain against the
+  // same bytes as the tables let a large soul (or the always-present ~2.5KB
+  // factory baseline) STARVE the tokens to zero on a default call — the whole
+  // point of `ds context` is to deliver those tokens. Exempting the whole chain
+  // (not just factory) fixes the class: a 150-line project soul had the same
+  // blind spot. Mirrors the `--with-theme` exemption in ds-context-impl.ts.
+  const prefixLines: string[] = [];
+  const m = ds.manifest;
+  prefixLines.push(
+    `# Design System: ${m.name}  (generation ${m.generation}, persona ${m.persona.slug} / ${m.persona.family})`,
+    "",
+    `Intent: ${m.intent}`,
+    "",
+  );
+
+  if (strict) {
+    prefixLines.push(STRICT_PREAMBLE);
+  }
+
+  // The soul is the declared stance every flow reads BEFORE personas/tokens,
+  // so it leads the sections. Absent soul.md → no section, never an error.
+  if (include.includes("soul") && soul !== undefined) {
+    prefixLines.push(
+      "## Soul (declared stance — precedence: brief > soul > memory > floors)",
+      "",
+      soulSectionForContext(soul),
+      "",
+    );
+  }
+
+  // The studio soul is the genealogy layer ABOVE every project soul — it
+  // rides the same `soul` include (one concept, two tiers) and always
+  // renders AFTER the project section above, since project is the more
+  // specific, later-declared layer and wins on conflict.
+  if (include.includes("soul") && studioSoul !== undefined) {
+    prefixLines.push(
+      "## Soul — studio (inherited base; the project soul above overrides it on conflict)",
+      "",
+    );
+    if (soul === undefined) {
+      prefixLines.push("_no project soul yet — this is the only declared layer_", "");
+    }
+    prefixLines.push(studioSoulSectionForContext(studioSoul), "");
+  }
+
+  // The factory baseline is the stance design:os itself ships — the tier
+  // BELOW every project/studio soul. It is a compiled-in constant (no fs), so
+  // it renders LAST in the soul chain whenever the section is included, even
+  // when the project has declared no soul of its own: mass users get a
+  // world-class stance day-0. Any soul above overrides it clause-by-clause.
+  if (include.includes("soul")) {
+    prefixLines.push(
+      "## Soul — factory (design:os baseline; any project/studio soul above overrides it)",
+      "",
+    );
+    if (soul === undefined && studioSoul === undefined) {
+      prefixLines.push(
+        "_no project or studio soul declared yet — this baseline is the only stance layer; run 'ui ds soul init' to declare yours_",
+        "",
+      );
+    }
+    prefixLines.push(factorySoulSectionForContext(), "");
+  }
+
+  // ── Variable tail: token / registry / naming / anti-pattern tables ───────────
+  // The ONLY part `maxBytes` truncates.
   const build = (
     ap: string[],
     reg: typeof regRows,
     tok: ResolvedToken[],
   ): string => {
     const lines: string[] = [];
-
-    const m = ds.manifest;
-    lines.push(
-      `# Design System: ${m.name}  (generation ${m.generation}, persona ${m.persona.slug} / ${m.persona.family})`,
-      "",
-      `Intent: ${m.intent}`,
-      "",
-    );
-
-    if (strict) {
-      lines.push(STRICT_PREAMBLE);
-    }
-
-    // The soul is the declared stance every flow reads BEFORE personas/tokens,
-    // so it leads the sections. Absent soul.md → no section, never an error.
-    if (include.includes("soul") && soul !== undefined) {
-      lines.push(
-        "## Soul (declared stance — precedence: brief > soul > memory > floors)",
-        "",
-        soulSectionForContext(soul),
-        "",
-      );
-    }
-
-    // The studio soul is the genealogy layer ABOVE every project soul — it
-    // rides the same `soul` include (one concept, two tiers) and always
-    // renders AFTER the project section above, since project is the more
-    // specific, later-declared layer and wins on conflict.
-    if (include.includes("soul") && studioSoul !== undefined) {
-      lines.push(
-        "## Soul — studio (inherited base; the project soul above overrides it on conflict)",
-        "",
-      );
-      if (soul === undefined) {
-        lines.push("_no project soul yet — this is the only declared layer_", "");
-      }
-      lines.push(studioSoulSectionForContext(studioSoul), "");
-    }
 
     if (include.includes("tokens")) {
       lines.push("## Tokens (semantic only)", "");
@@ -305,8 +345,13 @@ export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
     return lines.join("\n");
   };
 
-  const { content } = applyTruncation(antiPatterns, regRows, sem, maxBytes, build);
-  return content;
+  // Budget bounds only the variable tail; the soul-chain prefix is fixed prose.
+  const { content: tail } = applyTruncation(antiPatterns, regRows, sem, maxBytes, build);
+  const prefix = prefixLines.join("\n");
+  // prefixLines ends with a trailing "" (→ prefix ends "\n"); one more "\n"
+  // restores the blank line that separated the last prefix block from the first
+  // table heading in the old single-array layout.
+  return tail === "" ? prefix : prefix + "\n" + tail;
 }
 
 // ─── Structured formatter ─────────────────────────────────────────────────────
@@ -330,8 +375,12 @@ function buildStructured(
     generation: ds.manifest.generation,
     persona: ds.manifest.persona,
     intent: ds.manifest.intent,
+    // The whole soul chain is exempt from the byte budget (see formatStructured):
+    // project soul, studio soul, and the compiled-in factory baseline all ride
+    // through at full (capped) text whenever the soul section is included.
     soul: include.includes("soul") ? soul : null,
     studioSoul: include.includes("soul") ? studioSoul : null,
+    factorySoul: include.includes("soul") ? factorySoulSectionForContext() : null,
     semantic: include.includes("tokens")
       ? tok.map((t) => ({ path: t.path, value: formatValue(t) }))
       : [],
@@ -343,17 +392,34 @@ function buildStructured(
   };
 }
 
+/** Serialised byte size of ONLY the variable sections of a structured context —
+ * the token / registry / naming / anti-pattern payload the `maxBytes` budget
+ * governs. The fixed header fields AND the soul chain (soul/studioSoul/factory)
+ * are excluded: they are declared-stance prose, exempt from the budget (each
+ * already capped at 150 lines by soulSectionForContext). */
+function variableBytes(ctx: StructuredContext): number {
+  return Buffer.byteLength(
+    JSON.stringify({
+      semantic: ctx.semantic,
+      registry: ctx.registry,
+      naming: ctx.naming,
+      antiPatterns: ctx.antiPatterns,
+    }),
+    "utf8",
+  );
+}
+
 /** Format the design system as a structured JSON-serialisable object.
  *
- * Truncation drops whole rows deterministically (anti-patterns → registry → tokens),
- * then — only if zero-row versions still exceed the budget — drops soul text
- * (the declared stance outranks token rows, so it is dropped LAST), so the result
- * is always a valid object — no mid-string slicing. The studio soul (the more
- * expendable, inherited-base layer) drops before the project soul does — see
- * `soulPairs` below — since the project soul is the more specific layer and
- * wins on conflict everywhere else in this formatter too.
- * If even the minimal object exceeds maxBytes, rows are dropped until it fits or
- * all variable rows are exhausted (fixed header fields are never trimmed).
+ * `maxBytes` bounds ONLY the variable data dump (token/registry/naming/anti-pattern
+ * rows): truncation drops whole rows deterministically (anti-patterns → registry →
+ * tokens), never a mid-string slice, so the result is always a valid object. The
+ * soul chain — project soul, studio soul, and the always-present factory baseline —
+ * is FIXED declared-stance prose, exempt from the budget (mirrors formatMarkdown's
+ * prefix and the `--with-theme` exemption): it is never dropped to make room for
+ * tokens, because a large soul (or the ~2.5KB factory constant) starving the tokens
+ * defeats the point of `ds context`. Each soul layer has its own size cap
+ * (soulSectionForContext, 150 lines). Fixed header fields are never trimmed either.
  */
 export function formatStructured(ds: DesignSystem, opts: ContextOptions): StructuredContext {
   const { include, maxBytes } = opts;
@@ -365,52 +431,35 @@ export function formatStructured(ds: DesignSystem, opts: ContextOptions): Struct
   }));
   // Anti-patterns are persisted in the manifest at ds init time.
   const antiPatterns: string[] = ds.manifest.persona.antiPatterns ?? [];
+  // The soul chain is always at full (capped) text — never dropped for budget.
   const soulText = opts.soul !== undefined ? soulSectionForContext(opts.soul) : null;
   const studioSoulText = opts.studioSoul !== undefined ? studioSoulSectionForContext(opts.studioSoul) : null;
 
-  // Preference-ordered (soul, studioSoul) pairs — keep both as long as budget
-  // allows; sacrifice the studio layer first; drop the project soul only as
-  // the last resort before falling through to zero rows below. When there is
-  // no studio soul at all this reduces to the same 2-state ladder as before
-  // (byte-identical behaviour for every caller that never sets studioSoul).
-  const soulPairs: { soul: string | null; studio: string | null }[] =
-    soulText !== null && studioSoulText !== null
-      ? [
-          { soul: soulText, studio: studioSoulText },
-          { soul: soulText, studio: null },
-          { soul: null, studio: null },
-        ]
-      : soulText !== null
-      ? [{ soul: soulText, studio: null }, { soul: null, studio: null }]
-      : studioSoulText !== null
-      ? [{ soul: null, studio: studioSoulText }, { soul: null, studio: null }]
-      : [{ soul: null, studio: null }];
-
-  // Try progressively more aggressive truncation — drop rows, never mid-string slice
+  // Try progressively more aggressive truncation of the VARIABLE rows only —
+  // drop rows, never mid-string slice; the soul chain stays whole throughout.
   const apLimits = [antiPatterns.length, 5, 0];
   const regLimits = [regRows.length, 10, 5, 0];
   const tokLimits = [sem.length, 30, 15, 5, 0];
 
-  for (const pair of soulPairs) {
-    for (const apLimit of apLimits) {
-      for (const regLimit of regLimits) {
-        for (const tokLimit of tokLimits) {
-          const ctx = buildStructured(
-            ds, include, pair.soul, pair.studio,
-            antiPatterns.slice(0, apLimit),
-            regRows.slice(0, regLimit),
-            sem.slice(0, tokLimit),
-          );
-          if (Buffer.byteLength(JSON.stringify(ctx), "utf8") <= maxBytes) {
-            return ctx;
-          }
+  for (const apLimit of apLimits) {
+    for (const regLimit of regLimits) {
+      for (const tokLimit of tokLimits) {
+        const ctx = buildStructured(
+          ds, include, soulText, studioSoulText,
+          antiPatterns.slice(0, apLimit),
+          regRows.slice(0, regLimit),
+          sem.slice(0, tokLimit),
+        );
+        if (variableBytes(ctx) <= maxBytes) {
+          return ctx;
         }
       }
     }
   }
 
-  // Budget is too small even for zero rows — return the minimal header-only object
-  return buildStructured(ds, include, null, null, [], [], []);
+  // Budget is too small even for zero variable rows — the soul chain still rides
+  // through whole (it is exempt); only the row sections collapse to empty.
+  return buildStructured(ds, include, soulText, studioSoulText, [], [], []);
 }
 
 // ─── Include parser ───────────────────────────────────────────────────────────

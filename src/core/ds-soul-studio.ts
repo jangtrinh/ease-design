@@ -30,7 +30,8 @@ name: <studio>
 
 _The layer ABOVE every project soul: what stays true across ALL your products.
 A project's design/soul.md inherits this and overrides on conflict.
-\`name:\` above names your agents (e.g. name: JANG → agent jang-<project>)._
+\`name:\` above names your agents (e.g. name: JANG → agent jang-<project>).
+Below both sits the factory baseline design:os ships ('ui ds soul factory')._
 
 ## Never
 

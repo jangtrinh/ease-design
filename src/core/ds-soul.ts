@@ -22,7 +22,7 @@ status: draft
 # Design Soul — <project>
 
 _Declared stance. Every /ui:* flow reads this BEFORE picking personas or tokens.
-Precedence: brief > soul > memory prior > knowledge floors. Short beats long._
+Precedence: brief > soul (project > studio > factory) > memory prior > knowledge floors. Short beats long._
 
 ## Never
 

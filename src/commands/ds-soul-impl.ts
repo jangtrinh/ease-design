@@ -19,6 +19,7 @@ import { errJson, errText, ok, okJson, okJsonWithExit } from "../core/output.js"
 import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import { writeSoulScaffold, checkSoul, SOUL_FILENAME } from "../core/ds-soul.js";
 import { STUDIO_SOUL_FILENAME, checkStudioSoul, writeStudioSoulScaffold } from "../core/ds-soul-studio.js";
+import { FACTORY_SOUL } from "../core/ds-soul-factory.js";
 import { easeHome } from "../core/memory-store.js";
 import type { SoulCheckResult } from "../core/ds-soul.js";
 import type { ParsedArgs } from "../core/cli-args.js";
@@ -100,12 +101,24 @@ export function runSoul(parsed: ParsedArgs): CommandResult {
     useJson ? errJson(CMD, code, msg) : errText(`ui: ${msg}\n`);
 
   const action = parsed.positionals[0];
-  if (action !== "init" && action !== "check") {
+  if (action !== "init" && action !== "check" && action !== "factory") {
     const msg =
       action === undefined
-        ? "ui ds soul requires an action: init | check. Run 'ui ds --help'."
-        : `unknown action '${action}' — expected init | check. Run 'ui ds --help'.`;
+        ? "ui ds soul requires an action: init | check | factory. Run 'ui ds --help'."
+        : `unknown action '${action}' — expected init | check | factory. Run 'ui ds --help'.`;
     return err("BAD_ARG", msg);
+  }
+
+  // ── factory — print the shipped design:os baseline ───────────────────────────
+  // The product's own stance: a compiled-in constant (no fs), identical on every
+  // runtime and every project, so it takes neither --dir nor --studio (only the
+  // global flags). Emitter half of the factory-soul standard.
+  if (action === "factory") {
+    const unknown = findUnknownFlag(parsed.flags, []);
+    if (unknown !== null) return err("UNKNOWN_FLAG", unknownFlagMessage(unknown));
+    const lineCount = FACTORY_SOUL.split("\n").length;
+    if (useJson) return okJson(CMD, { text: FACTORY_SOUL, lineCount });
+    return ok(FACTORY_SOUL);
   }
 
   const studio = parsed.flags["studio"] === true;

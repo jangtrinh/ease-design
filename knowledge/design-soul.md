@@ -9,11 +9,17 @@ statement of what this design language **never** does, what it **always** holds,
 ## §1 Where it sits — the precedence chain
 
 ```
-brief  >  soul (declared)  >  memory prior (learned)  >  knowledge floors
+brief  >  soul: project > studio > factory (shipped)  >  memory prior (learned)  >  knowledge floors
 ```
 
 - The **explicit brief always wins** — a soul biases choices, it never vetoes what the
   user actually asked for.
+- The **soul tier has three layers**, most-specific first: a project's `design/soul.md`,
+  then the studio soul above it (§6), then the **factory soul design:os ships** (§7) —
+  a world-class product-design baseline, ratified by the product itself, that applies to
+  every project out of the box with zero setup and never needs a file on disk. A more
+  specific layer overrides a more general one clause-by-clause; this is a read-time
+  precedence contract, never a machine merge.
 - The **soul outranks memory**: a learned "this project tends dark-mode" yields to a
   declared "## Never: light backgrounds". Learned taste drifts; declared taste is stable
   until the owner edits it.
@@ -95,4 +101,32 @@ agents (`jang-<project>`); a missing or placeholder name is the error
 is the more specific layer and wins on conflict; a project with no soul.md yet
 still gets the studio section, since the studio soul is useful before day one.
 Promote a studio soul by graduation, not invention: once the same clauses ratify
-across ≥2 real products, copy them up to `studio-soul.md` and add `name:`.
+across ≥2 real products, copy them up to `studio-soul.md` and add `name:`. The studio
+soul sits ABOVE the factory baseline (§7): it overrides the shipped stance on conflict.
+
+## §7 Factory soul — the shipped baseline
+
+design:os ships **its own** ratified soul — `ui ds soul factory` prints it. It is the
+bottom tier of the soul chain (`brief > project > studio > factory > memory > floors`):
+the stance the product applies to every project out of the box, so a mass user has a
+world-class product-design stance on day-0 with zero setup.
+
+- **Why it exists** — most users never write a soul; without one, generation would fall
+  straight to the persona/knowledge floors. The factory soul raises that floor to a
+  top-tier stance for everyone, immediately.
+- **Whose stance it is** — the PRODUCT's, not a user pretending. design:os authors and
+  ratifies it, so "ratification is the point" (§2) holds honestly: `status: ratified`,
+  `layer: factory`.
+- **Override semantics** — any studio or project soul above it wins clause-by-clause; it
+  is never merged with the layers above, only out-ranked by them (a read-time contract).
+- **Never on disk** — it is a compiled-in constant, identical on every runtime; no file
+  is written and `ui ds context` always carries it as the `## Soul — factory` section,
+  even when the project has declared no soul of its own. The factory section is exempt
+  from `--max-bytes` (like the whole soul chain and `--with-theme`), so it never displaces
+  the token table — that budget governs only the variable data sections.
+- **Linter pairing** — like every standard here, the emitter is paired with a check:
+  a test enforces `checkSoul(FACTORY_SOUL)` returns **0 findings** (0 error and 0
+  warning) forever — the shipped baseline must pass the very structure floor it teaches.
+- **Graduation path unchanged** — a project still declares its own soul (§3) and a studio
+  still graduates shared clauses up (§6); the factory soul is the stance you inherit
+  until you do.
