@@ -11,6 +11,7 @@ directly** while designing UI — curated design taste that sets the quality flo
 
 | File | Covers |
 |---|---|
+| `authoring-standard.md` | **The meta-standard for writing knowledge/ files** — the repeatable file frame (`Purpose → Mental Model → When to Use/NOT → Content → Failure Modes`, Failure Modes mandatory), the constraint-language rules (bilateral ALLOWED/NOT-ALLOWED, WHY-with-mechanism, CAPS discipline), no-hardcoded-counts-in-prose, dual machine+human examples, the `<!-- ease:source ref=… -->` provenance grammar, untrusted-content quarantine, and scar-driven guardrails. Enforced by `ui knowledge check`. Read when writing or editing any knowledge file. |
 | `taste-rubric.md` | The 6-axis taste model — Layout, Typography, Spacing, Motion, Iconography, Depth/Surface — plus the 7th Consistency axis. Per-axis 0–10 scoring and the critique-gate pass thresholds. |
 | `motion-craft.md` | The animation decision ladder (T1 CSS → T6 Lottie/WebGL) — which motion technology to reach for so capability never exceeds intent, plus persona tier caps, the non-negotiable motion floors (reduced-motion every tier, transform/opacity only), and copy-paste CDN recipes. The *build* contract; `taste-rubric.md` Motion axis is the *grading* contract. |
 | `personas/<family>.md` | The persona library — 23 curated personas across 7 families, one file per family. Each persona carries full aesthetic DNA (typography, color, spacing, depth, motion, anti-patterns, …). A persona is a fixed point in taste-space. |
@@ -39,9 +40,14 @@ directly** while designing UI — curated design taste that sets the quality flo
 | `figma-craft/facet-model.md` | The **composition brain** — how ANY design job decomposes into 7 FACETS (intent/goal · requirements · IA/flow · layout · style · content · behavior) + 5 cross-cutting LAYERS (audience · tone · constraints · accessibility · states) each BOUND to a SOURCE (provided input tagged by role > project DS > persona/knowledge > data > AI judgment), with the binding-matrix + show-to-confirm + single-facet-regenerate UX and cheap per-facet extraction. Read when a designer designs something new from mixed inputs (Figma link=style, image=content, user-story=requirements). Used by `/ui:design`. |
 | `figma-craft/curator.md` | The **two-axis quality gate** every design passes in SEE — TASTE (`critique.md` + `taste-rubric.md` 7 axes) + GOAL/SPEC (acceptance-criteria coverage via `ui critique-coverage`, goal-plausibility vs `ux-psychology.md` incl. honest-persuasion, accessibility gate + `ui ds a11y` paired mode + DS-standard conformance (specimen clean, status honesty), adversarial refuter). Honest verdict → iterate the worst finding; each verdict seeds a learned `insight`. |
 | `figma-agent-hand.md` | How to drive the `figma-agent` CLI (the Figma "hands"). An optional **in-repo** hand — like the `ui` binary it runs over Bash, but it is NOT part of ease-design's deterministic binary; it ships as an npm workspace at `figma-agent/` (build once with `npm run build --workspace=figma-agent`) and needs its Figma plugin loaded. |
+| `designmd-format.md` | **The DESIGN.md contract** (Google Labs alpha) — the pinned on-disk spec for the `DESIGN.md` file the host model writes at project root: the YAML front-matter token schema + the exactly-8-sections-in-fixed-order Markdown body, both halves required. Read instead of refetching upstream; the `ui designmd` toolchain (extract-tokens/snapshot/audit) gates against it. |
 | `recall-mind.md` | How to drive the `recall` CLI (the semantic **"mind"** over the design memory). Another optional in-repo workspace (`recall/`, Node ≥ 22, local ONNX embeddings): `recall index` embeds the ledger corpus (+ this knowledge core) into a rebuildable `*.vec.db`; `recall query … --out ids.json` hybrid-ranks it (RRF × half-life decay × supersession) and feeds `ui memory context --rank-file`. The ledger stays truth; the `ui` binary never imports any of it. |
 
 ## Task → files
+
+**Writing or editing a knowledge file** — `authoring-standard.md`: the file frame,
+constraint-language rules, provenance grammar, and quarantine rules `ui knowledge check`
+enforces.
 
 **Generate a design from an intent**
 1. `persona-index.md` — auto-select personas from the intent

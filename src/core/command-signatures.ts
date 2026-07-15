@@ -751,6 +751,21 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
     },
   },
 
+  knowledge: {
+    summary: "Governance checks over the knowledge core (index / persona / xref / provenance drift)",
+    subcommands: {
+      check: {
+        summary: "Findings-linter over knowledge/; exit 1 on error-severity findings",
+        positionals: [],
+        flags: [
+          { name: "dir", type: "string", summary: "Repo root holding knowledge/ (default: current working directory)" },
+          { name: "as-of", type: "string", summary: "Reference month YYYYMM for benchmark-stale (default: current month)" },
+        ],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "NO_KNOWLEDGE", "BAD_AS_OF", "READ_ERROR"],
+      },
+    },
+  },
+
   taste: {
     summary: "Vote-driven taste corpus: ingest, pairwise Elo ranking, study verdicts",
     subcommands: {
