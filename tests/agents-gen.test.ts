@@ -145,4 +145,14 @@ describe("templates/agents/ contract", () => {
     expect(rendered).not.toContain("{{");
     expect(parseAgentStamp(rendered)).toEqual({ role, hash: templateHash(tpl) });
   });
+
+  // spec 002 WS-B: every project role feeds knowledge/ via a gap event and never
+  // edits it directly — the guard line must be present in all three templates.
+  it.each([...ROSTER])("%s.md carries the knowledge-guard line (record gap, no knowledge/ edits)", (role) => {
+    const tpl = readFileSync(join(REPO_ROOT, "templates", "agents", `${role}.md`), "utf8");
+    expect(tpl, `${role}.md must route knowledge changes through a gap event`).toContain(
+      "ui memory record gap",
+    );
+    expect(tpl, `${role}.md must forbid editing knowledge/`).toMatch(/NEVER edit `knowledge\/`/);
+  });
 });

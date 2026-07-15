@@ -229,6 +229,41 @@ describe("ui agents check", () => {
     expect(JSON.parse(healed.stdout).data.findings).toEqual([]);
   });
 
+  it("a pre-migration file (older template render) → agent-stale; init --force heals it", () => {
+    // spec 002 WS-B: bumping templates/agents/*.md (the knowledge-guard line) changes
+    // every template hash, so any file generated before the bump no longer matches the
+    // live template render and must report stale — the migration the PR body documents
+    // (`ui agents init --force` per project).
+    const tmp = mkdtempSync(join(tmpdir(), "ease-agents-"));
+    initDs(tmp);
+    writeStudioSoul(home);
+    capture(["agents", "init", "--dir", tmp]);
+
+    // Overwrite with a plausible OLD render: the designer body without the guard bullet,
+    // carrying a valid designer stamp. Detection compares file-text hash vs the live
+    // template render, so any prior-template content flags stale.
+    const p = agentPath(tmp, "designer-jang-vsf-pcp.md");
+    writeFileSync(
+      p,
+      "---\nname: designer-jang-vsf-pcp\n---\n\nYou are designer-jang-vsf-pcp, the designer agent for **vsf-pcp**." +
+        " You carry the JANG studio's soul as your base identity.\n\nold pre-migration body\n\n" +
+        "<!-- design-os agents · roster-role: designer · template-hash: deadbeef -->\n",
+      "utf8",
+    );
+
+    const r = capture(["agents", "check", "--dir", tmp, "--json"]);
+    expect(r.exitCode).toBe(1);
+    const data = JSON.parse(r.stdout).data;
+    expect(data.errorCount).toBe(1);
+    expect(data.findings[0].checkId).toBe("agent-stale");
+    expect(data.findings[0].message).toContain("designer-jang-vsf-pcp");
+
+    capture(["agents", "init", "--dir", tmp, "--force"]);
+    const healed = capture(["agents", "check", "--dir", tmp, "--json"]);
+    expect(healed.exitCode).toBe(0);
+    expect(JSON.parse(healed.stdout).data.findings).toEqual([]);
+  });
+
   it("no agents at all → the single no-agents warning, exit 0 (agents are opt-in)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-agents-"));
     initDs(tmp);

@@ -18,6 +18,9 @@ and you do NOT touch the Figma canvas (that is the figma hand's job).
   `ui a11y-lint`, `ui taste-lint`, `ui content-lint` — zero errors.
 - No fabricated evidence: no invented metrics, testimonials, or placeholder names.
 - Shape before dress (see `knowledge/page-structures.md` when the task is a page).
+- Knowledge boundary: NEVER edit `knowledge/` or `schemas/` — the librarian keeps those.
+  A knowledge gap is data you *record*, not a file you fix:
+  `ui memory record gap --data '{"text":"…","target":"<file>[#<section>]"}'`.
 
 **Handback format:** Status: DONE | DONE_WITH_CONCERNS | BLOCKED · what you built ·
 gate results · open questions.

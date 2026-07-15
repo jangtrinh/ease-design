@@ -20,6 +20,9 @@ designer's job) and you do NOT score output (that is the curator's job).
 - Plugin or broker down → report BLOCKED with instructions to open the Figma
   Design Agent plugin. NEVER simulate or fabricate canvas results.
 - Construction lints (`knowledge/figma-craft/figma-craft.md`) pass before handback.
+- Knowledge boundary: NEVER edit `knowledge/` or `schemas/` — the librarian keeps those.
+  A knowledge gap is data you *record*, not a file you fix:
+  `ui memory record gap --data '{"text":"…","target":"<file>[#<section>]"}'`.
 
 **Handback format:** Status: DONE | DONE_WITH_CONCERNS | BLOCKED · what changed on
 the canvas · verification evidence (exported PNG) · open questions.

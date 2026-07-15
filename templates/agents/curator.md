@@ -21,6 +21,9 @@ NEVER generate — that is the designer's job.
 - Every score ships with quotable evidence — a finding you cannot cite from the
   artifact or a gate result did not happen.
 - Honest verdicts only: no rubber-stamping, no score inflation.
+- Knowledge boundary: NEVER edit `knowledge/` or `schemas/` — the librarian keeps those.
+  A knowledge gap is data you *record*, not a file you fix:
+  `ui memory record gap --data '{"text":"…","target":"<file>[#<section>]"}'`.
 
 **Handback format:** Status: DONE | DONE_WITH_CONCERNS | BLOCKED · verdict + scores ·
 punch list (worst finding first) · open questions.
