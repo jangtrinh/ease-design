@@ -78,6 +78,10 @@ word inside a heading) read as generated, not designed. All-caps display keeps l
 **Anti-patterns:** five+ font sizes with no ratio relationship; headings and body at the
 same weight; uppercase paragraphs; default-tracked huge display text; pairing two fonts
 that occupy the same role; italic display headings; all-caps display with line-height below 1.0.
+*Machine floor:* `taste-lint`'s `font-scale-sprawl` counts the distinct hand-picked font
+sizes (arbitrary `text-[..px]` utilities and raw `font-size` literals — named Tailwind steps
+and `var(--…)` token sizes do not count) and warns past 7, errors past 10 — the signal that
+the scale was never derived from one ratio.
 
 ### Scoring 0–10
 
@@ -243,10 +247,16 @@ never designed.
 shadow and heavy border stacked on the same surface; glass over busy content that kills
 text contrast; elevation that doesn't correlate with actual stacking order; z-index 9999;
 a large background gradient in the indigo→magenta band (the machine-default "AI glow" —
-finance/enterprise surfaces read it as cheap). *Machine floor:* `taste-lint`'s
-`ai-cliche-gradient` (error) converts each gradient stop to OKLCH and flags a large-surface
-linear/radial/conic gradient dominated by stops in the ~270–330° hue band; recolor to the
-brand hue (or declare that hue as an in-doc brand token to exempt it).
+finance/enterprise surfaces read it as cheap); a low-alpha same-mode surface tint (a white
+hairline/fill on a light page, or the black inverse on a dark page) that passes text-contrast
+but draws no visible boundary. *Machine floor:* `taste-lint`'s `ai-cliche-gradient` (error)
+converts each gradient stop to OKLCH and flags a large-surface linear/radial/conic gradient
+dominated by stops in the ~270–330° hue band; `mode-invisible-surface` (error) reads the
+document mode from its root and flags a sub-15%-alpha white surface on a light page (or black
+on a dark page); `z-index-off-ladder` (warning) flags a `z-index` above single-digit local
+stacking that is not a base-10 ladder step, and `z-index-inflation` (error) flags the
+all-nines escalation. Recolor the gradient to the brand hue (or declare that hue as an in-doc
+brand token), give the invisible boundary a visible tint, and snap stacking to a named z-scale.
 
 ### Scoring 0–10
 

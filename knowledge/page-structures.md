@@ -132,11 +132,15 @@ page *genuinely* needs nothing else, and reach for a deliberate archetype otherw
 
 **What the machine already catches (do not spend judgment re-inspecting these):**
 `taste-lint` owns `italic-display-heading`, `uppercase-tight-line-height`,
-`overshoot-easing`, `focus-ring-animates-in`, `z-index-inflation`, `ai-cliche-gradient`
-(large violet-band background gradient), and `tap-target-undersized` (interactive control
-under the 44px touch minimum); `validate-layout` owns `css-100vw-width` and
-`root-overflow-x-hidden`. If a tell is on that list, the linter has it — spend your
-attention on the tells that are not.
+`overshoot-easing`, `focus-ring-animates-in`, `z-index-inflation`, `z-index-off-ladder`
+(a `z-index` off any base-10 ladder step), `ai-cliche-gradient` (large violet-band background
+gradient), `mode-invisible-surface` (a low-alpha white surface on a light page, or black on a
+dark page — a boundary that passes contrast but shows nothing), `font-scale-sprawl` (more than
+7 hand-picked font sizes), and `tap-target-undersized` (interactive control under the 44px
+touch minimum); `validate-layout` owns `css-100vw-width`, `root-overflow-x-hidden`,
+`clickable-no-pointer` (a non-native clickable with no `cursor:pointer`), and
+`font-display-missing` (a font with no `font-display` → FOIT + swap-in shift). If a tell is on
+that list, the linter has it — spend your attention on the tells that are not.
 
 ## §6 When to read this file
 

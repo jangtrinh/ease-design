@@ -16,12 +16,15 @@
  *
  * Coverage (axis → check):
  *   Typography    → tiny-body-text          (font-size ≤ 13px)
+ *   Typography    → font-scale-sprawl       (> 7 hand-picked font sizes; error > 10)
  *   Spacing       → off-grid-spacing        (Tailwind spacing not on 4px grid)
  *   Spacing       → tap-target-undersized   (interactive control < 44px; warning)
  *   Iconography   → mixed-icon-families     (≥ 2 icon libraries)
  *   Typography    → italic-display-heading, uppercase-tight-line-height
  *   Depth/Surface → pure-black-shadow       (hard/opaque black shadow)
  *   Depth/Surface → z-index-inflation       (all-nines z-index)
+ *   Depth/Surface → z-index-off-ladder      (z-index off a base-10 scale; warning)
+ *   Depth/Surface → mode-invisible-surface  (low-alpha same-mode surface tint; error)
  *   Depth/Surface → ai-cliche-gradient      (indigo/violet/magenta AI-glow gradient)
  *   Motion        → linear-easing, transition-all, animation-no-reduced-motion,
  *                   keyframes-layout-props
@@ -46,9 +49,11 @@ import {
 // 200-line guideline, so we import these directly rather than via that barrel).
 import { checkOvershootEasing, checkFocusRingAnimatesIn } from "./taste-checks-motion-state.js";
 import { checkItalicDisplayHeading, checkUppercaseTightLineHeight } from "./taste-checks-typography.js";
-import { checkZIndexInflation } from "./taste-checks-depth.js";
+import { checkZIndexInflation, checkZIndexOffLadder } from "./taste-checks-depth.js";
 import { checkTapTargetUndersized } from "./taste-checks-tap-target.js";
 import { checkAiClicheGradient } from "./taste-checks-gradient.js";
+import { checkFontScaleSprawl } from "./taste-checks-font-scale.js";
+import { checkModeInvisibleSurface } from "./taste-checks-invisible-surface.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -127,6 +132,7 @@ export function lintTaste(html: string, opts: TasteLintOptions = {}): TasteLintR
     ...checkMixedIconFamilies(stripped),
     ...checkPureBlackShadow(stripped),
     ...checkZIndexInflation(stripped),
+    ...checkZIndexOffLadder(stripped),
     ...checkLinearOrAllTransition(stripped),
     ...checkAnimationNoReducedMotion(stripped),
     ...checkKeyframesLayoutProps(stripped),
@@ -136,6 +142,10 @@ export function lintTaste(html: string, opts: TasteLintOptions = {}): TasteLintR
     // Craft lints (spec 003 P1). ai-cliche-gradient is an error; tap-target is a warning.
     ...checkAiClicheGradient(stripped),
     ...checkTapTargetUndersized(stripped),
+    // Web craft lints (spec 003 P2). font-scale-sprawl & z-index-off-ladder are warnings
+    // (font-scale escalates to error past 10 sizes); mode-invisible-surface is an error.
+    ...checkFontScaleSprawl(stripped),
+    ...checkModeInvisibleSurface(stripped),
   ];
 
   // Sort by rubric axis order, then by line (undefined lines last).

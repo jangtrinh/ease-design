@@ -35,3 +35,36 @@ export function checkZIndexInflation(html: string): TasteFinding[] {
   }
   return findings;
 }
+
+// ─── Off-ladder z-index: a stacking value that is not a clean scale step ─────────
+
+/** Any `z-index` set to an integer (optionally negative). Group 1 = the signed value. */
+const Z_INDEX_VALUE = /z-index\s*:\s*(-?\d+)\b/gi;
+
+/**
+ * z-index-off-ladder: a `z-index` above single-digit local stacking that is not a
+ * base-10 ladder step (10 / 20 / 30 / … / 100 / 1000). Values 0–9 are left alone
+ * (legitimate local stacking within a component); the all-nines values are already
+ * an error via `checkZIndexInflation`, so they are excluded here to avoid a double
+ * report. A value like `z-index: 47` or `z-index: 250` is the tell that the scale
+ * was improvised rather than designed. Scoped to CSS regions; a warning (the page
+ * still renders). Pure string/regex.
+ */
+export function checkZIndexOffLadder(html: string): TasteFinding[] {
+  const findings: TasteFinding[] = [];
+  const css = cssRegions(html);
+  Z_INDEX_VALUE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = Z_INDEX_VALUE.exec(css)) !== null) {
+    const raw = m[1] ?? "0";
+    const mag = Math.abs(parseInt(raw, 10));
+    if (mag <= 9) continue;                     // single-digit local stacking is fine
+    if (mag % 10 === 0) continue;               // on the 10/20/…/100/1000 ladder
+    if (/^(?:9{3,}|2147483647)$/.test(String(mag))) continue; // all-nines → already an error
+    findings.push({
+      checkId: "z-index-off-ladder", axis: "Depth/Surface", severity: "warning",
+      message: `z-index: ${raw} is off any base-10 ladder (rubric Depth/Surface: "stacking order is a designed scale, not an arms race") — snap it to a named z-scale step (e.g. 10/20/30/40/50)`,
+    });
+  }
+  return findings;
+}

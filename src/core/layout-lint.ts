@@ -1,7 +1,7 @@
 /**
  * Static HTML layout linter — pure string/regex heuristics, zero deps.
  *
- * Runs 13 checks against an HTML string and returns a structured result.
+ * Runs 15 checks against an HTML string and returns a structured result.
  * All checks are documented as heuristic approximations (no DOM parser, no
  * browser, no rendering). See layout-checks.ts for individual check logic.
  *
@@ -26,6 +26,7 @@ import {
 } from "./layout-checks.js";
 import { checkCss100vwWidth, checkRootOverflowXHidden } from "./layout-checks-viewport.js";
 import { checkAvoidableScreenshotCrop } from "./layout-checks-delivery.js";
+import { checkClickableNoPointer, checkFontDisplayMissing } from "./layout-checks-craft.js";
 import { isRedirectStub } from "./redirect-stub.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,6 +74,9 @@ const WARNING_CHECKS = [
   checkImgNoDimensions,
   checkEmptyFlexGrid,
   checkAvoidableScreenshotCrop,
+  // Web craft lints (spec 003 P2): functional affordance/loading bugs, not layout structure.
+  checkClickableNoPointer,
+  checkFontDisplayMissing,
 ] as const;
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
@@ -86,10 +90,10 @@ function stripCommentsPreservingOffsets(html: string): string {
   return html.replace(/<!--[\s\S]*?-->/g, (match) => " ".repeat(match.length));
 }
 
-/** Run all 13 checks and return findings sorted errors-first, then warnings. */
+/** Run all 15 checks and return findings sorted errors-first, then warnings. */
 export function lintLayout(html: string): LayoutLintResult {
   // L4 dogfood: a redirect stub intentionally has no <html>/<body>, so every structural
-  // check below is noise on it — short-circuit before running any of the 12 checks.
+  // check below is noise on it — short-circuit before running any of the other checks.
   if (isRedirectStub(html)) {
     return { findings: [], errorCount: 0, warningCount: 0 };
   }
