@@ -34,6 +34,15 @@ without a soul is fine — absence is never an error anywhere except an explicit
 
 ## §2 How to write one — short, sharp, measurable
 
+- **Souls are written in English, always** — they are read by every runtime and every
+  agent, and they ship with the product. (A `## Voice` clause may *quote* copy in the
+  product's language — "Duyệt", "Từ chối" — but the clause itself is English.)
+- **Character over cosmetics.** A soul carries how a real product designer thinks,
+  works, and speaks — judgment, method, voice. Colors, type faces, spacing, radii are
+  the DESIGN SYSTEM's facts, not soul clauses: a project soul may state *policy about*
+  a token ("operational data wears the DS mono face"), citing the token by name, but
+  never restates the palette. If a clause would break when the DS retokens, it belongs
+  in the DS.
 - **Short beats long.** Three sharp clauses beat thirty vague ones; the linter warns
   past 120 lines. A soul that reads like a spec has stopped being a stance.
 - **Write clauses a machine could someday check.** "No rounded corners over 4px" and

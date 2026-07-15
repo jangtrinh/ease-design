@@ -35,15 +35,15 @@ Below both sits the factory baseline design:os ships ('ui ds soul factory')._
 
 ## Never
 
-- <!-- điều studio KHÔNG BAO GIỜ làm, bất kể project -->
+- <!-- what the studio NEVER does, regardless of project -->
 
 ## Always
 
-- <!-- điều mọi sản phẩm của studio LUÔN giữ -->
+- <!-- what every product of this studio ALWAYS holds -->
 
 ## Voice
 
-- <!-- giọng chung của studio -->
+- <!-- the studio-wide voice -->
 `;
 
 /**

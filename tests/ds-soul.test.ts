@@ -109,7 +109,7 @@ describe("soul-empty-section (error)", () => {
   it("fires when a section has only a placeholder-comment bullet", () => {
     const emptied = RATIFIED.replace(
       "- direct, no filler",
-      "- <!-- copy nói giọng gì -->",
+      "- <!-- how the copy speaks -->",
     );
     const r = checkSoul(emptied);
     const empty = r.findings.filter((f) => f.checkId === "soul-empty-section");
@@ -267,15 +267,15 @@ Below both sits the factory baseline design:os ships ('ui ds soul factory')._
 
 ## Never
 
-- <!-- điều studio KHÔNG BAO GIỜ làm, bất kể project -->
+- <!-- what the studio NEVER does, regardless of project -->
 
 ## Always
 
-- <!-- điều mọi sản phẩm của studio LUÔN giữ -->
+- <!-- what every product of this studio ALWAYS holds -->
 
 ## Voice
 
-- <!-- giọng chung của studio -->
+- <!-- the studio-wide voice -->
 `);
   });
 });

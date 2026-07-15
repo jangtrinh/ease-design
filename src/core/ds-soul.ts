@@ -26,18 +26,18 @@ Precedence: brief > soul (project > studio > factory) > memory prior > knowledge
 
 ## Never
 
-- <!-- điều hệ này KHÔNG BAO GIỜ làm — vd: "rounded corners", "purple gradients" -->
+- <!-- what this system NEVER does — e.g. "rounded corners", "purple gradients" -->
 
 ## Always
 
-- <!-- điều hệ này LUÔN giữ — vd: "display type lớn, không xin lỗi", "ảnh thật, không stock" -->
+- <!-- what this system ALWAYS holds — e.g. "oversized display type", "real photography, never stock" -->
 
 ## Voice
 
-- <!-- copy nói giọng gì — vd: "thẳng, tiếng Việt trước, không sáo" -->
+- <!-- how the copy speaks — e.g. "plain-spoken, Vietnamese-first, zero filler" -->
 
-<!-- Khi đã sửa xong: đổi status: draft → status: ratified. \`ui ds soul check\`
-     cảnh báo chừng nào file còn draft hoặc còn comment placeholder này. -->
+<!-- When done editing: change status: draft → status: ratified. \`ui ds soul check\`
+     keeps warning while the file is a draft or these placeholder comments remain. -->
 `;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
