@@ -27,3 +27,8 @@ release-manifest.json
 .fog-context/
 .project-agent.md
 .brv/
+
+# Local symlinks into design-os-hq (private) corpus/ — taste ledger + third-party
+# reference captures live there, never in this public repo.
+/taste
+/references
