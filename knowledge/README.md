@@ -32,6 +32,7 @@ directly** while designing UI — curated design taste that sets the quality flo
 | `design-agents.md` | **Soul-bound, task-scoped project agents** — what a design agent is, the role-first naming with a genealogy suffix (studio soul `name:` × project → `designer-jang-vsf-pcp`), the first three roles and their hard boundaries (designer never self-scores · curator never edits · figma-hand never simulates), runtime-read identity (agents read `ui ds context`, soul text is never baked), the opt-in roster (`ui agents init|list|check`), and the stale-drift check. Claude Code only for now. Read when generating or auditing a project's agent roster. |
 | `page-structures.md` | **Shape before dress — the page-composition layer between persona and code.** The macrostructure catalog (21 named page shapes — pick one shape, not six loose axes), the diversification rule + the variety↔conformance switch (resist the default-attractor), honest-copy rules (no fabricated evidence), the six-axis pre-emit self-critique, and the nav/footer/hero "AI tells" (with pointers to the `taste-lint`/`layout-lint` checkIds that catch the machine-detectable ones). Read when shaping a standalone landing / marketing / docs surface or a custom `ds preview` chrome — NOT for a single component. |
 | `prompt-modes.md` | The replicate / enhance / adapt strategy modifiers for reference-driven generation. |
+| `delivery-assets.md` | **Resolve reproduced images to originals, never screenshot crops** — the best→last-resort resolution ladder (inline-SVG logo → harvested site-served raster → sprite slice → screenshot-crop LAST RESORT, art-only), the machine floor (the deterministic `avoidable-screenshot-crop` lint in `ui validate-layout` + the host-model resolution workflow that fills `real/` and emits `ASSET-MAP.json` provenance), and the failure modes (crop-includes-text · screenshot-as-hero · missing-DPR · provenance-loss). Read when rebuilding / cloning / design-from-URL off a probed source with a mirror + asset harvest — NOT for a from-scratch generative design. |
 | `ux-psychology.md` | UX laws (Hick's, Fitts', Miller's, …), Gestalt perception, cognitive biases, emotional design, trust building, cognitive-load management, ethical persuasion — with per-law application rules and a final audit checklist. Read selectively: only the law(s) a brief triggers. |
 | `benchmarks/*.dna.json` | SOURCE-grade measured DNA (type ramps, surfaces, shadows, gaps) of 8 ship-grade products — Arc, Figma, Framer, Linear, Notion, Raycast, Stripe, Vercel. Calibration data for the excellence-tier reference duel; see `benchmarks/README.md`. |
 | `figma-craft/workflow-experience.md` | The **interaction + cost brain** above the Figma verbs — the intent router (intent/drop → job → verb, incl. the multi-URL/image reference-drop row), the uniform job lifecycle (REFERENCE→SCOPE→PLAN→BUILD→SEE→ITERATE→LAND), reference intake (subagent-isolated DNA extract → cache in `<project>/references/` → deterministic synth), the "eyes" feedback contract, trust/clone-safety, progressive disclosure, and the zero-token-`ui`-binary cost contract. Read FIRST when routing a plain-language Figma job; every `/ui:*` Figma verb follows it. |
@@ -68,6 +69,11 @@ enforces.
 
 **Generate from a reference (image or existing design)** — `prompt-modes.md` to pick
 replicate / enhance / adapt, then the generate flow above
+
+**Rebuilding / cloning from a source** (design-from-URL, clone-adapt off a probed site) —
+`delivery-assets.md`: resolve every reproduced image to the original the source serves
+(inline-SVG → harvested raster → sprite slice → crop last resort), enforced by the
+`avoidable-screenshot-crop` lint
 
 **Make a color decision** — `color-science.md`
 

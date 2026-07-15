@@ -272,6 +272,74 @@ describe("lintLayout — root-overflow-x-hidden", () => {
   });
 });
 
+// ─── Delivery-asset discipline (P4) ───────────────────────────────────────────
+
+describe("lintLayout — avoidable-screenshot-crop", () => {
+  it("flags a crops/ img when a same-role real/ original is referenced", () => {
+    const html = [
+      "<!doctype html><html><body>",
+      '<img src="assets/crops/hero.png" width="800" height="600">',
+      '<img src="assets/real/hero.webp" width="1560" height="1248">',
+      "</body></html>",
+    ].join("\n");
+    const { findings } = lintLayout(html);
+    const f = findings.find((x) => x.checkId === "avoidable-screenshot-crop");
+    expect(f).toBeDefined();
+    expect(f?.severity).toBe("warning");
+    expect(f?.line).toBeDefined();
+  });
+
+  it("matches across dimension/extension differences (crops/hero-1560x1248.png ↔ real/hero.webp)", () => {
+    const html = [
+      "<!doctype html><html><body>",
+      '<img src="/assets/real/hero.webp" width="1560" height="1248">',
+      '<img src="/assets/crops/hero-1560x1248.png" width="800" height="600">',
+      "</body></html>",
+    ].join("");
+    const { findings } = lintLayout(html);
+    expect(findings.some((x) => x.checkId === "avoidable-screenshot-crop")).toBe(true);
+  });
+
+  it("does NOT flag a lone crops/ img with no real/ counterpart (precision-first)", () => {
+    const html = '<!doctype html><html><body><img src="assets/crops/hero.png" width="8" height="6"></body></html>';
+    const { findings } = lintLayout(html);
+    expect(findings.some((x) => x.checkId === "avoidable-screenshot-crop")).toBe(false);
+  });
+
+  it("does NOT flag when the crop's stem differs from every real/ stem", () => {
+    const html = [
+      "<!doctype html><html><body>",
+      '<img src="assets/real/logo.svg" width="120" height="40">',
+      '<img src="assets/crops/hero.png" width="800" height="600">',
+      "</body></html>",
+    ].join("");
+    const { findings } = lintLayout(html);
+    expect(findings.some((x) => x.checkId === "avoidable-screenshot-crop")).toBe(false);
+  });
+
+  it("does NOT flag two real/ images (no crop present)", () => {
+    const html = [
+      "<!doctype html><html><body>",
+      '<img src="assets/real/a.png" width="100" height="100">',
+      '<img src="assets/real/b.png" width="100" height="100">',
+      "</body></html>",
+    ].join("");
+    const { findings } = lintLayout(html);
+    expect(findings.some((x) => x.checkId === "avoidable-screenshot-crop")).toBe(false);
+  });
+
+  it("does NOT flag a commented-out crops/ img", () => {
+    const html = [
+      "<!doctype html><html><body>",
+      '<img src="assets/real/hero.webp" width="1560" height="1248">',
+      '<!-- <img src="assets/crops/hero.png"> -->',
+      "</body></html>",
+    ].join("");
+    const { findings } = lintLayout(html);
+    expect(findings.some((x) => x.checkId === "avoidable-screenshot-crop")).toBe(false);
+  });
+});
+
 // ─── Comment stripping ────────────────────────────────────────────────────────
 
 describe("lintLayout — HTML comments do not trigger findings", () => {
