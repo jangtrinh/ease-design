@@ -83,6 +83,13 @@ than one file might be open, set the `FIGMA_AGENT_FILE` env var to pin the targe
 rather than relying on recency. This is the single highest-recurrence mistake in Figma work
 across dogfood sessions — check the header every time, not just the first time.
 
+`figma-agent status` is a cheap instantaneous ping — a green result proves the connection
+was alive at that instant, nothing more. A long operation against the same plugin
+(`audit-ds` over a big file) can still hang and drop with `E_NO_PLUGIN: Figma plugin
+disconnected mid-request` — seen live when someone is actively navigating the file in Figma
+Desktop. Treat that error as transient connection flakiness: re-run when the file is idle.
+(Heartbeat's `figma-audit` task already retries and degrades to a skip on its own.)
+
 ## 5. Recall at job start (and reflect at the end)
 
 Priming a job with the project's own memory is optional but cheap, and today it is only

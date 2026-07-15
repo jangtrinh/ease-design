@@ -42,10 +42,10 @@ Subcommands:
 Naming (genealogy — studio × project × role):
   With a studio soul ($EASE_DESIGN_HOME/studio-soul.md, frontmatter name: JANG)
   and project 'vsf-pcp' (design/ds.manifest.json name):
-    designer   → jang-vsf-pcp            (the flagship carries the bare name)
-    curator    → jang-vsf-pcp-curator
-    figma-hand → jang-vsf-pcp-figma
-  Without a studio soul: vsf-pcp-designer / vsf-pcp-curator / vsf-pcp-figma
+    designer   → designer-jang-vsf-pcp
+    curator    → curator-jang-vsf-pcp
+    figma-hand → figma-jang-vsf-pcp
+  Without a studio soul: designer-vsf-pcp / curator-vsf-pcp / figma-vsf-pcp
   (and init hints at 'ui ds soul init --studio'). Names are sanitized to
   ^[a-z][a-z0-9-]*$, capped at 64 chars.
 

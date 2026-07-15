@@ -37,6 +37,16 @@ E4 and E6 both touch a Figma file or images and can run before or after E1–E3;
 legitimately enter at E4 (clean up a messy Figma library first), exit with a specimen page,
 then re-enter at E2 on the app repo — the store is the meeting point, not a single path.
 
+### Already onboarded? Run the verify pass, not an entry road
+
+- **Trigger:** `ui scan` verdict `ds-present` — the table above is entry-only; do NOT pick
+  an entry road for a project that already has a sealed store.
+- **The verify pass** is a checklist over the numbered sections below: §2 both doctors → §3
+  git → §5 `ui ds soul check` (and `--studio`) → §6 `ui agents check` + one
+  `design-os heartbeat` run → the staleness check in §4.
+- **Discipline:** flag findings as recommendations; re-init/`--force` fixes are the owner's
+  call, not the verifier's.
+
 Before running `design-os figma audit` (E4's optional cleanup pass) on a file you have not
 scanned this session, run `design-os figma scan` first — the audit reads the same live
 document, not a cached copy.
@@ -103,9 +113,17 @@ interchangeable:
 not touch any manifest. `ui ds import --name <slug>` is the one that seals
 `design/ds.manifest.json`'s `name` field — and if you omit it, the default is the **literal
 string `imported-ds`**. That string then becomes the identity `ui agents init` names every
-generated agent after (`imported-ds-designer` instead of `vsf-pcp-designer`). Always pass an
+generated agent after (`designer-imported-ds` instead of `designer-vsf-pcp`). Always pass an
 explicit, real `--name` on whichever command seals the manifest, before running
 `ui agents init`.
+
+**Stale-seal check:** nothing computes staleness for you. If the ingested Figma artifacts
+(`tokens.json`, `component-registry.json`, `DESIGN.md`) carry mtimes NEWER than the sealed
+store (`design.tokens.json` / `ds.manifest.json`), every `ds a11y`/`ds specimen`/
+`agents init` answer is coming from the older seal — check mtimes by hand. Remedy order
+matters: `ui ds import <tokens.json> --dir <project> --name <slug> --force` to reseal, THEN
+`ui agents init --force` (a reseal writes a fresh manifest, and agent identity is keyed off
+the manifest's `name` — regenerate agents after a reseal, never before).
 
 ## 5. Soul-layer selection — three files, one precedence chain
 
@@ -128,12 +146,15 @@ you edit — it never tells you *which* layer a given change belongs in:
 full chain and its rules are owned by `knowledge/design-soul.md` §1, not repeated here.
 
 **Sequencing in onboarding:** scaffold the studio soul first (`ui ds soul init --studio`,
-once ever) so agent identities are correct from the start, then `ui ds init`/import/ingest,
-then the project soul (`ui ds soul init`, or let `/ui:learn` draft it), then
-`ui ds soul check [--studio]` to lint structure (fails on `soul-missing-section` /
-`soul-empty-section` / `soul-placeholder-copy`; warns on `soul-draft-status` /
-`soul-scaffold-untouched` / `soul-too-long`). Both souls start as `status: draft` — fill
-**Never / Always / Voice**, then set `status: ratified` before treating either as final.
+once ever) so agent identities are correct from the start, then `ui ds init`/import/ingest.
+`ui ds init` already scaffolds `design/soul.md` (`status: draft`) as part of its own
+output — edit that file in place and do NOT re-run `ui ds soul init` after it (that hits
+`EXISTS`). `ui ds import` does NOT scaffold a soul — run `ui ds soul init` after it (or let
+`/ui:learn` draft it) to get one. Either way, finish with `ui ds soul check [--studio]` to
+lint structure (fails on `soul-missing-section` / `soul-empty-section` /
+`soul-placeholder-copy`; warns on `soul-draft-status` / `soul-scaffold-untouched` /
+`soul-too-long`). Both souls start as `status: draft` — fill **Never / Always / Voice**,
+then set `status: ratified` before treating either as final.
 
 ## 6. Agents roster + heartbeat setup
 

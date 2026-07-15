@@ -23,7 +23,9 @@ already changed tokens tells you nothing):
    ```
    Catches `dangling-ref` / `unreachable-screen` / `dead-end` / `missing-error-state` /
    `invalid-trigger` / `noop-self-loop` / `no-entry` (errors) before they invalidate a
-   later audit pass.
+   later audit pass. If flow lint fails and the ask is still "run the full pre-ship check,"
+   keep going — but the handoff summary must say downstream results are qualified by the
+   unresolved flow errors (the ordering rationale above is why).
 
 2. **Evidence** — record what backs any claim/copy in the delivery, before anything ships:
    ```bash
@@ -31,7 +33,11 @@ already changed tokens tells you nothing):
    ui evidence verify --dir design --json
    ```
    `verify` re-checks every quote finding against its stored source and fails on any
-   fabricated or broken one — run it, don't just add and assume.
+   fabricated or broken one — run it, don't just add and assume. The ledger lives wherever
+   `--dir` pointed when `ui evidence add` first ran — an empty ledger and a missing one are
+   indistinguishable in the envelope (`checked: 0`, no error). If `--dir design` returns 0
+   findings on a project that should have evidence, retry `--dir .` before concluding none
+   exists.
 
 3. **VR baseline — capture BEFORE making further changes**, so later diffs measure against
    a known-good state, not a moving target:
@@ -53,12 +59,21 @@ already changed tokens tells you nothing):
    ```bash
    a11y-audit <pages...> --tags wcag2a,wcag2aa --json
    ```
+   Exclude redirect stubs (one-line `<meta http-equiv="refresh">` pages) from the page list
+   first — the browser navigates mid-scan and the WHOLE batch aborts with a raw Playwright
+   error ("Execution context was destroyed"), not a labeled finding. Tier-1 (`ui a11y-lint`,
+   `ui validate-layout`) already exempts these stubs; the rendered tier currently does not.
 
 6. **Full audit** — the final deterministic sweep, composing the whole `ui` linter chain
    over the project:
    ```bash
    design-os audit <project-dir> --dir <project-dir> --json
    ```
+   When the deliverable is a subfolder of a larger repo, point the TARGET at that subfolder
+   and `--dir` at the project root (`design-os audit prototypes/<thing> --dir .`) — the
+   TARGET scopes which HTML files get linted, `--dir` only locates the DS/flow artifacts;
+   auditing `.` as the target drags unrelated HTML (skill panels, local runners) into the
+   handoff's numbers.
 
 ## 2. Delivery checklist — specimen → docs → preview → vr-matrix → changelog
 
@@ -79,6 +94,11 @@ ui changelog --dir <project> --format markdown       # 5. fold ds.manifest.json'
 hood — baselines and gate renders **must** be produced on the same machine/fonts (cross-
 machine antialiasing noise floods the diff); `--max-ratio` is the escape hatch for same-
 machine hinting jitter only, not a substitute for matching environments.
+
+Registries ingested from Figma (`ui ingest-figma-ds`) carry EMPTY `markup` on every record
+until markup is backfilled — `ds preview` and `vr-matrix` will "succeed" with
+`components: 0` and write nothing. Read the components count in the envelope: 0 means steps
+3–4 never meaningfully ran; it is not a pass.
 
 ## 3. Static vs. rendered a11y — know what static did not prove
 
@@ -106,7 +126,8 @@ repeated here. For the end-to-end PR flow (materialize base/head, diff, post the
 comment, fold the changelog, sync DS docs), follow `knowledge/design-review.md` directly —
 it is already a complete, agent-facing procedure; this journey only tells you *when* to
 reach for it (right after the ordered audit above is clean and the delivery checklist is
-done).
+done). A FIRST delivery has no prior DS state — there is no base-dir to diff; skip this
+section and say so in the handoff rather than inventing a base.
 
 ## Handback discipline
 
