@@ -8,9 +8,18 @@
 // capture the main's structure and rebuild it as a detached frame — exactly the
 // degradation P2 exists to remove. What the ref+overrides model cannot carry is
 // recorded in `figmaScanInnerOverrides` so the loss stays visible.
+//
+// P11 narrows that loss without touching the model: an inner child's overridden
+// FIELD is not structure, and writing it back onto the rebuilt twin detaches
+// nothing. So the walker now also captures those fields' VALUES (`innerOverrides`,
+// addressed by a main-relative childKey) for the subset it can read AND replay.
+// `figmaScanInnerOverrides` stays, and stays the TOTAL: the fields outside that
+// subset (characters, fontName, fills…) are still a real loss, and the two lists
+// disagreeing is exactly how the mirror reports how much of it is left.
 
 import type { FigmaExportNode, FigmaKeyedBinding } from '../../../shared/figma-payload-types';
 import { unbindableFields } from '../../../shared/figma-unbindable-fields';
+import { readInnerOverrideFields, readInnerOverrides } from './scan-node-inner-overrides';
 import type { ScannedNode } from './scan-node-types';
 import { aliasId, safe } from './scan-node-utils';
 import { bindingsToKeyedBindings, bindingsToTokenRefs } from './scan-token-refs';
@@ -40,23 +49,6 @@ export function readBindings(n: Record<string, unknown>): Record<string, string>
     }
   }
   return rec;
-}
-
-/**
- * Fields overridden on the instance's INNER children (deduped + sorted).
- * `InstanceNode.overrides` reports one entry per overridden node; entries for the
- * instance node ITSELF are excluded — those are node-level overrides the payload
- * models and the builder re-applies. What remains is the un-survivable class.
- */
-function readInnerOverrideFields(n: Record<string, unknown>, selfId: string): string[] {
-  const overrides = safe(() => n.overrides as Array<{ id?: string; overriddenFields?: string[] }>);
-  if (!Array.isArray(overrides)) return [];
-  const fields = new Set<string>();
-  for (const o of overrides) {
-    if (!o || o.id === selfId) continue;
-    for (const f of o.overriddenFields ?? []) fields.add(f);
-  }
-  return [...fields].sort();
 }
 
 /** A main component's identity, as the async pre-pass resolved it. */
@@ -99,6 +91,11 @@ export function readInstance(
   }
   const inner = readInnerOverrideFields(n, selfId);
   if (inner.length) out.figmaScanInnerOverrides = inner;
+  // The reversible SUBSET of the same fact, with values (P11). Both are emitted: the
+  // names list stays the honest total, `innerOverrides` is only what a rebuild can
+  // carry — when the two disagree, the difference IS the residual loss.
+  const withValues = readInnerOverrides(n, selfId);
+  if (withValues.length) out.innerOverrides = withValues;
 }
 
 /**

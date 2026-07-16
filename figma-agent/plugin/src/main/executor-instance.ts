@@ -11,6 +11,7 @@
 // path would have produced before P2, with a warning (visible loss, not silent).
 
 import type { FigmaExportNode } from '../../../shared/figma-payload-types';
+import { applyInnerOverrides } from './executor-instance-inner-overrides';
 import { exportFillToPaint, mapExportEffects, pushImportWarning } from './executor-styles';
 
 /** Builds the degrade-to-frame placeholder — injected to avoid an import cycle. */
@@ -123,5 +124,6 @@ export async function createInstanceNode(
 
   applyComponentProperties(instance, spec); // properties FIRST — a variant swap resets visuals
   applyNodeOverrides(instance, spec);
+  applyInnerOverrides(instance, spec); // …and the inner children LAST (spec-005 P11)
   return instance;
 }

@@ -38,6 +38,23 @@ export interface FigmaKeyedBinding {
   name?: string;
 }
 
+/**
+ * One of an instance's INNER children, and the overridden field VALUES it carries
+ * (spec-005 P11). `childKey` addresses the child relative to the MAIN component, so
+ * it names the same node in any instance of that main — see
+ * plugin/src/main/instance-inner-override-keys.ts for how it is derived (and for the
+ * id-shape premise it rests on).
+ * `fields` keys are Figma's raw `NodeChangeProperty` names (name, width, height,
+ * layoutGrow, textAutoResize, primaryAxisSizingMode, counterAxisSizingMode) — an
+ * inner override is replayed field-for-field, so it needs no slot mapping. Only
+ * fields the rebuild can actually write are here; the rest stay a recorded loss in
+ * `figmaScanInnerOverrides`.
+ */
+export interface FigmaInnerOverride {
+  childKey: string;
+  fields: Record<string, string | number>;
+}
+
 export interface FigmaExportNode {
   type: 'FRAME' | 'TEXT' | 'RECTANGLE' | 'IMAGE' | 'GROUP' | 'INSTANCE';
   name: string;
@@ -180,6 +197,13 @@ export interface FigmaExportNode {
   // the only kinds the Plugin API accepts; a bound VariableAlias value has no
   // reversible slot here and is skipped by the walker.
   componentProperties?: Record<string, string | boolean>;
+  // Per-child overrides INSIDE the instance, with their values (spec-005 P11) — the
+  // reversible half of what `figmaScanInnerOverrides` records. Ref + componentProperties
+  // rebuild the instance's composition; these carry back the ad-hoc edits made on its
+  // inner children (a stretched row, a renamed slot). Reapplied AFTER createInstance +
+  // setProperties, addressed by `childKey`, best-effort per field: a write Figma
+  // refuses warns and the loss stays visible in `figmaScanInnerOverrides`.
+  innerOverrides?: FigmaInnerOverride[];
 
   // Nesting
   children?: FigmaExportNode[];

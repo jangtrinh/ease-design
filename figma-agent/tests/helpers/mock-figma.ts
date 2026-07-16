@@ -35,12 +35,37 @@
 //      that key: nothing published it. So the only road home for a local key is the
 //      local list, matched by key — the spec-005 P8 gap. A mock whose import
 //      answered for any known key would hide exactly that.
+//  11. an instance's inner nodes carry the COMPOUND id `I<instanceId>;<idInTheMain>`,
+//      and `InstanceNode.overrides` reports every node whose field differs from its
+//      main twin — INCLUDING the ones resize() rewrote as a side-effect. Hand-written
+//      override arrays could never surface that, and it is the whole hazard of P11.
 // It does NOT emulate Figma's layout re-flow (a child's FILL coercing the parent's
-// sizing mode), nor `InstanceNode.overrides` bookkeeping (tests set it by hand).
-// Those are exactly the classes of loss the LIVE half (P5) must confirm.
+// sizing mode) — exactly the class of loss the LIVE half (P5) must confirm.
 
 let idSeq = 0;
 export const FIGMA_MIXED = Symbol('figma.mixed');
+
+/** instance node → the MAIN node it mirrors, for the `overrides` bookkeeping below. */
+const mainTwinOf = new WeakMap<FakeNode, FakeNode>();
+
+/**
+ * The fields `overrides` compares an instance's nodes against their main twins.
+ * A superset of what the P11 replay can write (name/width/height/layoutGrow/
+ * textAutoResize/*AxisSizingMode) plus the classes it deliberately cannot
+ * (characters, fontSize, fills) — so a test can tell "reapplied" from "still lost".
+ */
+const OVERRIDE_COMPARED_FIELDS = [
+  'name', 'width', 'height', 'layoutGrow', 'textAutoResize',
+  'primaryAxisSizingMode', 'counterAxisSizingMode',
+  'characters', 'fontSize', 'fills', 'opacity', 'visible',
+] as const;
+
+const readOrUndefined = (n: FakeNode, f: string): unknown => {
+  try {
+    const v = (n as unknown as Record<string, unknown>)[f];
+    return typeof v === 'symbol' ? undefined : v;
+  } catch { return undefined; }
+};
 
 type Corners = { tl: number; tr: number; br: number; bl: number };
 type Sides = { top: number; right: number; bottom: number; left: number };
@@ -164,7 +189,52 @@ export class FakeNode {
     const inst = this.cloneAs('INSTANCE');
     delete inst.key; // only a main component is publishable
     inst.mainComponent = { id: this.id, key: this.key as string | undefined, name: this.name };
+    // The COMPOUND inner id — `I<instanceId>;<idOfTheNodeInTheMAIN>` — and the
+    // main twin each inner node is measured against. Both are what makes an inner
+    // override addressable across two instances of one main (spec-005 P11).
+    const pair = (i: FakeNode, m: FakeNode): void => {
+      mainTwinOf.set(i, m);
+      i.children.forEach((child, idx) => {
+        const twin = m.children[idx];
+        if (!twin) return;
+        child.id = `I${inst.id};${twin.id}`;
+        pair(child, twin);
+      });
+    };
+    pair(inst, this);
     return inst;
+  }
+
+  // ── InstanceNode.overrides: DERIVED, not bookkept by hand ──
+  //
+  // The old mock stored nothing here and made every test hand-write the array — a
+  // permissive mock in the exact place spec-005 P11 lives, so it could only ever
+  // confirm the test's own assumption. Figma reports an override where an instance
+  // node's field DIFFERS from its main twin's, so the mock computes precisely that.
+  // It buys two behaviours no hand-written array can:
+  //   - resize()'s side-effects (sizing modes → FIXED, and on TEXT the coerced
+  //     textAutoResize) show up as REAL overrides the source never had;
+  //   - a field restored to the main's value stops being an override.
+  // DEVIATION, on purpose: Figma tracks some fields as "was set" rather than
+  // "differs"; for a value that genuinely differs the two agree, which is the whole
+  // domain here. `overrides =` still assigns a fixed list, for tests probing field
+  // classes this mock has no storage for.
+  private _overridesManual: { id: string; overriddenFields: string[] }[] | undefined;
+  set overrides(v: { id: string; overriddenFields: string[] }[]) { this._overridesManual = v; }
+  get overrides(): { id: string; overriddenFields: string[] }[] {
+    if (this._overridesManual) return this._overridesManual;
+    const main = mainTwinOf.get(this);
+    if (!main) return [];
+    const out: { id: string; overriddenFields: string[] }[] = [];
+    const visit = (i: FakeNode, m: FakeNode): void => {
+      const fields = OVERRIDE_COMPARED_FIELDS.filter(
+        (f) => JSON.stringify(readOrUndefined(i, f) ?? null) !== JSON.stringify(readOrUndefined(m, f) ?? null),
+      );
+      if (fields.length) out.push({ id: i.id, overriddenFields: [...fields] });
+      i.children.forEach((c, idx) => { const t = m.children[idx]; if (t) visit(c, t); });
+    };
+    visit(this, main);
+    return out;
   }
 
   /** InstanceNode.setProperties — throws on a property the main doesn't expose. */

@@ -808,6 +808,107 @@
     }
   }
 
+  // plugin/src/main/scan-node-utils.ts
+  function safe(read) {
+    try {
+      const v = read();
+      if (typeof v === "symbol") return void 0;
+      return v;
+    } catch {
+      return void 0;
+    }
+  }
+
+  // plugin/src/main/instance-inner-override-keys.ts
+  var INNER_OVERRIDE_FIELDS = [
+    "name",
+    "width",
+    "height",
+    "layoutGrow",
+    "textAutoResize",
+    "primaryAxisSizingMode",
+    "counterAxisSizingMode"
+  ];
+  var FIELD_SET = new Set(INNER_OVERRIDE_FIELDS);
+  function innerChildKey(instanceId, nodeId) {
+    const prefix = `I${instanceId};`;
+    return nodeId.startsWith(prefix) && nodeId.length > prefix.length ? nodeId.slice(prefix.length) : void 0;
+  }
+  function keyInnerChildren(instance, instanceId, maxNodes = 2e3) {
+    const map = /* @__PURE__ */ new Map();
+    const visit = (node) => {
+      if (map.size >= maxNodes) return;
+      const kids = safe(() => node.children);
+      if (!Array.isArray(kids)) return;
+      for (const kid of kids) {
+        const id = safe(() => kid.id);
+        if (typeof id === "string") {
+          const key = innerChildKey(instanceId, id);
+          if (key !== void 0) map.set(key, kid);
+        }
+        visit(kid);
+      }
+    };
+    visit(instance);
+    return map;
+  }
+
+  // plugin/src/main/executor-instance-inner-overrides.ts
+  var SIDE_EFFECT_FIELDS = ["primaryAxisSizingMode", "counterAxisSizingMode", "textAutoResize"];
+  function writeField(child, name, field, value) {
+    try {
+      child[field] = value;
+    } catch (err) {
+      pushImportWarning(`instance "${name}": inner override ${field} failed (${String(err)})`);
+    }
+  }
+  function applyChildFields(child, fields, name) {
+    const before = {};
+    for (const f of SIDE_EFFECT_FIELDS) before[f] = safe(() => child[f]);
+    if (typeof fields.name === "string") writeField(child, name, "name", fields.name);
+    const w = fields.width;
+    const h = fields.height;
+    if (typeof w === "number" || typeof h === "number") {
+      try {
+        const resize = child.resize;
+        const cw = typeof w === "number" ? w : child.width;
+        const ch = typeof h === "number" ? h : child.height;
+        if (typeof resize === "function") resize.call(child, cw, ch);
+      } catch (err) {
+        pushImportWarning(`instance "${name}": inner override resize failed (${String(err)})`);
+      }
+    }
+    for (const f of SIDE_EFFECT_FIELDS) {
+      const wanted = f in fields ? fields[f] : before[f];
+      if (wanted === void 0) continue;
+      try {
+        if (child[f] !== wanted) child[f] = wanted;
+      } catch {
+        if (f in fields) pushImportWarning(`instance "${name}": inner override ${f} failed`);
+      }
+    }
+    if (typeof fields.layoutGrow === "number") writeField(child, name, "layoutGrow", fields.layoutGrow);
+  }
+  function applyInnerOverrides(instance, spec) {
+    const overrides = spec.innerOverrides;
+    if (!overrides || !overrides.length) return;
+    const byKey = keyInnerChildren(instance, instance.id);
+    const missed = [];
+    for (const o of overrides) {
+      const child = byKey.get(o.childKey);
+      if (!child) {
+        missed.push(o.childKey);
+        continue;
+      }
+      applyChildFields(child, o.fields, spec.name);
+    }
+    if (missed.length) {
+      pushImportWarning(
+        `instance "${spec.name}": ${missed.length} inner override(s) had no matching child (${missed.join(", ")}) \u2014 those inner edits are lost`
+      );
+    }
+  }
+
   // plugin/src/main/executor-instance.ts
   async function resolveMainComponent(spec) {
     if (spec.componentKey) {
@@ -905,6 +1006,7 @@
     }
     applyComponentProperties(instance, spec);
     applyNodeOverrides(instance, spec);
+    applyInnerOverrides(instance, spec);
     return instance;
   }
 
