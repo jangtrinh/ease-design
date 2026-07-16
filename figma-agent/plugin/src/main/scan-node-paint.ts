@@ -3,6 +3,7 @@
 // executor-styles.mapExportEffects. Extracted from scan-node.ts (Art IX).
 
 import type { FigmaExportEffect, FigmaExportFill } from '../../../shared/figma-payload-types';
+import { safe } from './scan-node-utils';
 
 /** One Figma Paint → FigmaExportFill (SOLID alpha lives in paint.opacity → color.a). */
 export function paintToFill(p: Paint): FigmaExportFill | null {
@@ -41,7 +42,24 @@ export function effectToExport(e: Effect): FigmaExportEffect | null {
 }
 
 /** A node's fills/strokes array → payload fills; undefined when nothing modelled. */
-export const asFills = (v: unknown): FigmaExportFill[] | undefined => {
+const SIDE_WEIGHT_FIELDS = ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const;
+
+/**
+ * The four individual stroke weights, or undefined when the node has none.
+ *
+ * The inverse of executor-strokes.applyStrokes: `node.strokeWeight` answers
+ * figma.mixed exactly when these differ (a border-bottom-only divider), and a
+ * mixed read is the ONLY reason to come here — see the caller.
+ */
+export function readIndividualStrokeWeights(
+  n: Record<string, unknown>,
+): { top: number; right: number; bottom: number; left: number } | undefined {
+  const [top, right, bottom, left] = SIDE_WEIGHT_FIELDS.map((f) => safe(() => n[f] as number));
+  if ([top, right, bottom, left].some((w) => typeof w !== 'number')) return undefined;
+  return { top: top as number, right: right as number, bottom: bottom as number, left: left as number };
+}
+
+export const asFills =(v: unknown): FigmaExportFill[] | undefined => {
   if (!Array.isArray(v) || v.length === 0) return undefined;
   const out = (v as Paint[]).map(paintToFill).filter((f): f is FigmaExportFill => f !== null);
   return out.length ? out : undefined;

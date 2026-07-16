@@ -146,10 +146,25 @@ describe('fixed point — auto-layout FRAME with text children', () => {
     expect(title?.layoutSizingHorizontal).toBe('HUG');
   });
 
-  it('does NOT capture the ROOT frame own sizing (no auto-layout parent)', async () => {
+  // This test used to assert the ROOT's own sizing was UNCAPTURABLE ("no auto-layout
+  // parent"). That belief was wrong, and the live P5 gate on 25575:353653 billed us
+  // for it: HUG needs auto-layout on the node ITSELF — only FILL is parent-relative —
+  // so a standalone root hugs perfectly well. What actually broke it was resize()
+  // fixing both axes; the mock just didn't reproduce that, so the bug round-tripped
+  // green here and lost the root's HUG live.
+  it('captures the ROOT frame own sizing, projected from its axis sizing modes', async () => {
     const [s] = await roundTrips(card);
-    expect(s.layoutSizingHorizontal).toBeUndefined();
-    expect(s.layoutSizingVertical).toBeUndefined();
+    // VERTICAL layout → vertical IS the primary axis: AUTO ⟺ HUG, FIXED ⟺ FIXED.
+    expect(s.layoutSizingVertical).toBe('HUG');
+    expect(s.layoutSizingHorizontal).toBe('FIXED');
+  });
+
+  it('survives resize() forcing both axes FIXED — the spec has the last word', async () => {
+    const [s] = await roundTrips(card);
+    // The live P5 root diffs, in one assertion: an authored AUTO must not come back
+    // FIXED just because the builder resized the frame after laying it out.
+    expect(s.primaryAxisSizingMode).toBe('AUTO');
+    expect(s.counterAxisSizingMode).toBe('FIXED');
   });
 });
 
@@ -166,6 +181,57 @@ describe('fixed point — native GRID', () => {
     expect(spec1).toMatchObject({
       layoutMode: 'GRID', gridColumnCount: 3, gridRowCount: 2, gridColumnGap: 16, gridRowGap: 16,
     });
+  });
+});
+
+// The three live P5 losses on 25575:353653 that the old mock could not see, each
+// reduced to the smallest spec that reproduces it (Art: every phase budgets one run
+// on real data — this is that run, brought home).
+describe('fixed point — spec-005 P10 sizing + stroke losses (live 25575:353653)', () => {
+  it('keeps a NESTED frame AUTO on the counter axis (live diff 3)', async () => {
+    const shell: FigmaExportNode = {
+      type: 'FRAME', name: 'Shell', width: 400, height: 300, layoutMode: 'VERTICAL',
+      primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED',
+      children: [{
+        type: 'FRAME', name: 'Inner', width: 200, height: 100, layoutMode: 'VERTICAL',
+        // The live nested frame's exact shape, and the reason the loss was visible
+        // ONLY as a counterAxisSizingMode diff: the frame FILLs its parent's width, so
+        // layoutSizingHorizontal reads FILL on both sides and masks the axis mode
+        // underneath — where the AUTO→FIXED loss was hiding.
+        primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'AUTO',
+        layoutSizingHorizontal: 'FILL',
+      }],
+    };
+    const [spec1, spec2] = await roundTrips(shell);
+    expectFixedPoint(spec1, spec2);
+    expect(spec1.children?.[0]?.counterAxisSizingMode).toBe('AUTO');
+  });
+
+  it('round-trips INDIVIDUAL side stroke weights (live diff 4)', async () => {
+    // A border-bottom-only divider — strokeWeight reads figma.mixed, so the uniform
+    // field cannot carry it. Left unread, the rebuild invented a 1px box.
+    const divider: FigmaExportNode = {
+      type: 'FRAME', name: 'Divider', width: 300, height: 40, layoutMode: 'HORIZONTAL',
+      primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED',
+      strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 0.1 } }],
+      strokeWeights: { top: 0, right: 0, bottom: 1, left: 0 },
+      strokeAlign: 'INSIDE',
+    };
+    const [spec1, spec2] = await roundTrips(divider);
+    expectFixedPoint(spec1, spec2);
+    expect(spec1.strokeWeights).toEqual({ top: 0, right: 0, bottom: 1, left: 0 });
+    expect(spec1.strokeWeight).toBeUndefined(); // mixed — no uniform weight to claim
+  });
+
+  it('never invents a stroke on a node that has none', async () => {
+    const plain: FigmaExportNode = {
+      type: 'FRAME', name: 'Plain', width: 100, height: 100, layoutMode: 'VERTICAL',
+      primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED',
+    };
+    const [spec1] = await roundTrips(plain);
+    expect(spec1.strokes).toBeUndefined();
+    expect(spec1.strokeWeight).toBeUndefined();
+    expect(spec1.strokeWeights).toBeUndefined();
   });
 });
 

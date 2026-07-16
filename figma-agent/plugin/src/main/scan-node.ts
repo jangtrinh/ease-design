@@ -23,7 +23,7 @@ import type { FigmaExportEffect, FigmaExportNode, FigmaKeyedBinding } from '../.
 import type { ScannedNode } from './scan-node-types';
 import { readExtensions, readInstance, type MainComponentRef } from './scan-node-instance';
 import { readLayout, readSelfSizing } from './scan-node-layout';
-import { asFills, effectToExport } from './scan-node-paint';
+import { asFills, effectToExport, readIndividualStrokeWeights } from './scan-node-paint';
 import { readText } from './scan-node-text';
 import { r2, safe } from './scan-node-utils';
 
@@ -119,7 +119,15 @@ function readFrameVisuals(n: Record<string, unknown>, out: ScannedNode): void {
   const strokes = asFills(n.strokes);
   if (strokes) {
     out.strokes = strokes;
-    if (typeof n.strokeWeight === 'number') out.strokeWeight = n.strokeWeight;
+    // strokeWeight answers figma.mixed (a symbol — safe() drops it) exactly when the
+    // node carries INDIVIDUAL side weights. Reading only the uniform value is why
+    // the live P5 divider scanned with no weight at all, and rebuilt as a 1px box.
+    const w = safe(() => n.strokeWeight as number);
+    if (typeof w === 'number') out.strokeWeight = w;
+    else {
+      const sides = readIndividualStrokeWeights(n);
+      if (sides) out.strokeWeights = sides;
+    }
     if (n.strokeAlign) out.strokeAlign = n.strokeAlign as FigmaExportNode['strokeAlign'];
   }
 

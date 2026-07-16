@@ -8,7 +8,8 @@
 import type { FigmaExportNode } from '../../../shared/figma-payload-types';
 import { createTextNode } from './executor-text';
 import { createRectangleNode, createImageNode, createSvgNode, createImageNodeWithFetch, resolveImagePaint } from './executor-shapes';
-import { rgbToFigma, figmaColorToHex, exportFillToPaint, mapExportEffects, pushImportWarning, specNodeName } from './executor-styles';
+import { figmaColorToHex, exportFillToPaint, mapExportEffects, pushImportWarning, specNodeName } from './executor-styles';
+import { applyStrokes } from './executor-strokes';
 import { createInstanceNode } from './executor-instance';
 import { applyKeyedBindings } from './executor-keyed-vars';
 import { applyTokenRefs } from './executor-variables';
@@ -132,6 +133,34 @@ export function applyAutoLayout(frame: FrameNode, spec: Partial<FigmaExportNode>
   return applied;
 }
 
+/**
+ * Re-assert the spec's axis sizing modes — the LAST word on a built frame.
+ *
+ * Two things overwrite them on the way up, and both are unavoidable:
+ *   1. `resize()` on an auto-layout frame forces BOTH primaryAxisSizingMode and
+ *      counterAxisSizingMode to FIXED. Since createFrameNode resizes AFTER
+ *      applyAutoLayout, every AUTO frame in a payload rebuilt as FIXED.
+ *   2. appending a child that FILLs an axis its parent HUGs coerces the parent to
+ *      FIXED on that axis.
+ *
+ * This is what the live P5 gate saw on 25575:353653: the root's
+ * `primaryAxisSizingMode AUTO→FIXED`, the nested frame's `counterAxisSizingMode
+ * AUTO→FIXED` — and, as the same fact seen through the newer API, the root's
+ * `layoutSizingVertical HUG→FIXED`. HUG is legal on a standalone frame (it needs
+ * auto-layout on the node ITSELF, not on a parent — only FILL needs the parent), so
+ * that third diff is not a context artifact: restoring the mode restores the HUG.
+ */
+function reassertAxisSizing(frame: FrameNode, spec: Partial<FigmaExportNode>): void {
+  if (!spec.layoutMode || spec.layoutMode === 'NONE' || spec.layoutMode === 'GRID') return;
+  if (frame.layoutMode === 'NONE') return; // GRID fell back, or no auto-layout to speak of
+  if (spec.primaryAxisSizingMode) {
+    try { frame.primaryAxisSizingMode = spec.primaryAxisSizingMode; } catch { /* not auto-layout */ }
+  }
+  if (spec.counterAxisSizingMode) {
+    try { frame.counterAxisSizingMode = spec.counterAxisSizingMode; } catch { /* same */ }
+  }
+}
+
 /** Sizing hints for a child just appended to an auto-layout frame (port of code.ts:811-848). */
 function applyChildSizingHints(frame: FrameNode, childNode: SceneNode, childExport: FigmaExportNode): void {
   if (frame.layoutMode === 'NONE') return;
@@ -185,13 +214,13 @@ export async function createFrameNode(
     applyAutoLayout(frame, exportNode, true);
   }
 
-  // Dimensions
+  // Dimensions. resize() FIXES both axes on an auto-layout frame, so the spec's
+  // modes are restored right after — an AUTO axis re-derives its size from the
+  // children appended below, which is the point of AUTO.
   if (exportNode.width) {
     const h = exportNode.height || 100;
     frame.resize(exportNode.width, h);
-    if (exportNode.counterAxisSizingMode === 'FIXED') {
-      try { frame.layoutSizingHorizontal = 'FIXED'; } catch { /* no auto-layout context */ }
-    }
+    reassertAxisSizing(frame, exportNode);
   }
 
   // Fills — gradient (linear/radial/angular), solid (token style reuse),
@@ -245,16 +274,7 @@ export async function createFrameNode(
     try { frame.counterAxisAlignContent = exportNode.counterAxisAlignContent; } catch { /* not supported */ }
   }
 
-  // Strokes
-  if (exportNode.strokes && exportNode.strokes.length > 0) {
-    frame.strokes = exportNode.strokes.filter((s) => s.color).map((s) => ({
-      type: 'SOLID' as const,
-      color: rgbToFigma(s.color!),
-      opacity: s.color!.a,
-    }));
-    frame.strokeWeight = exportNode.strokeWeight || 1;
-    if (exportNode.strokeAlign) frame.strokeAlign = exportNode.strokeAlign;
-  }
+  applyStrokes(frame, exportNode);
 
   // Opacity — skip 0 values which are CSS animation artifacts (reveal animations)
   if (exportNode.opacity !== undefined && exportNode.opacity > 0) {
@@ -307,6 +327,11 @@ export async function createFrameNode(
       applyChildSizingHints(frame, childNode, childExport);
     }
   }
+
+  // Belt, mirroring the textAutoResize one above: a child set to FILL an axis its
+  // parent HUGs coerces the parent to FIXED, so the spec's modes get the last word
+  // once every child is in place.
+  reassertAxisSizing(frame, exportNode);
 
   return frame;
 }

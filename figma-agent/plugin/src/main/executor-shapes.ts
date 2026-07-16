@@ -5,6 +5,7 @@
 
 import type { FigmaExportNode } from '../../../shared/figma-payload-types';
 import { rgbToFigma, figmaColorToHex, mapExportEffects, pushImportWarning, specNodeName } from './executor-styles';
+import { applyStrokes } from './executor-strokes';
 import { applyTokenRefs } from './executor-variables';
 
 const PLACEHOLDER_FILL: SolidPaint = { type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 }, opacity: 1 };
@@ -52,15 +53,7 @@ export async function createRectangleNode(
     rect.effects = mapExportEffects(exportNode.effects);
   }
 
-  // Strokes
-  if (exportNode.strokes && exportNode.strokes.length > 0) {
-    rect.strokes = exportNode.strokes.filter((s) => s.color).map((s) => ({
-      type: 'SOLID' as const,
-      color: rgbToFigma(s.color!),
-      opacity: s.color!.a,
-    }));
-    rect.strokeWeight = exportNode.strokeWeight || 1;
-  }
+  applyStrokes(rect, exportNode);
 
   // Opacity — skip 0 values (CSS animation artifacts)
   if (exportNode.opacity !== undefined && exportNode.opacity > 0) {

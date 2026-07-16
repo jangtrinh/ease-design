@@ -645,6 +645,37 @@
     return textNode;
   }
 
+  // plugin/src/main/executor-strokes.ts
+  var SIDE_FIELDS = {
+    top: "strokeTopWeight",
+    right: "strokeRightWeight",
+    bottom: "strokeBottomWeight",
+    left: "strokeLeftWeight"
+  };
+  function applyStrokes(node, spec) {
+    if (!spec.strokes || spec.strokes.length === 0) return;
+    node.strokes = spec.strokes.filter((s) => s.color).map((s) => ({
+      type: "SOLID",
+      color: rgbToFigma(s.color),
+      opacity: s.color.a
+    }));
+    if (spec.strokeWeights) {
+      const target = node;
+      for (const [side, field] of Object.entries(SIDE_FIELDS)) {
+        const w = spec.strokeWeights[side];
+        try {
+          target[field] = w;
+        } catch {
+        }
+      }
+    } else if (spec.strokeWeight !== void 0) {
+      node.strokeWeight = spec.strokeWeight;
+    } else {
+      node.strokeWeight = 1;
+    }
+    if (spec.strokeAlign) node.strokeAlign = spec.strokeAlign;
+  }
+
   // plugin/src/main/executor-shapes.ts
   var PLACEHOLDER_FILL = { type: "SOLID", color: { r: 0.85, g: 0.85, b: 0.85 }, opacity: 1 };
   async function createRectangleNode(exportNode, colorStyles, tokenVars) {
@@ -678,14 +709,7 @@
     if (exportNode.effects) {
       rect.effects = mapExportEffects(exportNode.effects);
     }
-    if (exportNode.strokes && exportNode.strokes.length > 0) {
-      rect.strokes = exportNode.strokes.filter((s) => s.color).map((s) => ({
-        type: "SOLID",
-        color: rgbToFigma(s.color),
-        opacity: s.color.a
-      }));
-      rect.strokeWeight = exportNode.strokeWeight || 1;
-    }
+    applyStrokes(rect, exportNode);
     if (exportNode.opacity !== void 0 && exportNode.opacity > 0) {
       rect.opacity = exportNode.opacity;
     }
@@ -1128,6 +1152,22 @@
     }
     return applied;
   }
+  function reassertAxisSizing(frame, spec) {
+    if (!spec.layoutMode || spec.layoutMode === "NONE" || spec.layoutMode === "GRID") return;
+    if (frame.layoutMode === "NONE") return;
+    if (spec.primaryAxisSizingMode) {
+      try {
+        frame.primaryAxisSizingMode = spec.primaryAxisSizingMode;
+      } catch {
+      }
+    }
+    if (spec.counterAxisSizingMode) {
+      try {
+        frame.counterAxisSizingMode = spec.counterAxisSizingMode;
+      } catch {
+      }
+    }
+  }
   function applyChildSizingHints(frame, childNode, childExport) {
     if (frame.layoutMode === "NONE") return;
     const child = childNode;
@@ -1167,12 +1207,7 @@
     if (exportNode.width) {
       const h = exportNode.height || 100;
       frame.resize(exportNode.width, h);
-      if (exportNode.counterAxisSizingMode === "FIXED") {
-        try {
-          frame.layoutSizingHorizontal = "FIXED";
-        } catch {
-        }
-      }
+      reassertAxisSizing(frame, exportNode);
     }
     const hasBgImage = !!exportNode.backgroundImageUrl;
     if (exportNode.fills && exportNode.fills.length > 0 || hasBgImage) {
@@ -1221,15 +1256,7 @@
       } catch {
       }
     }
-    if (exportNode.strokes && exportNode.strokes.length > 0) {
-      frame.strokes = exportNode.strokes.filter((s) => s.color).map((s) => ({
-        type: "SOLID",
-        color: rgbToFigma(s.color),
-        opacity: s.color.a
-      }));
-      frame.strokeWeight = exportNode.strokeWeight || 1;
-      if (exportNode.strokeAlign) frame.strokeAlign = exportNode.strokeAlign;
-    }
+    applyStrokes(frame, exportNode);
     if (exportNode.opacity !== void 0 && exportNode.opacity > 0) {
       frame.opacity = exportNode.opacity;
     }
@@ -1264,6 +1291,7 @@
         applyChildSizingHints(frame, childNode, childExport);
       }
     }
+    reassertAxisSizing(frame, exportNode);
     return frame;
   }
 

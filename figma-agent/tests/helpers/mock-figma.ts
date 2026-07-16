@@ -43,6 +43,7 @@ let idSeq = 0;
 export const FIGMA_MIXED = Symbol('figma.mixed');
 
 type Corners = { tl: number; tr: number; br: number; bl: number };
+type Sides = { top: number; right: number; bottom: number; left: number };
 
 export class FakeNode {
   id = `S:${idSeq++}`;
@@ -53,6 +54,7 @@ export class FakeNode {
   children: FakeNode[] = [];
   boundVariables: Record<string, unknown> = {};
   private _corners: Corners = { tl: 0, tr: 0, br: 0, bl: 0 };
+  private _sides: Sides = { top: 1, right: 1, bottom: 1, left: 1 };
   private _lsh: string | undefined;
   private _lsv: string | undefined;
   private _name = 'Node';
@@ -86,9 +88,18 @@ export class FakeNode {
     return this._main;
   }
 
+  /** resize() FIXES both axes of an auto-layout frame — Figma's documented
+   * behaviour, and the one the permissive mock skipped. createFrameNode resizes
+   * AFTER applying auto-layout, so without this every AUTO frame round-tripped as
+   * AUTO here and rebuilt FIXED on the live canvas (P5 diffs on 25575:353653). */
   resize(w: number, h: number): void {
     this.width = w;
     this.height = h;
+    const m = this.layoutMode as string | undefined;
+    if (m && m !== 'NONE') {
+      this.primaryAxisSizingMode = 'FIXED';
+      this.counterAxisSizingMode = 'FIXED';
+    }
   }
 
   appendChild(child: FakeNode): void {
@@ -188,17 +199,75 @@ export class FakeNode {
   set bottomLeftRadius(v: number) { this._corners.bl = v; }
   get bottomLeftRadius(): number { return this._corners.bl; }
 
-  // ── layoutSizing: only settable inside an auto-layout parent (Figma throws otherwise) ──
-  set layoutSizingHorizontal(v: string) {
-    if (!this.inAutoLayout) throw new Error('layoutSizingHorizontal needs an auto-layout parent');
-    this._lsh = v;
+  // ── layoutSizing: the NEWER view of the same state as primary/counterAxisSizingMode ──
+  //
+  // The old mock stored these as free-standing strings and threw unless the node sat
+  // in an auto-layout PARENT. Both halves were wrong, and together they hid the P5
+  // root diff:
+  //   - HUG needs auto-layout on the node ITSELF, not on a parent. Only FILL is a
+  //     parent-relative concept. So a standalone auto-layout frame CAN hug — the
+  //     root's `layoutSizingVertical: HUG` was never a context artifact.
+  //   - On an auto-layout frame these are not storage: they are a projection of
+  //     primary/counterAxisSizingMode (HUG ⟺ AUTO), with the axis mapping decided by
+  //     layoutMode. Storing them separately let the mock report HUG while the real
+  //     sizing mode said FIXED — the exact split the live gate caught.
+  //
+  /** The sizing-mode field governing `axis`, or null when the node has no auto-layout. */
+  private axisField(axis: 'H' | 'V'): 'primaryAxisSizingMode' | 'counterAxisSizingMode' | null {
+    const m = this.layoutMode as string | undefined;
+    if (!m || m === 'NONE') return null;
+    const primary = m === 'VERTICAL' ? 'V' : 'H';
+    return axis === primary ? 'primaryAxisSizingMode' : 'counterAxisSizingMode';
   }
-  get layoutSizingHorizontal(): string | undefined { return this._lsh; }
-  set layoutSizingVertical(v: string) {
-    if (!this.inAutoLayout) throw new Error('layoutSizingVertical needs an auto-layout parent');
-    this._lsv = v;
+
+  private readSizing(axis: 'H' | 'V'): string | undefined {
+    const stored = axis === 'H' ? this._lsh : this._lsv;
+    if (stored === 'FILL') return 'FILL'; // parent-relative — not derivable from a mode
+    const field = this.axisField(axis);
+    if (!field) return stored;
+    return this[field] === 'AUTO' ? 'HUG' : 'FIXED';
   }
-  get layoutSizingVertical(): string | undefined { return this._lsv; }
+
+  private writeSizing(axis: 'H' | 'V', v: string): void {
+    const field = this.axisField(axis);
+    const name = axis === 'H' ? 'layoutSizingHorizontal' : 'layoutSizingVertical';
+    if (v === 'FILL') {
+      if (!this.inAutoLayout) throw new Error(`${name}: FILL needs an auto-layout parent`);
+    } else if (!field && !this.inAutoLayout) {
+      throw new Error(`${name}: needs auto-layout on the node or its parent`);
+    } else if (v === 'HUG' && !field && this.type !== 'TEXT') {
+      // HUG is legal on auto-layout frames AND on text nodes (which hug their glyphs);
+      // nothing else can hug.
+      throw new Error(`${name}: HUG needs auto-layout on the node itself, or a TEXT node`);
+    }
+    if (field && v !== 'FILL') this[field] = v === 'HUG' ? 'AUTO' : 'FIXED';
+    if (axis === 'H') this._lsh = v; else this._lsv = v;
+  }
+
+  set layoutSizingHorizontal(v: string) { this.writeSizing('H', v); }
+  get layoutSizingHorizontal(): string | undefined { return this.readSizing('H'); }
+  set layoutSizingVertical(v: string) { this.writeSizing('V', v); }
+  get layoutSizingVertical(): string | undefined { return this.readSizing('V'); }
+
+  // ── strokeWeight: figma.mixed when the four sides differ (IndividualStrokesMixin) ──
+  set strokeWeight(v: number) {
+    // Assigning the uniform weight RESETS every side — the reason applyStrokes must
+    // write per-side weights INSTEAD of, never after, this.
+    this._sides = { top: v, right: v, bottom: v, left: v };
+  }
+  get strokeWeight(): number | symbol {
+    const { top, right, bottom, left } = this._sides;
+    return top === right && right === bottom && bottom === left
+      ? top : (FIGMA_MIXED as unknown as symbol);
+  }
+  set strokeTopWeight(v: number) { this._sides.top = v; }
+  get strokeTopWeight(): number { return this._sides.top; }
+  set strokeRightWeight(v: number) { this._sides.right = v; }
+  get strokeRightWeight(): number { return this._sides.right; }
+  set strokeBottomWeight(v: number) { this._sides.bottom = v; }
+  get strokeBottomWeight(): number { return this._sides.bottom; }
+  set strokeLeftWeight(v: number) { this._sides.left = v; }
+  get strokeLeftWeight(): number { return this._sides.left; }
 }
 
 /** Clone a paint and stamp a variable alias onto its color (Figma's paint-copy binding). */

@@ -88,6 +88,11 @@ export interface FigmaExportNode {
   // Stroke
   strokes?: FigmaExportFill[];
   strokeWeight?: number;
+  // Per-side weights, the ONLY truth for a node with individual strokes (a
+  // border-bottom-only divider, say). Figma's `strokeWeight` getter answers
+  // figma.mixed there, so `strokeWeight` above cannot carry it. Set, this wins:
+  // assigning the uniform weight resets the four sides.
+  strokeWeights?: { top: number; right: number; bottom: number; left: number };
   strokeAlign?: 'INSIDE' | 'OUTSIDE' | 'CENTER';
 
   // Text
