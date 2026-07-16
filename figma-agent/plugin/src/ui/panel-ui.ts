@@ -16,7 +16,7 @@ import {
   type PanelMode,
 } from './panel-model';
 import {
-  activityLabel, activityMeta,
+  activityLabel, activityMeta, formatTimestamp,
   toActivityRecord, toActivityResult, pushActivity, resolveActivity,
   type ActivityRecord,
 } from './activity-feed';
@@ -87,29 +87,40 @@ const ACTIVITY_ROWS = 20;
 /**
  * One feed row — the LABEL is the hero, the timing is footnote:
  *   ● Mirror-verify · rebuild
- *     → Hero card · 2 warnings · 1.2s · 5s ago
+ *     → Hero card · 2 warnings · 1.2s · 16s
  * The priority is deliberate. The old row laid time/label/duration out on ONE flex
  * line, so on a ~300px panel the two fixed-width footnotes ate the width and the
  * label — the only part that says WHAT is happening — ellipsised down to "R".
+ *
+ * `stale` dims every row but the newest (recency, at zero vertical cost). The mark's
+ * SHAPE carries the state (filled / hollow / ✗) because colour alone is not a channel
+ * every eye has, and its aria-label carries it again because neither is a channel a
+ * screen reader has.
  */
-function activityRow(r: ActivityRecord, now: number): HTMLElement {
+function activityRow(r: ActivityRecord, now: number, stale: boolean): HTMLElement {
   const li = document.createElement('li');
-  li.className = 'activity-row';
+  li.className = stale ? 'activity-row is-stale' : 'activity-row';
 
   const dot = document.createElement('span');
   dot.className = 'log-dot';
   dot.dataset.ok = String(r.ok);
   dot.dataset.pending = String(r.pending);
+  const state = r.pending ? 'running' : (r.ok ? 'ok' : 'failed');
+  dot.setAttribute('aria-label', state);
+  // A failure IS the ✗ (CSS drops the square for it); the other two are the square.
+  dot.textContent = state === 'failed' ? '✗' : '';
 
   const label = document.createElement('div');
   label.className = 'log-label';
   label.textContent = activityLabel(r);
+  label.title = activityLabel(r); // the row ellipsises — hover still tells the truth
 
-  // One muted line: outcome (if any) + duration (or "running…") + relative age.
+  // One muted line: outcome (if any) + duration (or "running…") + compact age.
   const m = document.createElement('div');
   m.className = 'log-meta';
   m.dataset.ok = String(r.ok);
   m.textContent = activityMeta(r, now);
+  m.title = formatTimestamp(r.at); // the compact age never says WHEN; this does
 
   const body = document.createElement('div');
   body.className = 'log-body';
@@ -121,7 +132,9 @@ function activityRow(r: ActivityRecord, now: number): HTMLElement {
 
 function renderActivity(now: number): void {
   if (activity.length === 0) return; // leave the static "No activity yet" empty-state row
-  activityList.replaceChildren(...activity.slice(0, ACTIVITY_ROWS).map((r) => activityRow(r, now)));
+  activityList.replaceChildren(
+    ...activity.slice(0, ACTIVITY_ROWS).map((r, i) => activityRow(r, now, i > 0)),
+  );
 }
 
 function render(): void {

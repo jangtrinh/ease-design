@@ -5,7 +5,7 @@
 // human watching the plugin work, so a wrong one is a lie, not a cosmetic bug.
 import { describe, it, expect } from 'vitest';
 import {
-  activityLabel, activityMeta, humanizeTool, formatClock, formatDuration, timeAgo,
+  activityLabel, activityMeta, humanizeTool, formatClock, formatTimestamp, formatDuration, timeAgo,
   toActivityRecord, toActivityResult, pushActivity, resolveActivity,
   type ActivityRecord,
 } from '../plugin/src/ui/activity-feed.ts';
@@ -34,7 +34,7 @@ describe('activityLabel — the CLI names the intent, the cmd is only the fallba
   });
 });
 
-describe('formatClock / formatDuration / timeAgo', () => {
+describe('formatClock / formatTimestamp / formatDuration / timeAgo', () => {
   it('formatClock is a zero-padded local HH:MM:SS', () => {
     const at = new Date(2026, 6, 16, 9, 5, 3).getTime();
     expect(formatClock(at)).toBe('09:05:03');
@@ -42,34 +42,53 @@ describe('formatClock / formatDuration / timeAgo', () => {
   it('formatClock refuses to invent a time from a broken stamp', () => {
     expect(formatClock(Number.NaN)).toBe('--:--:--');
   });
-  it('formatDuration is ms under a second, then 1-decimal seconds', () => {
+  it('formatTimestamp is the absolute date+time the compact age cannot say', () => {
+    expect(formatTimestamp(new Date(2026, 6, 16, 14, 32, 7).getTime())).toBe('2026-07-16 14:32:07');
+  });
+  it('formatTimestamp refuses to invent a stamp from a broken one', () => {
+    expect(formatTimestamp(Number.NaN)).toBe('—');
+  });
+  it('formatDuration is ms under a second, then 1-decimal seconds, then m+s', () => {
     expect(formatDuration(12)).toBe('12ms');
     expect(formatDuration(1_250)).toBe('1.3s');
     expect(formatDuration(-1)).toBe('—');
   });
-  it('timeAgo is relative to now', () => {
+  it('formatDuration breaks to minutes past 60s — "124.0s" is a number, not a duration', () => {
+    expect(formatDuration(60_000)).toBe('1m 0s');
+    expect(formatDuration(124_000)).toBe('2m 4s');
+    expect(formatDuration(59_900)).toBe('59.9s'); // still under the minute
+  });
+  it('timeAgo is relative to now and COMPACT — the column already means "ago"', () => {
     const now = 1_000_000;
-    expect(timeAgo(now, now)).toBe('just now');
-    expect(timeAgo(now, now - 5_000)).toBe('5s ago');
-    expect(timeAgo(now, now - 180_000)).toBe('3m ago');
-    expect(timeAgo(now, now - 7_200_000)).toBe('2h ago');
+    expect(timeAgo(now, now)).toBe('now');
+    expect(timeAgo(now, now - 5_000)).toBe('5s');
+    expect(timeAgo(now, now - 180_000)).toBe('3m');
+    expect(timeAgo(now, now - 7_200_000)).toBe('2h');
+  });
+  it('timeAgo never spends width on the word "ago" — it is the first thing truncation eats', () => {
+    expect(timeAgo(1_000_000, 940_000)).not.toContain('ago');
   });
 });
 
 describe('activityMeta — the row FOOTNOTE: outcome + timing on one line, never the label', () => {
   it('folds outcome, duration and age into one sentence', () => {
     const r = rec({ at: 1_000, ms: 173, pending: false, result: '→ 42 nodes' });
-    expect(activityMeta(r, 121_000)).toBe('→ 42 nodes · 173ms · 2m ago');
+    expect(activityMeta(r, 121_000)).toBe('→ 42 nodes · 173ms · 2m');
   });
   it('an in-flight row has no duration to report — it says so instead of "0ms"', () => {
-    expect(activityMeta(rec({ at: 1_000 }), 1_000)).toBe('running… · just now');
+    expect(activityMeta(rec({ at: 1_000 }), 1_000)).toBe('running… · now');
   });
   it('a failure reads its own error, not a generic "failed"', () => {
     const r = rec({ at: 1_000, ms: 8, pending: false, ok: false, result: '✗ node not found' });
-    expect(activityMeta(r, 4_000)).toBe('✗ node not found · 8ms · 3s ago');
+    expect(activityMeta(r, 4_000)).toBe('✗ node not found · 8ms · 3s');
   });
   it('a command with nothing countable to report still times itself', () => {
-    expect(activityMeta(rec({ at: 1_000, ms: 40, pending: false }), 6_000)).toBe('40ms · 5s ago');
+    expect(activityMeta(rec({ at: 1_000, ms: 40, pending: false }), 6_000)).toBe('40ms · 5s');
+  });
+  it('orders the parts outcome-FIRST so the age, not the outcome, is what truncation eats', () => {
+    const r = rec({ at: 1_000, ms: 173, pending: false, result: '→ 42 nodes' });
+    const parts = activityMeta(r, 121_000).split(' · ');
+    expect(parts).toEqual(['→ 42 nodes', '173ms', '2m']);
   });
   it('carries NO wall-clock stamp — the age already answers "when", and the stamp is what crowded out the label', () => {
     const meta = activityMeta(rec({ at: new Date(2026, 6, 16, 9, 5, 3).getTime(), ms: 5, pending: false }), Date.now());
