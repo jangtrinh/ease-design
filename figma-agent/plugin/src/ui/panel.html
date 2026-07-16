@@ -216,11 +216,21 @@
 /* Panel override (spec P5 §Tokens): the plugin iframe cannot fetch a webfont, so
    the display/body families keep Inter first but fall back to the host system
    stack — self-contained, no network. A mono family var carries the brand's
-   JetBrains-Mono data/label voice (falls back to the system monospace). */
+   JetBrains-Mono data/label voice (falls back to the system monospace).
+
+   The two sub-xs sizes and the hair space are PANEL-ONLY, and live here rather
+   than in the compiled block above on purpose: the brand scale bottoms out at
+   --font-size-xs (14px) because it is authored for page surfaces, whereas this
+   is a 300px-wide dense DATA LOG — the one place the chrome shows a scannable
+   history rather than prose. Regenerating the brand tokens must not clobber them.
+   11px is the floor: below it the mono digits stop being legible at 1× zoom. */
 :root {
   --font-family-body: Inter, -apple-system, system-ui, sans-serif;
   --font-family-display: Inter, -apple-system, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --font-size-2xs: 12px; /* feed label — the dense-feed primary */
+  --font-size-3xs: 11px; /* feed meta — the floor */
+  --space-hair: 4px;     /* the sub-space-1 gap a mini row needs */
 }
 
 /* ── Panel chrome — Swiss Monolith brutalism, COMPACT-FIRST (P5.1) ─────────────
@@ -431,38 +441,62 @@ code {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  max-height: 180px;
+  gap: var(--space-hair);
+  max-height: 168px; /* ~7 mini rows — the band scrolls past that */
   overflow-y: auto;
 }
 /* A row is [dot][body], where body stacks the LABEL over the meta line. Nothing
    shares the label's line: on a ~300px panel a side-by-side stamp and duration
-   squeezed it to a single ellipsised letter, which is what this band is FOR. */
+   squeezed it to a single ellipsised letter, which is what this band is FOR.
+   Mini sizing (~31px/row, was ~44px): a log is READ BY SCANNING, so more history
+   on screen beats a larger typeface — the density IS the legibility here. */
 .activity-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-1);
+  gap: var(--space-hair);
   font-family: var(--font-mono);
 }
+/* Every row but the newest is dimmed. Recency needs a channel, and dimming the
+   past costs no vertical space — which is the whole currency of this band. */
+.activity-row.is-stale { opacity: 0.6; }
+/* Status reads by SHAPE first, colour second (a hue-only signal is invisible to a
+   colour-blind eye): ok = filled square, running = hollow, failed = an ink ✗. */
 .log-dot {
   width: 6px;
   height: 6px;
-  margin-top: 5px; /* optically centred on the label line, not the whole row */
+  margin-top: 4px; /* optically centred on the smaller label line, not the row */
   flex: 0 0 auto;
   background: var(--color-success);
 }
-.log-dot[data-ok="false"] { background: var(--color-danger); }
-/* In-flight beats the ok/fail colour — nothing has been decided yet. */
-.log-dot[data-pending="true"] { background: var(--color-warning); }
+/* In-flight beats the ok/fail colour — nothing has been decided yet. It also goes
+   HOLLOW and breathes, so "still running" is legible without reading the meta. */
+.log-dot[data-pending="true"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--color-warning);
+  animation: fga-breathe 1s ease-in-out infinite;
+}
+/* A failure swaps the mark entirely — same glyph the meta line already uses. The
+   box stays pinned at 6px (the ✗ is a hair wider and simply overhangs into the gap)
+   so every row's label starts on the SAME left edge: in a column read by scanning,
+   that edge is the anchor, and a per-row glyph width would ripple it. */
+.log-dot[data-ok="false"][data-pending="false"] {
+  height: auto;
+  margin-top: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-3xs);
+  line-height: 1.35;
+  color: var(--color-danger);
+}
 .log-body {
   flex: 1 1 auto;
   min-width: 0; /* lets the ellipsis in .log-label / .log-meta actually engage */
 }
 /* The hero line — what the plugin is doing, on what. Owns the full row width. */
 .log-label {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-medium);
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--color-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -470,8 +504,8 @@ code {
 }
 /* The footnote — outcome + duration + age, one muted line under the label. */
 .log-meta {
-  font-size: var(--font-size-xs);
-  line-height: 1.4;
+  font-size: var(--font-size-3xs);
+  line-height: 1.35;
   color: var(--color-muted-foreground);
   font-variant-numeric: tabular-nums;
   overflow: hidden;
@@ -554,8 +588,17 @@ code {
   0%   { opacity: 0.5; transform: scale(1); }
   100% { opacity: 0;   transform: scale(2.4); }
 }
+/* The in-flight feed mark breathes. This is a STATUS channel, not decoration — it
+   is the only thing distinguishing "running" from "finished" at a glance — so it
+   animates opacity alone (never a layout prop) and stops under reduced-motion,
+   where the hollow shape still carries the state on its own. */
+@keyframes fga-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
 @media (prefers-reduced-motion: reduce) {
   .status-dot.is-pulsing::after { animation: none; }
+  .log-dot[data-pending="true"] { animation: none; }
   .footer-cell { transition: none; }
 }
 </style>

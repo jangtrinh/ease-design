@@ -49,29 +49,52 @@ export function formatClock(at: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/** A completed request's duration: "12ms" under a second, else "1.2s". */
+/** Absolute stamp for a row's `title`: "2026-07-16 14:32:07" (local). The compact age
+ *  ("2m") is unreadable to a screen reader — "1m" gets announced as "1 meter" — and
+ *  answers "how long ago", never "when". This is the hover/AT answer to "when". */
+export function formatTimestamp(at: number): string {
+  if (!Number.isFinite(at)) return '—';
+  const d = new Date(at);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${formatClock(at)}`;
+}
+
+/** A completed request's duration: "12ms" under a second, "1.2s" under a minute, else "2m 4s". */
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return '—';
   if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}m ${total % 60}s`;
 }
 
-/** Relative time for the activity log: "just now", "5s ago", "3m ago", "2h ago". */
+/**
+ * Relative age for the activity log, COMPACT: "now", "5s", "3m", "2h" — no "ago".
+ * The column already means "ago", so the word is 4 characters of pure repetition on
+ * the row whose whole problem is width; it is the last thing on the meta line, so it
+ * is also the first thing truncation eats. The absolute time survives in the `title`
+ * (formatTimestamp) for anyone who needs to actually read it.
+ */
 export function timeAgo(nowMs: number, atMs: number): string {
   const s = Math.floor((nowMs - atMs) / 1000);
-  if (s < 1) return 'just now';
-  if (s < 60) return `${s}s ago`;
+  if (s < 1) return 'now';
+  if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  return `${Math.floor(m / 60)}h ago`;
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h`;
 }
 
 /**
  * The row's SECOND line — outcome and timing folded into ONE muted sentence:
- *   "→ 42 nodes · 173ms · 2m ago" | "running… · just now" | "✗ node not found · 8ms · 3s ago"
+ *   "→ 42 nodes · 173ms · 2m" | "running… · now" | "✗ node not found · 8ms · 3s"
  * Deliberately carries no wall-clock stamp: the relative age already answers "when",
  * and the absolute time is what used to crowd the label — the only line that says WHAT
- * the plugin is doing — off the row entirely on a narrow panel.
+ * the plugin is doing — off the row entirely on a narrow panel. It survives in the
+ * row's `title` instead (panel-ui.ts).
+ *
+ * Part ORDER is outcome-first on purpose: the parts are ellipsised from the right, so
+ * the least-durable fact (the age, which the 1s heartbeat re-renders anyway) is the
+ * one truncation eats, and the outcome — the reason to read the row — never is.
  */
 export function activityMeta(rec: ActivityRecord, now: number): string {
   const parts: string[] = [];
