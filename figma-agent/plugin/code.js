@@ -372,7 +372,10 @@
     const bind = (field, tokenName) => {
       if (!tokenName) return;
       const variable = tokenVars.get(tokenName);
-      if (!variable) return;
+      if (!variable) {
+        pushImportWarning(`token bind ${field}\u2192${tokenName} skipped on "${node.name}": no variable named "${tokenName}" in this file (library/remote token?) \u2014 literal value kept`);
+        return;
+      }
       try {
         bindVariableToField(node, field, variable);
       } catch (err) {

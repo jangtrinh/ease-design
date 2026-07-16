@@ -119,6 +119,10 @@ export function bindVariableToField(node: SceneNode, field: string, variable: Va
  * fill/textColor → 'fills', stroke → 'strokes', radius → 'cornerRadius',
  * gap → 'itemSpacing', padding → all four padding fields. Failures warn and
  * skip — a missed binding must never abort the import.
+ *
+ * A tokenRef naming a variable this file has no local Variable for (a library /
+ * remote token, spec-005 P1's known edge) warns and leaves the literal value in
+ * place — never a crash, never a silent drop.
  */
 export function applyTokenRefs(
   node: SceneNode,
@@ -128,7 +132,10 @@ export function applyTokenRefs(
   const bind = (field: string, tokenName: string | undefined) => {
     if (!tokenName) return;
     const variable = tokenVars.get(tokenName);
-    if (!variable) return;
+    if (!variable) {
+      pushImportWarning(`token bind ${field}→${tokenName} skipped on "${node.name}": no variable named "${tokenName}" in this file (library/remote token?) — literal value kept`);
+      return;
+    }
     try {
       bindVariableToField(node, field, variable);
     } catch (err) {

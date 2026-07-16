@@ -88,6 +88,13 @@ function setBoundVariableForPaint(paint: Record<string, unknown>, _field: 'color
   return { ...paint, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: variable.id } } };
 }
 
+/** The file's LOCAL variables, as getLocalVariablesAsync reports them. A binding
+ * to an id absent from this list = the library/remote-variable edge. */
+let localVariables: Array<{ id: string; name: string }> = [];
+export function setMockLocalVariables(vars: Array<{ id: string; name: string }>): void {
+  localVariables = vars;
+}
+
 export interface MockFigma {
   mixed: symbol;
   createFrame(): FakeNode;
@@ -97,6 +104,7 @@ export interface MockFigma {
   listAvailableFontsAsync(): Promise<Array<{ fontName: FontName }>>;
   variables: {
     setBoundVariableForPaint: typeof setBoundVariableForPaint;
+    getLocalVariablesAsync(): Promise<Array<{ id: string; name: string }>>;
   };
 }
 
@@ -114,7 +122,10 @@ export function installMockFigma(): MockFigma {
     createRectangle: () => mk('RECTANGLE'),
     loadFontAsync: async () => { /* every font "exists" */ },
     listAvailableFontsAsync: async () => [],
-    variables: { setBoundVariableForPaint },
+    variables: {
+      setBoundVariableForPaint,
+      getLocalVariablesAsync: async () => localVariables,
+    },
   };
   (globalThis as unknown as { figma: MockFigma }).figma = figma;
   return figma;

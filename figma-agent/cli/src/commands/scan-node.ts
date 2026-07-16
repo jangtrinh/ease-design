@@ -51,10 +51,13 @@ export async function run(args: CommandArgs): Promise<unknown> {
   if (!nodeId) throw new CliError('E_INVALID_ARGS', 'scan-node requires a <nodeId>');
 
   const walker = await bundleWalker();
+  // The id→name token map is read ONCE (async) and handed to the sync walker, so
+  // variable bindings come back as reversible tokenRefs (spec-005 P1).
   const code = `${walker}
 const node = figma.getNodeById(${JSON.stringify(nodeId)});
 if (!node) throw new Error('node not found: ' + ${JSON.stringify(nodeId)});
-return __scan.nodeToSpec(node);`;
+const tokenNames = await __scan.readTokenNameMap();
+return __scan.nodeToSpec(node, tokenNames);`;
 
   const requested = args.num('timeout') ?? COMMAND_TIMEOUTS.EXEC_JS ?? 30_000;
   const timeoutMs = Math.min(requested, EXEC_JS_MAX_TIMEOUT_MS);

@@ -11,15 +11,22 @@
 // RESULT SUMMARY (asserted below):
 //   SURVIVE (fixed point): auto-layout topology (mode/spacing/padding/sizing/align),
 //     GRID counts+gaps, fills+alpha, corner radius (uniform & per-corner), strokes,
-//     child self-sizing (HUG/FILL/FIXED), text chars/size/family/weight/colour/align.
+//     child self-sizing (HUG/FILL/FIXED), text chars/size/family/weight/colour/align,
+//     and — since spec-005 P1 — variable bindings, via the token NAME: the walker
+//     joins each bound variable id against the file's id→name map and re-emits
+//     tokenRefs, which the build path rebinds by name (fill/textColor/stroke/radius/
+//     gap/uniform padding).
 //   DO NOT SURVIVE (documented gaps):
-//     - variable bindings: recovered as a variable *id*, never as the token *name*
-//       tokenRefs needs → tokenRefs is dropped, so a rebuild loses the binding.
+//     - library / remote variable bindings: the id is not in the file's LOCAL
+//       variables, so no token name is recoverable → the binding is reported as a raw
+//       id in figmaScanBindings (visible, not silent) and a rebuild drops it.
+//     - per-side (non-uniform) padding bindings: tokenRefs models uniform padding
+//       only → no slot to carry them back.
 //     - instance / component references: FigmaExportNode has no instance type and
 //       createFigmaNode has no instance build-case → an INSTANCE degrades to a plain
-//       FRAME and its inner composition is not recursed.
+//       FRAME and its inner composition is not recursed. (spec-005 P2)
 import { describe, it, expect, beforeAll } from 'vitest';
-import { installMockFigma, FakeNode } from './helpers/mock-figma.ts';
+import { installMockFigma, setMockLocalVariables, FakeNode } from './helpers/mock-figma.ts';
 import type { FigmaExportNode } from '../shared/figma-payload-types.ts';
 import type { ScannedNode } from '../plugin/src/main/scan-node.ts';
 
@@ -29,21 +36,29 @@ beforeAll(() => { installMockFigma(); });
 // Imported lazily inside tests would also work; static import is safe because the
 // executor modules only touch `figma` inside function bodies.
 const { createFigmaNode } = await import('../plugin/src/main/executor-frame.ts');
-const { nodeToSpec } = await import('../plugin/src/main/scan-node.ts');
+const { nodeToSpec, readTokenNameMap } = await import('../plugin/src/main/scan-node.ts');
 
 type Vars = Map<string, { id: string; name: string }>;
 
-async function build(spec: FigmaExportNode, vars?: Vars): Promise<ScannedNode> {
+/** The file's id→name token map, as readTokenNameMap would produce it live. */
+const namesOf = (vars?: Vars): Map<string, string> =>
+  new Map([...(vars?.values() ?? [])].map((v) => [v.id, v.name]));
+
+async function build(spec: FigmaExportNode, vars?: Vars, tokenNames = namesOf(vars)): Promise<ScannedNode> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const node = await createFigmaNode(spec as any, new Map(), vars as any);
   if (!node) throw new Error('builder returned null');
-  return nodeToSpec(node);
+  return nodeToSpec(node, tokenNames);
 }
 
-/** One round of forward+reverse; returns [spec1, spec2] to check the fixed point. */
+/**
+ * One round of forward+reverse; returns [spec1, spec2] to check the fixed point.
+ * Both passes see the SAME token collection — a rebuild happens in a file whose
+ * variables exist, so withholding them would test a different question.
+ */
 async function roundTrips(spec0: FigmaExportNode, vars?: Vars): Promise<[ScannedNode, ScannedNode]> {
   const spec1 = await build(spec0, vars);
-  const spec2 = await build(spec1); // second pass, no vars — bindings cannot rebuild
+  const spec2 = await build(spec1, vars);
   return [spec1, spec2];
 }
 
@@ -131,30 +146,105 @@ describe('fixed point — per-corner radius (figma.mixed path)', () => {
   });
 });
 
-describe('reversibility GAP — variable bindings do not survive', () => {
+describe('fixed point — variable bindings survive via the token NAME (spec-005 P1)', () => {
   const btn: FigmaExportNode = {
     type: 'FRAME', name: 'Btn', width: 120, height: 40, layoutMode: 'HORIZONTAL',
+    itemSpacing: 8, paddingTop: 12, paddingRight: 12, paddingBottom: 12, paddingLeft: 12,
     primaryAxisSizingMode: 'AUTO', counterAxisSizingMode: 'AUTO',
     fills: [{ type: 'SOLID', color: { r: 0.5, g: 0.2, b: 0.9, a: 1 } }],
+    strokes: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 0.2 } }], strokeWeight: 1,
     cornerRadius: 8,
-    tokenRefs: { fill: 'color/brand', radius: 'radius/sm' },
+    tokenRefs: {
+      fill: 'color/brand', stroke: 'color/border', radius: 'radius/sm',
+      gap: 'space/sm', padding: 'space/md',
+    },
+    children: [
+      {
+        type: 'TEXT', name: 'Label', characters: 'Go', fontSize: 14,
+        textAutoResize: 'WIDTH_AND_HEIGHT', textColor: { r: 1, g: 1, b: 1, a: 1 },
+        tokenRefs: { textColor: 'color/on-brand' },
+      },
+    ],
   };
   const vars: Vars = new Map([
     ['color/brand', { id: 'VariableID:1', name: 'color/brand' }],
     ['radius/sm', { id: 'VariableID:2', name: 'radius/sm' }],
+    ['color/border', { id: 'VariableID:3', name: 'color/border' }],
+    ['space/sm', { id: 'VariableID:4', name: 'space/sm' }],
+    ['space/md', { id: 'VariableID:5', name: 'space/md' }],
+    ['color/on-brand', { id: 'VariableID:6', name: 'color/on-brand' }],
   ]);
 
-  it('detects the binding as a variable id but drops tokenRefs (name unrecoverable)', async () => {
+  it('recovers every bound field as a token NAME, not just an id', async () => {
     const spec1 = await build(btn, vars);
-    expect(spec1.figmaScanBindings).toEqual({ fills: 'VariableID:1', cornerRadius: 'VariableID:2' });
-    expect(spec1.tokenRefs).toBeUndefined(); // the token NAME is gone
+    expect(spec1.tokenRefs).toEqual({
+      fill: 'color/brand', stroke: 'color/border', radius: 'radius/sm',
+      gap: 'space/sm', padding: 'space/md',
+    });
+    // The raw ids stay recorded alongside (uniform padding → all four sides bound).
+    expect(spec1.figmaScanBindings).toMatchObject({
+      fills: 'VariableID:1', strokes: 'VariableID:3',
+      cornerRadius: 'VariableID:2', itemSpacing: 'VariableID:4',
+      paddingTop: 'VariableID:5', paddingLeft: 'VariableID:5',
+    });
   });
 
-  it('is NOT a fixed point — rebuilding spec1 loses the binding entirely', async () => {
-    const spec1 = await build(btn, vars);
-    const spec2 = await build(spec1); // no tokenRefs on spec1 → nothing to bind
+  it('recovers a TEXT colour binding as textColor (build-path convention)', async () => {
+    const [spec1] = await roundTrips(btn, vars);
+    expect(spec1.children?.[0]?.tokenRefs).toEqual({ textColor: 'color/on-brand' });
+  });
+
+  it('IS a fixed point — the rebuilt node carries the same bindings (spec1 === spec2)', async () => {
+    const [spec1, spec2] = await roundTrips(btn, vars);
+    expect(spec2.tokenRefs).toEqual(spec1.tokenRefs);
+    expect(spec2.figmaScanBindings).toEqual(spec1.figmaScanBindings);
+    expect(spec2).toEqual(spec1);
+  });
+
+  it('reads the id→name map from the file LOCAL variables (the live join source)', async () => {
+    setMockLocalVariables([{ id: 'VariableID:1', name: 'color/brand' }]);
+    const map = await readTokenNameMap();
+    expect(map.get('VariableID:1')).toBe('color/brand');
+    setMockLocalVariables([]);
+  });
+});
+
+describe('reversibility GAP that REMAINS — library / remote variable bindings', () => {
+  const card: FigmaExportNode = {
+    type: 'FRAME', name: 'LibCard', width: 100, height: 40, layoutMode: 'HORIZONTAL',
+    primaryAxisSizingMode: 'AUTO', counterAxisSizingMode: 'AUTO',
+    fills: [{ type: 'SOLID', color: { r: 0.2, g: 0.4, b: 0.8, a: 1 } }],
+    tokenRefs: { fill: 'lib/color/primary' },
+  };
+  const vars: Vars = new Map([['lib/color/primary', { id: 'VariableID:9', name: 'lib/color/primary' }]]);
+
+  it('reports the binding as a raw id — a library variable has no LOCAL name to join', async () => {
+    // getLocalVariablesAsync does not list library variables → empty join map.
+    const spec1 = await build(card, vars, new Map());
+    expect(spec1.figmaScanBindings).toEqual({ fills: 'VariableID:9' });
+    expect(spec1.tokenRefs).toBeUndefined(); // no name recovered → nothing to rebind
+  });
+
+  it('is NOT a fixed point — the rebuild loses the library binding (loss is visible, not silent)', async () => {
+    const spec1 = await build(card, vars, new Map());
+    const spec2 = await build(spec1, vars, new Map());
     expect(spec2.figmaScanBindings).toBeUndefined();
     expect(spec2).not.toEqual(spec1);
+  });
+});
+
+describe('reversibility GAP that REMAINS — per-side (non-uniform) padding binding', () => {
+  it('leaves a single bound padding side as a raw id (tokenRefs models uniform padding only)', async () => {
+    const frame = new FakeNode('FRAME');
+    frame.name = 'PadOnTop';
+    frame.resize(100, 40);
+    frame.layoutMode = 'VERTICAL';
+    frame.paddingTop = 12;
+    frame.setBoundVariable('paddingTop', { id: 'VariableID:5' });
+
+    const spec1 = nodeToSpec(frame as unknown as SceneNode, new Map([['VariableID:5', 'space/md']]));
+    expect(spec1.figmaScanBindings).toEqual({ paddingTop: 'VariableID:5' });
+    expect(spec1.tokenRefs).toBeUndefined();
   });
 });
 

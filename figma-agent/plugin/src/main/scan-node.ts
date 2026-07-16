@@ -9,21 +9,23 @@
 // the fixed-point harness can unit-test it against mock nodes. Runs in the Figma
 // plugin sandbox (browser platform, no node APIs) — never throws on a missing field.
 //
-// SPIKE SCOPE — what is DELIBERATELY only *captured as an extension*, not modelled
-// as a reversible field (documented as the reversibility gap, see the *.figmaScan
-// keys below): variable bindings (boundVariables), instance/component references
-// (mainComponent), and nested-variant composition. These have NO slot in
-// FigmaExportNode and NO build-path in createFigmaNode today, so they cannot survive
-// a round-trip — the spike's job is to prove exactly that.
+// SCOPE — variable bindings ARE reversible since spec-005 P1: `nodeToSpec` takes the
+// file's id→name token map (see readTokenNameMap) and rebuilds `tokenRefs`, which the
+// build path already reattaches by name. Still only *captured as an extension*, with
+// no reversible slot: instance/component references (mainComponent) and nested-variant
+// composition — FigmaExportNode has no instance type and createFigmaNode no instance
+// build-case, so an INSTANCE cannot survive a round-trip (spec-005 P2's job).
 
 import type {
   FigmaColor, FigmaExportEffect, FigmaExportFill, FigmaExportNode,
 } from '../../../shared/figma-payload-types';
+import { bindingsToTokenRefs } from './scan-token-refs';
 
-/** Non-reversible material captured for the spike's gap analysis (never fed back to build). */
+/** Material captured beyond the reversible FigmaExportNode fields. */
 export interface ScanExtensions {
-  // A binding was found on this node — records field → variable id (NOT the token
-  // NAME that tokenRefs needs). Recovering tokenRefs requires an id→name resolver.
+  // Raw field → variable id, ALWAYS recorded. Ids that resolve against the token
+  // map also become `tokenRefs` (reversible); ids that don't (library/remote
+  // variables) stay here only — the loss stays visible instead of silent.
   figmaScanBindings?: Record<string, string>;
   // This node is an INSTANCE / COMPONENT — records the source. FigmaExportNode has
   // no instance type and createFigmaNode has no instance build-case → link is lost.
@@ -173,8 +175,29 @@ function aliasId(val: unknown): string | undefined {
   return (alias as { id?: string } | undefined)?.id;
 }
 
-/** Capture the non-reversible material (bindings / instance ref) for gap analysis. */
-function readExtensions(n: Record<string, unknown>, out: ScannedNode): void {
+/**
+ * The file's variable id → name map — the join source that makes bindings
+ * reversible. Same source as serializeDesignSystem's `tokens` (local variables
+ * only; library/remote variables are NOT listed → documented edge). Async, so it
+ * runs ONCE per scan and keeps `nodeToSpec` synchronous; never throws.
+ */
+export async function readTokenNameMap(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const vars = await figma.variables.getLocalVariablesAsync();
+    for (const v of vars) map.set(v.id, v.name);
+  } catch {
+    // Variables API unavailable (older Figma / restricted plan) → no tokenRefs.
+  }
+  return map;
+}
+
+/** Capture bindings (→ tokenRefs when resolvable) + the instance ref (gap 2). */
+function readExtensions(
+  n: Record<string, unknown>,
+  out: ScannedNode,
+  tokenNames: Map<string, string> | undefined,
+): void {
   const rec: Record<string, string> = {};
   // Scalar fields (cornerRadius, itemSpacing, padding…) live on node.boundVariables.
   const bound = safe(() => n.boundVariables as Record<string, unknown>);
@@ -193,7 +216,11 @@ function readExtensions(n: Record<string, unknown>, out: ScannedNode): void {
       if (id) { rec[field] = id; break; }
     }
   }
-  if (Object.keys(rec).length) out.figmaScanBindings = rec;
+  if (Object.keys(rec).length) {
+    out.figmaScanBindings = rec;
+    const refs = bindingsToTokenRefs(rec, out.type, tokenNames);
+    if (refs) out.tokenRefs = refs;
+  }
   const type = n.type as string;
   if (type === 'INSTANCE' || type === 'COMPONENT' || type === 'COMPONENT_SET') {
     out.figmaScanSourceType = type;
@@ -204,10 +231,12 @@ function readExtensions(n: Record<string, unknown>, out: ScannedNode): void {
 
 /**
  * Walk one live SceneNode subtree → FigmaExportNode (+ scan extensions).
+ * `tokenNames` (from readTokenNameMap) turns variable ids into reversible
+ * tokenRefs; omit it and bindings degrade to raw ids only.
  * INSTANCE composition is NOT recursed (audit rule L106) — its inner tree is the
  * component's, not the instance's, and has no reversible representation here.
  */
-export function nodeToSpec(node: SceneNode): ScannedNode {
+export function nodeToSpec(node: SceneNode, tokenNames?: Map<string, string>): ScannedNode {
   const n = node as unknown as Record<string, unknown>;
   const type = node.type;
   const out: ScannedNode = { type: mapType(type), name: node.name };
@@ -263,12 +292,12 @@ export function nodeToSpec(node: SceneNode): ScannedNode {
   if (typeof n.opacity === 'number' && n.opacity < 1 && n.opacity > 0) out.opacity = n.opacity;
   if (typeof n.rotation === 'number' && Math.abs(n.rotation) > 0.001) out.rotation = n.rotation;
 
-  readExtensions(n, out);
+  readExtensions(n, out, tokenNames);
 
   // Children — recurse, EXCEPT into an instance (composition is the component's).
   if (type !== 'INSTANCE' && 'children' in node) {
     const kids = (node as SceneNode & ChildrenMixin).children;
-    if (kids.length) out.children = kids.map((c) => nodeToSpec(c as SceneNode));
+    if (kids.length) out.children = kids.map((c) => nodeToSpec(c as SceneNode, tokenNames));
   }
 
   return out;
