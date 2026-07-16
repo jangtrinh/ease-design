@@ -36,6 +36,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
   installMockFigma, setMockLocalVariables, setMockComponents, makeMockComponent, FakeNode,
 } from './helpers/mock-figma.ts';
+import { structuralDiff } from '../cli/src/util/structural-diff.ts';
 import { getImportWarnings, resetImportWarnings } from '../plugin/src/main/executor-styles.ts';
 import type { FigmaExportNode } from '../shared/figma-payload-types.ts';
 import type { ScannedNode } from '../plugin/src/main/scan-node.ts';
@@ -72,6 +73,21 @@ async function roundTrips(spec0: FigmaExportNode, vars?: Vars): Promise<[Scanned
   return [spec1, spec2];
 }
 
+/**
+ * The fixed-point assertion, made through the SAME linter the live gate uses —
+ * `structuralDiff` (cli/src/util/structural-diff.ts), which `figma-agent
+ * mirror-verify` runs against a real canvas. Asserting both here is the point: a
+ * spec this suite calls a fixed point is one mirror-verify must also call `equal`,
+ * so the mock proof and the live proof can never drift into disagreeing. `toEqual`
+ * stays alongside as the independent second opinion.
+ */
+function expectFixedPoint(spec1: ScannedNode, spec2: ScannedNode): void {
+  const { equal, diffs } = structuralDiff(spec1, spec2);
+  expect(diffs).toEqual([]); // fails with the exact path, not just `false`
+  expect(equal).toBe(true);
+  expect(spec2).toEqual(spec1);
+}
+
 describe('fixed point — auto-layout FRAME with text children', () => {
   const card: FigmaExportNode = {
     type: 'FRAME', name: 'Card', width: 320, height: 200,
@@ -91,7 +107,7 @@ describe('fixed point — auto-layout FRAME with text children', () => {
 
   it('reaches a fixed point (spec1 === spec2)', async () => {
     const [spec1, spec2] = await roundTrips(card);
-    expect(spec2).toEqual(spec1);
+    expectFixedPoint(spec1, spec2);
   });
 
   it('preserves auto-layout topology, fills, radius, strokes', async () => {
@@ -134,7 +150,7 @@ describe('fixed point — native GRID', () => {
   };
   it('round-trips grid counts + gaps', async () => {
     const [spec1, spec2] = await roundTrips(grid);
-    expect(spec2).toEqual(spec1);
+    expectFixedPoint(spec1, spec2);
     expect(spec1).toMatchObject({
       layoutMode: 'GRID', gridColumnCount: 3, gridRowCount: 2, gridColumnGap: 16, gridRowGap: 16,
     });
@@ -150,7 +166,7 @@ describe('fixed point — per-corner radius (figma.mixed path)', () => {
   };
   it('recovers cornerRadii via the mixed-getter fallback', async () => {
     const [spec1, spec2] = await roundTrips(chip);
-    expect(spec2).toEqual(spec1);
+    expectFixedPoint(spec1, spec2);
     expect(spec1.cornerRadii).toEqual({ tl: 16, tr: 4, br: 16, bl: 4 });
     expect(spec1.cornerRadius).toBeUndefined();
   });
@@ -208,7 +224,7 @@ describe('fixed point — variable bindings survive via the token NAME (spec-005
     const [spec1, spec2] = await roundTrips(btn, vars);
     expect(spec2.tokenRefs).toEqual(spec1.tokenRefs);
     expect(spec2.figmaScanBindings).toEqual(spec1.figmaScanBindings);
-    expect(spec2).toEqual(spec1);
+    expectFixedPoint(spec1, spec2);
   });
 
   it('reads the id→name map from the file LOCAL variables (the live join source)', async () => {
@@ -240,6 +256,10 @@ describe('reversibility GAP that REMAINS — library / remote variable bindings'
     const spec2 = await build(spec1, vars, new Map());
     expect(spec2.figmaScanBindings).toBeUndefined();
     expect(spec2).not.toEqual(spec1);
+    // …and the linter the live gate runs names WHICH field was lost, by path.
+    expect(structuralDiff(spec1, spec2).diffs).toEqual([
+      { path: 'figmaScanBindings', left: { fills: 'VariableID:9' }, right: undefined },
+    ]);
   });
 });
 
@@ -311,7 +331,7 @@ describe('fixed point — INSTANCE survives as ref + overrides (spec-005 P2)', (
 
   it('IS a fixed point (spec1 === spec2)', async () => {
     const [spec1, spec2] = await roundTrips(instSpec());
-    expect(spec2).toEqual(spec1);
+    expectFixedPoint(spec1, spec2);
   });
 
   it('mirrors the main visuals without re-writing them as overrides', async () => {
@@ -329,7 +349,7 @@ describe('fixed point — INSTANCE survives as ref + overrides (spec-005 P2)', (
     const [spec1, spec2] = await roundTrips(overridden);
     expect(spec1).toMatchObject({ type: 'INSTANCE', width: 200, height: 48, cornerRadius: 24 });
     expect(spec1.fills?.[0]?.color).toMatchObject({ r: 1, g: 0, b: 0 });
-    expect(spec2).toEqual(spec1);
+    expectFixedPoint(spec1, spec2);
   });
 
   it('resolves the main by componentId when no key is published', async () => {
@@ -355,7 +375,7 @@ describe('fixed point — INSTANCE survives as ref + overrides (spec-005 P2)', (
     expect(spec1.children?.[1]).toMatchObject({
       type: 'INSTANCE', componentKey: 'KEY-BTN', componentProperties: { State: 'Hover' },
     });
-    expect(spec2).toEqual(spec1);
+    expectFixedPoint(spec1, spec2);
   });
 });
 
@@ -409,5 +429,8 @@ describe('instance GAP that REMAINS — INNER (per-child) ad-hoc overrides', () 
     expect(spec2.type).toBe('INSTANCE');
     expect(spec2.figmaScanInnerOverrides).toBeUndefined();
     expect(spec2).not.toEqual(spec1); // NOT a fixed point — the loss is reported, not faked
+    expect(structuralDiff(spec1, spec2).diffs).toEqual([
+      { path: 'figmaScanInnerOverrides', left: ['characters', 'fontSize'], right: undefined },
+    ]);
   });
 });

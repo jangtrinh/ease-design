@@ -15,6 +15,7 @@ import * as execJs from './commands/exec-js.ts';
 import * as exportPng from './commands/export-png.ts';
 import * as getSelection from './commands/get-selection.ts';
 import * as htmlToFigma from './commands/html-to-figma.ts';
+import * as mirrorVerify from './commands/mirror-verify.ts';
 import * as scanDesignSystem from './commands/scan-design-system.ts';
 import * as scanNode from './commands/scan-node.ts';
 import * as scanConventions from './commands/scan-conventions.ts';
@@ -35,6 +36,7 @@ const COMMAND_MODULES: Record<string, { run(args: CommandArgs): Promise<unknown>
   'get-selection': getSelection,
   'scan-design-system': scanDesignSystem,
   'scan-node': scanNode,
+  'mirror-verify': mirrorVerify,
   'scan-conventions': scanConventions,
   'audit-ds': auditDs,
   'create-frame': createFrame,
@@ -62,6 +64,7 @@ Commands:
   get-selection        Serialize the current selection [--depth 1]
   scan-design-system   Components/variables/styles registry [--out file.json --timeout ms]
   scan-node            [SPIKE] Reverse-walk one node → FigmaExportNode spec <nodeId> [--timeout ms]
+  mirror-verify        Prove one node round-trips: scan → rebuild → scan → diff <nodeId> [--parent id --keep --timeout ms]
   scan-conventions     Convention-DNA walk over sections → usage-dna.json [<sectionId...> --out file.json --budget 14000 --timeout ms]
   audit-ds             DS-hygiene audit of the open file's component library [--out file.json --sections "01 A,02 B" --facts raw.json --from-facts raw.json --timeout ms]
   create-frame         --name n --w 400 --h 300 [--parent id --x 0 --y 0]
