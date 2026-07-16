@@ -57,8 +57,13 @@ async function readLocalVariablesByKey(): Promise<Map<string, Variable>> {
 }
 
 /** Resolve once per key — local first, then a published import; a failure is
- * remembered as null (warned once, not per node). */
-async function resolveByKey(key: string): Promise<Variable | null> {
+ * remembered as null (warned once, not per node).
+ *
+ * Exported since spec-005 P15: an inner child's bound paint resolves down the SAME
+ * two roads, and its caller (executor-instance-inner-visual) rebinds one field rather
+ * than a whole node's record — so it needs the resolution, not applyKeyedBindings'
+ * loop. One resolver keeps the per-import cache, and the warning, in one place. */
+export async function resolveKeyedVariable(key: string): Promise<Variable | null> {
   const cached = resolvedByKey.get(key);
   if (cached !== undefined) return cached;
 
@@ -89,7 +94,7 @@ export async function applyKeyedBindings(
 ): Promise<void> {
   for (const [field, ref] of Object.entries(bindings)) {
     if (!ref || typeof ref.key !== 'string' || !ref.key) continue;
-    const variable = await resolveByKey(ref.key);
+    const variable = await resolveKeyedVariable(ref.key);
     if (!variable) {
       pushImportWarning(`keyed bind ${field}→${ref.name ?? ref.key} skipped on "${node.name}": key not resolvable — literal value kept`);
       continue;

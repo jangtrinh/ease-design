@@ -39,6 +39,42 @@ export interface FigmaKeyedBinding {
 }
 
 /**
+ * An inner child's overridden VISUAL layer (spec-005 P15) — the half `fields` cannot
+ * carry, because none of it is a primitive: paints, effects, a style link, a
+ * visibility flag.
+ *
+ * PRESENCE IS THE STATEMENT. A key is written here only when Figma itself named that
+ * field in `overrides[].overriddenFields`, and then the value is recorded WHATEVER it
+ * is — `effects: []` and `effectStyleId: ''` are real overrides (the user REMOVED the
+ * shadow the main gives; live: node 25579:746648 on the P15 gate). Dropping an empty
+ * value the way `fields` drops an empty string would silently rebuild the main's own
+ * shadow back onto a node the user had cleared.
+ *
+ * `keyedBindings` is the P14 lesson made structural: on the P15 gate EVERY overridden
+ * `fills` was bound to a variable, so a rebuild that wrote the captured literal paints
+ * would destroy the binding — the exact clobber P14 fixed one layer up. A field listed
+ * here travels by KEY (resolve → setBoundVariableForPaint) and its literal is NOT
+ * written; the literal stays only as the record of what the binding resolved to.
+ */
+export interface FigmaInnerVisual {
+  fills?: FigmaExportFill[];
+  strokes?: FigmaExportFill[];
+  effects?: FigmaExportEffect[];
+  /**
+   * The child's effect-style link, as a same-file style ID (`''` = the override
+   * REMOVED the main's style). Not a publish key: the walker is sync and the key is
+   * only reachable through an async style lookup. So a payload rebuilt in ANOTHER
+   * file cannot resolve it — and does not have to, because `effects` above carries
+   * the same shadows as literals and the rebuild falls back to them, with a warning.
+   */
+  effectStyleId?: string;
+  visible?: boolean;
+  opacity?: number;
+  /** Bound paint fields (fills/strokes), addressed by publish key — see above. */
+  keyedBindings?: Record<string, FigmaKeyedBinding>;
+}
+
+/**
  * One of an instance's INNER children, and the overridden field VALUES it carries
  * (spec-005 P11). `childKey` addresses the child relative to the MAIN component, so
  * it names the same node in any instance of that main — see
@@ -75,6 +111,14 @@ export interface FigmaInnerOverride {
    * `figmaScanInnerOverrides` still names the field, so the loss stays visible.
    */
   componentProperties?: Record<string, string | boolean>;
+  /**
+   * The child's overridden VISUAL fields (spec-005 P15) — fills, strokes, effects,
+   * the effect-style link, visible, opacity. `fields` above is primitives only, and
+   * that whitelist is exactly why the P15 gate lost four field classes on every
+   * scan: an inner child's shadow, colour and visibility were named as overridden
+   * and had nowhere to travel.
+   */
+  visual?: FigmaInnerVisual;
   /**
    * SCAN-ONLY (spec-005 P14). The child's measured size on the axes its auto-layout
    * parent FILLs — an observation, never an instruction: no builder reads it, because

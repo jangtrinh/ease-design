@@ -10,11 +10,11 @@
 // Nothing here throws: an unresolvable main degrades to the plain frame the build
 // path would have produced before P2, with a warning (visible loss, not silent).
 
-import type { FigmaExportFill, FigmaExportNode } from '../../../shared/figma-payload-types';
+import type { FigmaExportEffect, FigmaExportFill, FigmaExportNode } from '../../../shared/figma-payload-types';
 import { applyInnerOverrides } from './executor-instance-inner-overrides';
 import { exportFillToPaint, mapExportEffects, pushImportWarning } from './executor-styles';
 import { resolveMainComponent } from './resolve-main-component';
-import { asFills } from './scan-node-paint';
+import { asFills, effectToExport } from './scan-node-paint';
 
 /** Builds the degrade-to-frame placeholder — injected to avoid an import cycle. */
 export type FrameFallback = (spec: FigmaExportNode) => Promise<SceneNode | null>;
@@ -52,6 +52,24 @@ function applyComponentProperties(instance: InstanceNode, spec: FigmaExportNode)
 function fillsDiffer(current: readonly Paint[] | symbol, wanted: FigmaExportFill[]): boolean {
   if (typeof current === 'symbol') return true; // figma.mixed → cannot compare
   return JSON.stringify(asFills(current as Paint[]) ?? []) !== JSON.stringify(wanted);
+}
+
+/**
+ * The effects twin of fillsDiffer, and it exists for the same reason (spec-005 P15).
+ *
+ * `effects` was the ONE node-level visual written with no comparison at all — so an
+ * instance whose main already gives the spec's shadow had that shadow overwritten with
+ * literals on every single rebuild. It is the fills clobber P14 fixed, in the field
+ * next door: a live Effect carries `boundVariables` (a DS shadow is bound five ways —
+ * colour, radius, spread, offsetX, offsetY, live on the P15 gate), so writing literals
+ * destroys those bindings AND mints a spurious override, silently, exactly as
+ * JSON.stringify-ing a live Paint used to. `effectToExport` is the walker's own lens,
+ * so both sides speak the payload's vocabulary and cannot drift.
+ */
+function effectsDiffer(current: readonly Effect[], wanted: FigmaExportEffect[]): boolean {
+  if (!Array.isArray(current)) return true;
+  const seen = current.map(effectToExport).filter((e): e is FigmaExportEffect => e !== null);
+  return JSON.stringify(seen) !== JSON.stringify(wanted);
 }
 
 /**
@@ -93,7 +111,7 @@ function applyNodeOverrides(instance: InstanceNode, spec: FigmaExportNode): void
     try { instance.opacity = spec.opacity; } catch { /* opacity locked */ }
   }
 
-  if (spec.effects && spec.effects.length) {
+  if (spec.effects && spec.effects.length && effectsDiffer(instance.effects, spec.effects)) {
     try { instance.effects = mapExportEffects(spec.effects); } catch { /* effects locked */ }
   }
 }

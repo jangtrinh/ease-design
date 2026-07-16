@@ -22,35 +22,8 @@ import { unbindableFields } from '../../../shared/figma-unbindable-fields';
 import { readUnreproducibleInnerFields } from './instance-inner-fill-sizing';
 import { readInnerOverrideFields, readInnerOverrides } from './scan-node-inner-overrides';
 import type { ScannedNode } from './scan-node-types';
-import { aliasId, safe } from './scan-node-utils';
+import { readBindings, safe } from './scan-node-utils';
 import { bindingsToKeyedBindings, bindingsToTokenRefs } from './scan-token-refs';
-
-/**
- * field→variable-id for every bound field the walker can see (node + paints).
- * Exported since spec-005 P7: the publish-key pre-pass (scan-keyed-vars) must
- * collect the SAME ids the walker will later ask it about — one reader, no drift.
- */
-export function readBindings(n: Record<string, unknown>): Record<string, string> {
-  const rec: Record<string, string> = {};
-  // Scalar fields (cornerRadius, itemSpacing, padding…) live on node.boundVariables.
-  const bound = safe(() => n.boundVariables as Record<string, unknown>);
-  if (bound && typeof bound === 'object') {
-    for (const [field, val] of Object.entries(bound)) {
-      const id = aliasId(val);
-      if (id) rec[field] = id;
-    }
-  }
-  // Paint fields (fills/strokes) record the alias on the PAINT, not the node.
-  for (const field of ['fills', 'strokes'] as const) {
-    const paints = safe(() => n[field] as Array<Record<string, unknown>>);
-    if (!Array.isArray(paints)) continue;
-    for (const p of paints) {
-      const id = aliasId((p.boundVariables as { color?: unknown } | undefined)?.color);
-      if (id) { rec[field] = id; break; }
-    }
-  }
-  return rec;
-}
 
 /** A main component's identity, as the async pre-pass resolved it. */
 export interface MainComponentRef { key?: string; id?: string; name?: string }
@@ -72,6 +45,7 @@ export function readInstance(
   selfId: string,
   mainRef?: MainComponentRef,
   mainComps?: ReadonlyMap<string, MainComponentRef>,
+  keyedVars?: ReadonlyMap<string, FigmaKeyedBinding>,
 ): void {
   const main = mainRef
     ?? safe(() => n.mainComponent as { id?: string; key?: string; name?: string } | null);
@@ -100,7 +74,7 @@ export function readInstance(
   // The reversible SUBSET of the same fact, with values (P11). Both are emitted: the
   // names list stays the honest total, `innerOverrides` is only what a rebuild can
   // carry — when the two disagree, the difference IS the residual loss.
-  const withValues = readInnerOverrides(n, selfId, mainComps);
+  const withValues = readInnerOverrides(n, selfId, mainComps, keyedVars);
   if (withValues.length) out.innerOverrides = withValues;
 }
 

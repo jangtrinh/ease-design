@@ -228,7 +228,7 @@ export function nodeToSpec(
   if (typeof n.rotation === 'number' && Math.abs(n.rotation) > 0.001) out.rotation = n.rotation;
 
   readExtensions(n, out, tokenNames, keyedVars);
-  if (type === 'INSTANCE') readInstance(n, out, node.id, mainComps?.get(node.id), mainComps);
+  if (type === 'INSTANCE') readInstance(n, out, node.id, mainComps?.get(node.id), mainComps, keyedVars);
 
   // Children — recurse, EXCEPT into an instance (composition is the component's).
   if (type !== 'INSTANCE' && 'children' in node) {

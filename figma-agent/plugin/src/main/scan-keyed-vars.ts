@@ -25,15 +25,40 @@
 // back from the walker — no cycle.
 
 import type { FigmaKeyedBinding } from '../../../shared/figma-payload-types';
-import { readBindings } from './scan-node-instance';
+import { innerChildKey, innerOverrideEntries, keyInnerChildren } from './instance-inner-override-keys';
+import { readBindings } from './scan-node-utils';
+
+/**
+ * The bound ids of the inner children an instance OVERRIDES (spec-005 P15).
+ *
+ * The instance's structure is still not descended — this asks only about the children
+ * Figma itself named in `overrides`, which are exactly the ones readInnerOverrides
+ * will emit. It has to: on the P15 gate every overridden `fills` is bound to a
+ * variable, and without a key for it the rebuild writes the literal paint and kills
+ * the binding — the P14 clobber, one layer deeper. A map that cannot name the
+ * variable is a rebuild that cannot rebind it.
+ */
+function collectInnerOverrideIds(instance: SceneNode, into: Set<string>): void {
+  const n = instance as unknown as Record<string, unknown>;
+  const entries = innerOverrideEntries(n, instance.id);
+  if (!entries.length) return;
+  const byKey = keyInnerChildren(n, instance.id);
+  for (const entry of entries) {
+    const key = typeof entry.id === 'string' ? innerChildKey(instance.id, entry.id) : undefined;
+    const child = key !== undefined ? byKey.get(key) : undefined;
+    if (child) for (const id of Object.values(readBindings(child))) into.add(id);
+  }
+}
 
 /** Every bound variable id in the subtree. Sync + mirrors nodeToSpec's recursion:
- * it does NOT descend into an INSTANCE, whose inner tree the spec never captures. */
+ * it does NOT descend into an INSTANCE, whose inner tree the spec never captures —
+ * except for that instance's OVERRIDDEN children, which the spec does capture (P15). */
 function collectBoundVariableIds(root: SceneNode): Set<string> {
   const ids = new Set<string>();
   const visit = (node: SceneNode): void => {
     for (const id of Object.values(readBindings(node as unknown as Record<string, unknown>))) ids.add(id);
-    if (node.type !== 'INSTANCE' && 'children' in node) {
+    if (node.type === 'INSTANCE') { collectInnerOverrideIds(node, ids); return; }
+    if ('children' in node) {
       for (const child of (node as SceneNode & ChildrenMixin).children) visit(child as SceneNode);
     }
   };

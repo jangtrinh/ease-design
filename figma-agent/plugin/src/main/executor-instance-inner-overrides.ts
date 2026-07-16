@@ -27,6 +27,7 @@
 import type { FigmaExportNode, FigmaInnerOverride } from '../../../shared/figma-payload-types';
 import { keyInnerChildren } from './instance-inner-override-keys';
 import { applyChildComponentProperties, applyChildSwap } from './executor-instance-inner-slot';
+import { applyChildVisual } from './executor-instance-inner-visual';
 import { pushImportWarning } from './executor-styles';
 import { safe } from './scan-node-utils';
 
@@ -95,11 +96,14 @@ function applyChildFields(child: Child, fields: Record<string, string | number>,
     if (wanted === undefined) continue;
     try {
       if (child[f] !== wanted) child[f] = wanted;
-    } catch {
+    } catch (err) {
       // Not applicable to this node type (textAutoResize off a frame, sizing modes
       // off a non-auto-layout child). Only worth a warning when the SPEC asked for
       // it — restoring the main's own value is housekeeping, not a loss.
-      if (f in fields) pushImportWarning(`instance "${name}": inner override ${f} failed`);
+      // The CAUSE travels with it: this was the one warning in the file that named a
+      // failure without saying why, and the first live regression that hit it (P15)
+      // could not be read off the report at all.
+      if (f in fields) pushImportWarning(`instance "${name}": inner override ${f} failed (${String(err)})`);
     }
   }
 
@@ -148,6 +152,10 @@ export async function applyInnerOverrides(instance: InstanceNode, spec: FigmaExp
     const revariant = applyChildComponentProperties(child, o, spec.name);
     const swapped = await applyChildSwap(child, o, spec.name);
     applyChildFields(child, o.fields, spec.name);
+    // The visual layer LAST: a swap or a variant set rebuilds the child's subtree from
+    // a different main, which is also where its shadow and paints come from — writing
+    // them before it would just hand them to the node that got thrown away.
+    await applyChildVisual(child, o.visual, spec.name, o.childKey);
     // Only re-walk when the tree actually changed — the common case is a plain field
     // write, and re-walking a 600-node instance per override would be nonsense.
     if (swapped || revariant) byKey = keyInnerChildren(root, instance.id);

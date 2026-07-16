@@ -10,11 +10,12 @@
 // Keeping both is the point: when they disagree, the difference is precisely the
 // loss that remains, and it stays on the record instead of being normalised away.
 
-import type { FigmaInnerOverride } from '../../../shared/figma-payload-types';
+import type { FigmaInnerOverride, FigmaKeyedBinding } from '../../../shared/figma-payload-types';
 import { readFillSize } from './instance-inner-fill-sizing';
 import {
   INNER_OVERRIDE_FIELDS, innerChildKey, innerOverrideEntries, keyInnerChildren,
 } from './instance-inner-override-keys';
+import { readInnerVisual } from './instance-inner-visual';
 import type { MainComponentRef } from './scan-node-instance';
 import { r2, safe } from './scan-node-utils';
 
@@ -128,6 +129,7 @@ export function readInnerOverrides(
   n: Record<string, unknown>,
   selfId: string,
   mainComps?: ReadonlyMap<string, MainComponentRef>,
+  keyedVars?: ReadonlyMap<string, FigmaKeyedBinding>,
 ): FigmaInnerOverride[] {
   // NOT filtered on `overriddenFields.length`: a SWAPPED inner child can be listed
   // with no field names at all (the swap is the override, and Figma does not name it),
@@ -146,6 +148,9 @@ export function readInnerOverrides(
     const fields = readOverriddenValues(child, overridden);
     const swap = readSwapRef(child, entry.id, mainComps);
     const props = readChildComponentProperties(child, overridden);
+    // The VISUAL half of the same whitelist (P15): paints, effects, a style link, a
+    // visibility flag — everything `fields` cannot hold because it is not a primitive.
+    const visual = readInnerVisual(child, overridden, keyedVars);
     // The geometry guard for the width/height flags the gate forgives (P14). Read off
     // the FILL axes THEMSELVES, not off the override report, so the rebuilt twin —
     // FILL too, but carrying no width/height override for Figma to report — emits it
@@ -154,16 +159,20 @@ export function readInnerOverrides(
     // An entry earns its place if ANY half is reversible: a swapped inner slot can
     // carry no replayable field at all (live P5: every field of the swapped child
     // equalled the main's, so the fields alone rebuilt a byte-identical WRONG node),
-    // and a variant picked inside a slot carries ONLY componentProperties (live P13).
+    // and a variant picked inside a slot carries ONLY componentProperties (live P13),
+    // and a child can carry ONLY a visual override (live P15: node 25579:746648
+    // overrides nothing but `effectStyleId,effects`, and rode in on its swap ref
+    // alone — an entry whose every reversible half was empty).
     // `fillSize` alone does NOT earn an entry: it is an observation about a child,
     // not an override of one. Minting entries for it would make the rebuild report
     // inner overrides its source never had — P10's spurious-override trap, moved.
-    if (Object.keys(fields).length || swap || props) {
+    if (Object.keys(fields).length || swap || props || visual) {
       out.push({
         childKey: key,
         fields,
         ...swap,
         ...(props ? { componentProperties: props } : {}),
+        ...(visual ? { visual } : {}),
         ...(fillSize ? { figmaScanFillSize: fillSize } : {}),
       });
     }

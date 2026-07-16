@@ -48,6 +48,14 @@ export const FIGMA_MIXED = Symbol('figma.mixed');
 /** instance node → the MAIN node it mirrors, for the `overrides` bookkeeping below. */
 const mainTwinOf = new WeakMap<FakeNode, FakeNode>();
 
+/** An effect style, as a file holds one: an id the node links to + the effects it
+ * carries. A DS shadow's effects are variable-BOUND (live P15: colour, radius,
+ * spread, offsetX and offsetY, all five), which is the whole reason the link must be
+ * replayed rather than the shadows copied. */
+export interface FakeEffectStyle { id: string; name: string; effects: unknown[] }
+let effectStyles: FakeEffectStyle[] = [];
+export function setMockEffectStyles(styles: FakeEffectStyle[]): void { effectStyles = styles; }
+
 /**
  * id → node, for every node an instance owns. `getNodeByIdAsync` MUST answer for a
  * compound inner id (`I<instanceId>;<mainChildId>`) because the live API does — probed
@@ -102,6 +110,10 @@ const OVERRIDE_COMPARED_FIELDS = [
   'name', 'width', 'height', 'layoutGrow', 'textAutoResize',
   'primaryAxisSizingMode', 'counterAxisSizingMode',
   'characters', 'fontSize', 'fills', 'opacity', 'visible',
+  // The VISUAL classes (spec-005 P15). Absent here, this mock could not see the four
+  // field names the live P15 gate lost on every scan — it would have reported the
+  // rebuild as a perfect twin, which is exactly what a permissive mock is for.
+  'strokes', 'effects', 'effectStyleId',
   // A variant picked / boolean toggled / text typed INSIDE an inner slot. Figma
   // reports it as this ONE field name on the inner node, with the values readable
   // off the node itself — the commonest inner override on a real file (spec-005 P13),
@@ -212,6 +224,48 @@ export class FakeNode {
     child.parent = this;
     this.children.push(child);
   }
+
+  // ── effectStyleId: the sync setter is UNUSABLE under documentAccess: dynamic-page ──
+  //
+  // Same refusal class as the `mainComponent` getter above, and modelled for the same
+  // reason: a mock that accepted `node.effectStyleId = id` would green-light a write
+  // that can only ever throw on the live canvas.
+  private _effectStyleId = '';
+  private _effects: unknown[] = [];
+
+  set effectStyleId(_v: string) {
+    throw new Error(
+      'in set_effectStyleId: Cannot call with documentAccess: dynamic-page. '
+      + 'Use node.setEffectStyleIdAsync instead.',
+    );
+  }
+  get effectStyleId(): string { return this._effectStyleId; }
+
+  /**
+   * The ONLY way to link an effect style live.
+   *
+   * Two refusals, both real: an id no style answers to throws (the cross-file case —
+   * a style id is same-file only), and linking a style REPLACES the node's effects
+   * with the style's, bindings and all. `''` unlinks and LEAVES the effects behind as
+   * literals — which is why an override that cleared a shadow (live: 25579:746648)
+   * needs the effects write too, and why the writer does both.
+   */
+  async setEffectStyleIdAsync(id: string): Promise<void> {
+    if (id === '') { this._effectStyleId = ''; return; }
+    const style = effectStyles.find((s) => s.id === id);
+    if (!style) throw new Error(`in setEffectStyleIdAsync: style not found: ${id}`);
+    this._effects = JSON.parse(JSON.stringify(style.effects));
+    this._effectStyleId = id;
+  }
+
+  /** Writing effects directly DETACHES the style — Figma's own behaviour, and the
+   * trap under the writer's order: a literal effects write layered on top of a style
+   * link would silently drop the link the rebuild had just replayed. */
+  set effects(v: unknown[]) {
+    this._effects = v;
+    this._effectStyleId = '';
+  }
+  get effects(): unknown[] { return this._effects; }
 
   /** Figma REFUSES some fields outright, by node type — encode the refusal, not the
    * happy path: a permissive mock here is what let the P5 rebuild ship a bind that
@@ -512,9 +566,25 @@ export class FakeNode {
   get strokeLeftWeight(): number { return this._sides.left; }
 }
 
-/** Clone a paint and stamp a variable alias onto its color (Figma's paint-copy binding). */
-function setBoundVariableForPaint(paint: Record<string, unknown>, _field: 'color', variable: { id: string }): Record<string, unknown> {
-  return { ...paint, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: variable.id } } };
+/**
+ * Clone a paint and stamp a variable alias onto its color (Figma's paint-copy binding).
+ *
+ * The bound paint RESOLVES to the variable's value — `paint.color` reads back the
+ * variable's colour, not the one that was there before. A mock that left the old
+ * colour sitting under the alias would call a rebind "done" while the node still
+ * rendered the main's colour, which is the half of a lost binding a user actually
+ * SEES. A variable carrying no value in this fixture leaves the paint as it was.
+ */
+function setBoundVariableForPaint(
+  paint: Record<string, unknown>, _field: 'color', variable: FakeVariable,
+): Record<string, unknown> {
+  const values = Object.values(variable.valuesByMode ?? {});
+  const value = values.find((v) => v && typeof v === 'object' && 'r' in (v as object));
+  return {
+    ...paint,
+    ...(value ? { color: value } : {}),
+    boundVariables: { color: { type: 'VARIABLE_ALIAS', id: variable.id } },
+  };
 }
 
 /** A Variable, as the plugin API models one: identity + a value per mode.
@@ -650,6 +720,7 @@ export function installMockFigma(): MockFigma {
   localVariables = [];
   libraryVariables = [];
   collections = [];
+  effectStyles = [];
   const mk = (type: string): FakeNode => {
     const n = new FakeNode(type);
     if (type === 'TEXT') n.name = 'Text';

@@ -489,7 +489,7 @@
     localByKey = map;
     return map;
   }
-  async function resolveByKey(key) {
+  async function resolveKeyedVariable(key) {
     const cached = resolvedByKey.get(key);
     if (cached !== void 0) return cached;
     let variable = (await readLocalVariablesByKey()).get(key) ?? null;
@@ -506,7 +506,7 @@
   async function applyKeyedBindings(node, bindings) {
     for (const [field, ref] of Object.entries(bindings)) {
       if (!ref || typeof ref.key !== "string" || !ref.key) continue;
-      const variable = await resolveByKey(ref.key);
+      const variable = await resolveKeyedVariable(ref.key);
       if (!variable) {
         pushImportWarning(`keyed bind ${field}\u2192${ref.name ?? ref.key} skipped on "${node.name}": key not resolvable \u2014 literal value kept`);
         continue;
@@ -931,6 +931,120 @@
     return any && changesVariant;
   }
 
+  // plugin/src/main/scan-node-paint.ts
+  function paintToFill(p) {
+    if (p.type === "SOLID") {
+      const a = typeof p.opacity === "number" ? p.opacity : 1;
+      return { type: "SOLID", color: { r: p.color.r, g: p.color.g, b: p.color.b, a } };
+    }
+    if (p.type === "GRADIENT_LINEAR" || p.type === "GRADIENT_RADIAL" || p.type === "GRADIENT_ANGULAR") {
+      const g = p;
+      return {
+        type: p.type,
+        gradientStops: g.gradientStops.map((s) => ({
+          color: { r: s.color.r, g: s.color.g, b: s.color.b, a: s.color.a },
+          position: s.position
+        })),
+        gradientTransform: g.gradientTransform
+      };
+    }
+    return null;
+  }
+  function effectToExport(e) {
+    if (e.type === "LAYER_BLUR" || e.type === "BACKGROUND_BLUR") {
+      return { type: e.type, radius: e.radius };
+    }
+    const s = e;
+    const c = s.color;
+    return {
+      type: e.type,
+      offset: { x: s.offset.x, y: s.offset.y },
+      radius: s.radius,
+      spread: s.spread ?? 0,
+      color: { r: c.r, g: c.g, b: c.b, a: c.a }
+    };
+  }
+  var asFills = (v) => {
+    if (!Array.isArray(v) || v.length === 0) return void 0;
+    const out = v.map(paintToFill).filter((f) => f !== null);
+    return out.length ? out : void 0;
+  };
+
+  // plugin/src/main/executor-instance-inner-visual.ts
+  function paintsDiffer(current, wanted) {
+    if (!Array.isArray(current)) return true;
+    return JSON.stringify(asFills(current) ?? []) !== JSON.stringify(wanted);
+  }
+  async function applyEffectStyle(child, wanted, name, key) {
+    if (safe(() => child.effectStyleId) === wanted) return false;
+    const set = child.setEffectStyleIdAsync;
+    if (typeof set !== "function") return false;
+    try {
+      await set.call(child, wanted);
+      return wanted !== "";
+    } catch (err) {
+      pushImportWarning(
+        `instance "${name}": inner override effectStyleId "${wanted}" on "${key}" failed (${String(err)}) \u2014 falling back to the literal effects`
+      );
+      return false;
+    }
+  }
+  async function applyPaintBinding(child, field, ref, name, key) {
+    const variable = await resolveKeyedVariable(ref.key);
+    if (!variable) {
+      pushImportWarning(
+        `instance "${name}": inner override ${field} on "${key}" is bound to ${ref.name ?? ref.key}, which cannot be resolved \u2014 literal paint written instead`
+      );
+      return false;
+    }
+    try {
+      bindVariableToField(child, field, variable);
+      return true;
+    } catch (err) {
+      pushImportWarning(`instance "${name}": inner override ${field} rebind on "${key}" failed (${String(err)})`);
+      return false;
+    }
+  }
+  async function applyPaintField(child, field, visual, name, key) {
+    const wanted = visual[field];
+    if (!wanted) return;
+    const ref = visual.keyedBindings?.[field];
+    if (ref && await applyPaintBinding(child, field, ref, name, key)) return;
+    if (!paintsDiffer(safe(() => child[field]), wanted)) return;
+    const paints = wanted.map(exportFillToPaint).filter((p) => p !== null);
+    try {
+      child[field] = paints;
+    } catch (err) {
+      pushImportWarning(`instance "${name}": inner override ${field} on "${key}" failed (${String(err)})`);
+    }
+  }
+  async function applyChildVisual(child, visual, name, key) {
+    if (!visual) return;
+    for (const field of ["visible", "opacity"]) {
+      const wanted = visual[field];
+      if (wanted === void 0 || safe(() => child[field]) === wanted) continue;
+      try {
+        child[field] = wanted;
+      } catch (err) {
+        pushImportWarning(`instance "${name}": inner override ${field} on "${key}" failed (${String(err)})`);
+      }
+    }
+    const styled = visual.effectStyleId !== void 0 && await applyEffectStyle(child, visual.effectStyleId, name, key);
+    if (visual.effects && !styled) {
+      const current = safe(() => child.effects);
+      const live = Array.isArray(current) ? JSON.stringify(current.map(effectToExport).filter((e) => e !== null)) : null;
+      if (live !== JSON.stringify(visual.effects)) {
+        try {
+          child.effects = mapExportEffects(visual.effects);
+        } catch (err) {
+          pushImportWarning(`instance "${name}": inner override effects on "${key}" failed (${String(err)})`);
+        }
+      }
+    }
+    await applyPaintField(child, "fills", visual, name, key);
+    await applyPaintField(child, "strokes", visual, name, key);
+  }
+
   // plugin/src/main/executor-instance-inner-overrides.ts
   var SIDE_EFFECT_FIELDS = ["primaryAxisSizingMode", "counterAxisSizingMode", "textAutoResize"];
   function writeField(child, name, field, value) {
@@ -966,8 +1080,8 @@
       if (wanted === void 0) continue;
       try {
         if (child[f] !== wanted) child[f] = wanted;
-      } catch {
-        if (f in fields) pushImportWarning(`instance "${name}": inner override ${f} failed`);
+      } catch (err) {
+        if (f in fields) pushImportWarning(`instance "${name}": inner override ${f} failed (${String(err)})`);
       }
     }
     if (typeof fields.layoutGrow === "number") writeField(child, name, "layoutGrow", fields.layoutGrow);
@@ -987,6 +1101,7 @@
       const revariant = applyChildComponentProperties(child, o, spec.name);
       const swapped = await applyChildSwap(child, o, spec.name);
       applyChildFields(child, o.fields, spec.name);
+      await applyChildVisual(child, o.visual, spec.name, o.childKey);
       if (swapped || revariant) byKey = keyInnerChildren(root, instance.id);
     }
     if (missed.length) {
@@ -995,31 +1110,6 @@
       );
     }
   }
-
-  // plugin/src/main/scan-node-paint.ts
-  function paintToFill(p) {
-    if (p.type === "SOLID") {
-      const a = typeof p.opacity === "number" ? p.opacity : 1;
-      return { type: "SOLID", color: { r: p.color.r, g: p.color.g, b: p.color.b, a } };
-    }
-    if (p.type === "GRADIENT_LINEAR" || p.type === "GRADIENT_RADIAL" || p.type === "GRADIENT_ANGULAR") {
-      const g = p;
-      return {
-        type: p.type,
-        gradientStops: g.gradientStops.map((s) => ({
-          color: { r: s.color.r, g: s.color.g, b: s.color.b, a: s.color.a },
-          position: s.position
-        })),
-        gradientTransform: g.gradientTransform
-      };
-    }
-    return null;
-  }
-  var asFills = (v) => {
-    if (!Array.isArray(v) || v.length === 0) return void 0;
-    const out = v.map(paintToFill).filter((f) => f !== null);
-    return out.length ? out : void 0;
-  };
 
   // plugin/src/main/executor-instance.ts
   function applyComponentProperties(instance, spec) {
@@ -1033,6 +1123,11 @@
   function fillsDiffer(current, wanted) {
     if (typeof current === "symbol") return true;
     return JSON.stringify(asFills(current) ?? []) !== JSON.stringify(wanted);
+  }
+  function effectsDiffer(current, wanted) {
+    if (!Array.isArray(current)) return true;
+    const seen = current.map(effectToExport).filter((e) => e !== null);
+    return JSON.stringify(seen) !== JSON.stringify(wanted);
   }
   function applyNodeOverrides(instance, spec) {
     if (spec.name && instance.name !== spec.name) {
@@ -1077,7 +1172,7 @@
       } catch {
       }
     }
-    if (spec.effects && spec.effects.length) {
+    if (spec.effects && spec.effects.length && effectsDiffer(instance.effects, spec.effects)) {
       try {
         instance.effects = mapExportEffects(spec.effects);
       } catch {
