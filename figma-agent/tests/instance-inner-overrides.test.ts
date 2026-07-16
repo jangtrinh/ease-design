@@ -171,6 +171,131 @@ describe('inner overrides — a replayed resize must not invent sizing overrides
   });
 });
 
+// spec-005 P12 — the last INSTANCE diff of the P5 live run, and the one P11's model
+// could not express: an inner slot the user SWAPPED to a different component.
+//
+// Live shape (node 25575:353516, "Shell / Template — Demo (slot swapped)"), read off
+// the canvas rather than reasoned about:
+//   main's own child 25575:353404  → name "Slot / Page content", 928x836, main = "Slot"
+//   the instance's twin            → the SAME name + size, main = "_Shell / Page content demo"
+// Every field equal, one component different. P11 replayed the four fields, Figma
+// registered no override (they already equalled the main's), and the rebuild came back
+// with `innerOverrides: null` — pointing at the wrong component, byte-identical.
+describe('inner overrides — a SWAPPED inner slot (spec-005 P12)', () => {
+  let main: FakeNode;
+  let demo: FakeNode;
+
+  /** A main whose inner child is itself an INSTANCE — the slot the user can swap. */
+  function mainWithSlot(): FakeNode {
+    const slotComp = new FakeNode('COMPONENT');
+    slotComp.name = 'Slot';
+    slotComp.key = 'KEY-SLOT';
+    slotComp.width = 256;
+    slotComp.height = 68;
+    const filler = new FakeNode('RECTANGLE');
+    filler.name = 'Slot';
+    slotComp.appendChild(filler);
+
+    const shell = new FakeNode('COMPONENT');
+    shell.name = 'Shell/Template';
+    shell.key = 'KEY-SHELL';
+    shell.width = 1440;
+    shell.height = 900;
+    shell.layoutMode = 'VERTICAL';
+    const slot = slotComp.createInstance();
+    slot.name = 'Slot / Page content'; // the main's own override on its slot…
+    slot.width = 928;
+    slot.height = 836;
+    shell.appendChild(slot);
+    return shell;
+  }
+
+  /** The component the live file swapped INTO the slot — a different size on purpose. */
+  function demoComponent(): FakeNode {
+    const c = new FakeNode('COMPONENT');
+    c.name = '_Shell / Page content demo';
+    c.key = 'KEY-DEMO';
+    c.width = 1104;
+    c.height = 836;
+    c.layoutMode = 'VERTICAL';
+    const title = new FakeNode('TEXT');
+    title.name = 'Title';
+    title.characters = 'Title';
+    c.appendChild(title);
+    return c;
+  }
+
+  beforeEach(() => {
+    main = mainWithSlot();
+    demo = demoComponent();
+    setMockComponents([main, demo]);
+    resetImportWarnings();
+  });
+
+  it('round-trips a swap whose every FIELD already equals the main\'s (the live diff)', async () => {
+    const inst = main.createInstance();
+    const slot = inst.children[0];
+    slot.swapComponent(demo); // …the ONLY difference from the main: the component
+
+    const spec1 = await scan(inst);
+    // The fields say nothing — this is precisely why P11 could not see it.
+    expect(spec1.innerOverrides).toEqual([
+      { childKey: main.children[0].id, fields: {}, componentKey: 'KEY-DEMO', componentId: demo.id },
+    ]);
+
+    const spec2 = await build(spec1);
+    expect(spec2.innerOverrides).toEqual(spec1.innerOverrides);
+    expect(structuralDiff(spec1, spec2).diffs).toEqual([]);
+    expect(getImportWarnings()).toEqual([]);
+  });
+
+  it('replays the swap onto the twin — the rebuilt slot points at the swapped main', async () => {
+    const inst = main.createInstance();
+    inst.children[0].swapComponent(demo);
+    const spec1 = await scan(inst);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rebuilt = await createFigmaNode(spec1 as any, new Map()) as unknown as FakeNode;
+    const slot = rebuilt.children[0];
+    expect((await slot.getMainComponentAsync())?.key).toBe('KEY-DEMO');
+    // …and it carries the swapped main's TREE, not the default slot's filler.
+    expect(slot.children.map((c) => c.name)).toEqual(['Title']);
+  });
+
+  it('leaves an UNswapped inner instance alone (no churn on the main\'s own child)', async () => {
+    const inst = main.createInstance();
+    inst.children[0].layoutGrow = 1; // an ordinary field override, no swap
+
+    const spec1 = await scan(inst);
+    // The ref is still recorded — the rebuild decides by comparing, not by guessing…
+    expect(spec1.innerOverrides?.[0]?.componentKey).toBe('KEY-SLOT');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rebuilt = await createFigmaNode(spec1 as any, new Map()) as unknown as FakeNode;
+    // …and finding it already correct, it swaps nothing: the slot keeps its own tree.
+    expect((await rebuilt.children[0].getMainComponentAsync())?.key).toBe('KEY-SLOT');
+    expect(structuralDiff(spec1, await scan(rebuilt)).diffs).toEqual([]);
+    expect(getImportWarnings()).toEqual([]);
+  });
+
+  it('reports an unresolvable swap target instead of faking the diff closed', async () => {
+    const spec: FigmaExportNode = {
+      type: 'INSTANCE', name: 'Shell/Template', componentKey: 'KEY-SHELL',
+      innerOverrides: [{
+        childKey: main.children[0].id,
+        fields: {},
+        componentKey: 'KEY-VANISHED', // a library that is not reachable from this file
+      }],
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rebuilt = await createFigmaNode(spec as any, new Map()) as unknown as FakeNode;
+    expect(rebuilt).toBeTruthy(); // the instance still builds…
+    // …on the main's default, and the loss is named rather than swallowed.
+    expect((await rebuilt.children[0].getMainComponentAsync())?.key).toBe('KEY-SLOT');
+    expect(getImportWarnings().join('\n')).toContain('swap lost');
+  });
+});
+
 // What P11 does NOT close, kept explicit. `innerOverrides` carries the fields this
 // codebase can read AND write; `figmaScanInnerOverrides` stays the TOTAL. When the
 // two disagree, the difference IS the residual loss — reported, never normalised away.

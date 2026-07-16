@@ -61,6 +61,39 @@ export async function readTokenNameMap(): Promise<Map<string, string>> {
 }
 
 /**
+ * Resolve the mains of the inner children Figma named in `instance.overrides`.
+ *
+ * TARGETED on purpose: an instance's inner tree runs to hundreds of nodes (196 on the
+ * live P5 gate) and each resolve is an async round-trip, but only an OVERRIDDEN inner
+ * child can carry a swap. Figma hands us those ids directly, so this asks about those
+ * and nothing else.
+ *
+ * The compound inner id (`I<instanceId>;<mainChildId>`) resolves through
+ * getNodeByIdAsync — probed live, not assumed. A failure just yields no entry, and
+ * the swap then stays a visible loss instead of a wrong write.
+ */
+async function readOverriddenInnerMains(
+  instance: InstanceNode,
+  resolve: (node: SceneNode) => Promise<void>,
+): Promise<void> {
+  let entries: readonly { id?: string }[] = [];
+  try {
+    entries = instance.overrides ?? [];
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (typeof entry?.id !== 'string' || entry.id === instance.id) continue;
+    try {
+      const inner = await figma.getNodeByIdAsync(entry.id);
+      if (inner && inner.type === 'INSTANCE') await resolve(inner as SceneNode);
+    } catch {
+      // Unresolvable inner id → no ref; readInnerOverrides records no swap.
+    }
+  }
+}
+
+/**
  * instance id → its MAIN component's identity, for every INSTANCE in the subtree.
  *
  * The second async pre-pass, and for the same reason as readTokenNameMap: the only
@@ -70,25 +103,31 @@ export async function readTokenNameMap(): Promise<Map<string, string>> {
  * scanned INSTANCE came back with componentKey/Id/Name null). Runs ONCE per scan and
  * hands `nodeToSpec` a plain map, so the walker stays synchronous and bundleable.
  *
- * Does NOT descend into an instance — mirroring nodeToSpec, whose spec stops there.
+ * Does NOT descend into an instance's STRUCTURE — mirroring nodeToSpec, whose spec
+ * stops there. It does resolve the mains of the inner children Figma itself named as
+ * overridden (see readOverriddenInnerMains): those are refs, not structure.
  * Never throws: an unreachable main just contributes no entry.
  */
 export async function readMainComponentMap(root: SceneNode): Promise<Map<string, MainComponentRef>> {
   const map = new Map<string, MainComponentRef>();
+  const resolve = async (node: SceneNode): Promise<void> => {
+    try {
+      const main = await (node as InstanceNode).getMainComponentAsync();
+      if (main) {
+        const ref: MainComponentRef = {};
+        if (typeof main.key === 'string' && main.key) ref.key = main.key;
+        if (typeof main.id === 'string' && main.id) ref.id = main.id;
+        if (typeof main.name === 'string' && main.name) ref.name = main.name;
+        map.set(node.id, ref);
+      }
+    } catch {
+      // Main in an unloaded library / deleted → no ref (the documented P2 edge).
+    }
+  };
   const visit = async (node: SceneNode): Promise<void> => {
     if (node.type === 'INSTANCE') {
-      try {
-        const main = await (node as InstanceNode).getMainComponentAsync();
-        if (main) {
-          const ref: MainComponentRef = {};
-          if (typeof main.key === 'string' && main.key) ref.key = main.key;
-          if (typeof main.id === 'string' && main.id) ref.id = main.id;
-          if (typeof main.name === 'string' && main.name) ref.name = main.name;
-          map.set(node.id, ref);
-        }
-      } catch {
-        // Main in an unloaded library / deleted → no ref (the documented P2 edge).
-      }
+      await resolve(node);
+      await readOverriddenInnerMains(node as InstanceNode, resolve);
       return; // an instance's composition is the main's — nothing below to map
     }
     if ('children' in node) {
@@ -189,7 +228,7 @@ export function nodeToSpec(
   if (typeof n.rotation === 'number' && Math.abs(n.rotation) > 0.001) out.rotation = n.rotation;
 
   readExtensions(n, out, tokenNames, keyedVars);
-  if (type === 'INSTANCE') readInstance(n, out, node.id, mainComps?.get(node.id));
+  if (type === 'INSTANCE') readInstance(n, out, node.id, mainComps?.get(node.id), mainComps);
 
   // Children — recurse, EXCEPT into an instance (composition is the component's).
   if (type !== 'INSTANCE' && 'children' in node) {

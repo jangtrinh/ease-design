@@ -199,6 +199,14 @@ function applyChildSizingHints(frame: FrameNode, childNode: SceneNode, childExpo
     // layoutGrow for proportional sizing
     if (childExport.layoutGrow && childExport.layoutGrow > 0) child.layoutGrow = childExport.layoutGrow;
   } catch { /* same */ }
+  // The same belt, for the child's OWN axis-sizing modes (spec-005 P12). Setting
+  // layoutSizing* to FILL on an axis coerces the child's sizing mode for that axis to
+  // FIXED — and the child's AUTO is not a contradiction Figma resolves away: a frame
+  // that FILLs its parent's counter axis can still HUG its own content on it (probed
+  // live: the write is accepted, keeps FILL, and leaves the size untouched). The
+  // child built its own modes before it was appended; the FILL above is what lost
+  // them, so they get the last word here.
+  if (childExport.type === 'FRAME') reassertAxisSizing(childNode as FrameNode, childExport);
 }
 
 export async function createFrameNode(

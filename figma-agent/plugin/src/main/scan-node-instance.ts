@@ -70,6 +70,7 @@ export function readInstance(
   out: ScannedNode,
   selfId: string,
   mainRef?: MainComponentRef,
+  mainComps?: ReadonlyMap<string, MainComponentRef>,
 ): void {
   const main = mainRef
     ?? safe(() => n.mainComponent as { id?: string; key?: string; name?: string } | null);
@@ -94,7 +95,7 @@ export function readInstance(
   // The reversible SUBSET of the same fact, with values (P11). Both are emitted: the
   // names list stays the honest total, `innerOverrides` is only what a rebuild can
   // carry — when the two disagree, the difference IS the residual loss.
-  const withValues = readInnerOverrides(n, selfId);
+  const withValues = readInnerOverrides(n, selfId, mainComps);
   if (withValues.length) out.innerOverrides = withValues;
 }
 

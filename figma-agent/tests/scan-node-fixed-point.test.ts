@@ -168,6 +168,46 @@ describe('fixed point — auto-layout FRAME with text children', () => {
   });
 });
 
+// spec-005 P12 — the last SIZING diff of the P5 live run on node 25575:353653:
+//
+//   children[0].children[2].children[0].counterAxisSizingMode: AUTO → FIXED
+//
+// The node ("Description", read off the live canvas) is a HORIZONTAL frame that FILLs
+// its parent's vertical axis while HUGging its own content on it — not a contradiction
+// Figma resolves away, but two facts about different axes that it stores separately.
+// P10 gave the frame's OWN modes the last word after its resize; nothing gave them the
+// last word after the PARENT set it to FILL, which happens later and coerces the mode
+// to FIXED. Probed live before fixing: re-setting AUTO after the FILL is accepted,
+// keeps FILL, and leaves the size untouched.
+describe('fixed point — a child that FILLs one axis and HUGs its own content on it', () => {
+  const footer: FigmaExportNode = {
+    type: 'FRAME', name: 'Footer', width: 1536, height: 60,
+    layoutMode: 'HORIZONTAL', primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'AUTO',
+    children: [{
+      type: 'FRAME', name: 'Description', width: 1536, height: 60,
+      layoutMode: 'HORIZONTAL',
+      primaryAxisSizingMode: 'FIXED',
+      counterAxisSizingMode: 'AUTO',   // the live value the rebuild kept losing
+      layoutSizingHorizontal: 'FIXED',
+      layoutSizingVertical: 'FILL',    // …and the write that used to overwrite it
+    }],
+  };
+
+  it('reaches a fixed point (spec1 === spec2)', async () => {
+    const [spec1, spec2] = await roundTrips(footer);
+    expect(spec2).toEqual(spec1);
+  });
+
+  it('keeps the child\'s authored AUTO after the parent set it to FILL (the live diff)', async () => {
+    const [s] = await roundTrips(footer);
+    const desc = s.children?.[0];
+    expect(desc?.counterAxisSizingMode).toBe('AUTO');
+    // The FILL is not sacrificed to save the mode: both survive, as they do live.
+    expect(desc?.layoutSizingVertical).toBe('FILL');
+    expect(desc?.primaryAxisSizingMode).toBe('FIXED');
+  });
+});
+
 describe('fixed point — native GRID', () => {
   const grid: FigmaExportNode = {
     type: 'FRAME', name: 'Grid', width: 600, height: 400, layoutMode: 'GRID',

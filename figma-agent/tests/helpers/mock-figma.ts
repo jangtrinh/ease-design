@@ -49,6 +49,26 @@ export const FIGMA_MIXED = Symbol('figma.mixed');
 const mainTwinOf = new WeakMap<FakeNode, FakeNode>();
 
 /**
+ * id → node, for every node an instance owns. `getNodeByIdAsync` MUST answer for a
+ * compound inner id (`I<instanceId>;<mainChildId>`) because the live API does — probed
+ * on the P5 gate, where `getNodeByIdAsync("I25575:353516;25575:353404")` resolved. The
+ * old mock only knew the file's components, which would have made the P12 pre-pass
+ * look correct while silently resolving nothing.
+ */
+const nodesById = new Map<string, FakeNode>();
+
+/**
+ * Inner instances the user SWAPPED (spec-005 P12).
+ *
+ * Live fact this encodes: a swapped inner child ALWAYS appears in `overrides`, even
+ * when every field it carries equals its main twin's — Figma reports the fields the
+ * swap moved, and on the P5 gate all four of them (name/width/height/sizing) happened
+ * to equal the main's. So an entry must exist where a differs-only comparison would
+ * produce none; otherwise the mock hides the exact bug P12 fixes.
+ */
+const swappedNodes = new WeakSet<FakeNode>();
+
+/**
  * The fields `overrides` compares an instance's nodes against their main twins.
  * A superset of what the P11 replay can write (name/width/height/layoutGrow/
  * textAutoResize/*AxisSizingMode) plus the classes it deliberately cannot
@@ -198,11 +218,35 @@ export class FakeNode {
         const twin = m.children[idx];
         if (!twin) return;
         child.id = `I${inst.id};${twin.id}`;
+        nodesById.set(child.id, child);
         pair(child, twin);
       });
     };
     pair(inst, this);
+    nodesById.set(inst.id, inst);
     return inst;
+  }
+
+  /**
+   * InstanceNode.swapComponent — repoint an instance at a different main.
+   *
+   * Models what the live canvas shows a swap actually does: the inner TREE becomes the
+   * new main's, the main ref follows it, and the node's OWN fields (name, size, sizing)
+   * are PRESERVED as overrides rather than taken from the target — which is why the P5
+   * gate's swapped slot reads 928x836 while its target component is 1104x836.
+   */
+  swapComponent(target: FakeNode): void {
+    if (this.type !== 'INSTANCE') throw new Error('in swapComponent: node is not an instance');
+    for (const c of this.children) c.parent = null;
+    this.children = [];
+    for (const c of target.children) {
+      const copy = c.cloneAs(c.type);
+      this.appendChild(copy);
+      copy.id = `I${this.id};${c.id}`;
+      nodesById.set(copy.id, copy);
+    }
+    this.mainComponent = { id: target.id, key: target.key as string | undefined, name: target.name };
+    swappedNodes.add(this);
   }
 
   // ── InstanceNode.overrides: DERIVED, not bookkept by hand ──
@@ -230,7 +274,12 @@ export class FakeNode {
       const fields = OVERRIDE_COMPARED_FIELDS.filter(
         (f) => JSON.stringify(readOrUndefined(i, f) ?? null) !== JSON.stringify(readOrUndefined(m, f) ?? null),
       );
-      if (fields.length) out.push({ id: i.id, overriddenFields: [...fields] });
+      // A swap is an override Figma never names in `overriddenFields` — so the entry
+      // must exist even when nothing differs (see swappedNodes).
+      if (fields.length || swappedNodes.has(i)) out.push({ id: i.id, overriddenFields: [...fields] });
+      // A swapped node's children belong to its NEW main — comparing them against the
+      // old twin's would report every one of them as overridden, which Figma does not.
+      if (swappedNodes.has(i)) return;
       i.children.forEach((c, idx) => { const t = m.children[idx]; if (t) visit(c, t); });
     };
     visit(this, main);
@@ -311,6 +360,12 @@ export class FakeNode {
       throw new Error(`${name}: HUG needs auto-layout on the node itself, or a TEXT node`);
     }
     if (field && v !== 'FILL') this[field] = v === 'HUG' ? 'AUTO' : 'FIXED';
+    // FILL COERCES the node's own mode for that axis to FIXED (probed live: a frame
+    // set to FILL its parent's counter axis came back counterAxisSizingMode FIXED,
+    // having been authored AUTO). The mode is still writable AFTERWARDS — the live
+    // probe re-set AUTO and kept FILL — which is what makes the P12 belt possible and
+    // what a mock that skipped this coercion could never have shown.
+    if (field && v === 'FILL') this[field] = 'FIXED';
     if (axis === 'H') this._lsh = v; else this._lsv = v;
   }
 
@@ -488,7 +543,10 @@ export function installMockFigma(): MockFigma {
     createComponent: () => mk('COMPONENT'),
     loadFontAsync: async () => { /* every font "exists" */ },
     listAvailableFontsAsync: async () => [],
-    getNodeByIdAsync: async (id: string) => components.find((c) => c.id === id) ?? null,
+    // Components by id, plus every node an instance owns — the live API resolves a
+    // compound inner id, and the P12 pre-pass depends on it (probed, not assumed).
+    getNodeByIdAsync: async (id: string) =>
+      components.find((c) => c.id === id) ?? nodesById.get(id) ?? null,
     importComponentByKeyAsync: async (key: string) => {
       const found = components.find((c) => c.key === key);
       if (!found) throw new Error(`component key not found: ${key}`); // the library-miss edge

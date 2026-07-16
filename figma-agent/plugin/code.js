@@ -853,6 +853,25 @@
     return map;
   }
 
+  // plugin/src/main/resolve-main-component.ts
+  async function resolveMainComponent(ref) {
+    if (ref.componentKey) {
+      try {
+        return await figma.importComponentByKeyAsync(ref.componentKey);
+      } catch {
+      }
+    }
+    if (ref.componentId) {
+      try {
+        const local = await figma.getNodeByIdAsync(ref.componentId);
+        if (local && local.type === "COMPONENT") return local;
+        if (local && local.type === "COMPONENT_SET") return local.defaultVariant;
+      } catch {
+      }
+    }
+    return null;
+  }
+
   // plugin/src/main/executor-instance-inner-overrides.ts
   var SIDE_EFFECT_FIELDS = ["primaryAxisSizingMode", "counterAxisSizingMode", "textAutoResize"];
   function writeField(child, name, field, value) {
@@ -889,7 +908,32 @@
     }
     if (typeof fields.layoutGrow === "number") writeField(child, name, "layoutGrow", fields.layoutGrow);
   }
-  function applyInnerOverrides(instance, spec) {
+  async function applyChildSwap(child, o, name) {
+    if (!o.componentKey && !o.componentId) return;
+    if (safe(() => child.type) !== "INSTANCE") return;
+    const node = child;
+    let current = null;
+    try {
+      current = await node.getMainComponentAsync();
+    } catch {
+    }
+    if (current && (o.componentKey && current.key === o.componentKey || o.componentId && current.id === o.componentId)) {
+      return;
+    }
+    const target = await resolveMainComponent(o);
+    if (!target) {
+      pushImportWarning(
+        `instance "${name}": inner slot "${o.childKey}" was swapped to a component that cannot be resolved (key=${o.componentKey ?? "\u2014"}, id=${o.componentId ?? "\u2014"}) \u2014 left on the main's default, swap lost`
+      );
+      return;
+    }
+    try {
+      node.swapComponent(target);
+    } catch (err) {
+      pushImportWarning(`instance "${name}": inner slot "${o.childKey}" swap failed (${String(err)})`);
+    }
+  }
+  async function applyInnerOverrides(instance, spec) {
     const overrides = spec.innerOverrides;
     if (!overrides || !overrides.length) return;
     const byKey = keyInnerChildren(instance, instance.id);
@@ -900,6 +944,7 @@
         missed.push(o.childKey);
         continue;
       }
+      await applyChildSwap(child, o, spec.name);
       applyChildFields(child, o.fields, spec.name);
     }
     if (missed.length) {
@@ -910,23 +955,6 @@
   }
 
   // plugin/src/main/executor-instance.ts
-  async function resolveMainComponent(spec) {
-    if (spec.componentKey) {
-      try {
-        return await figma.importComponentByKeyAsync(spec.componentKey);
-      } catch {
-      }
-    }
-    if (spec.componentId) {
-      try {
-        const local = await figma.getNodeByIdAsync(spec.componentId);
-        if (local && local.type === "COMPONENT") return local;
-        if (local && local.type === "COMPONENT_SET") return local.defaultVariant;
-      } catch {
-      }
-    }
-    return null;
-  }
   function applyComponentProperties(instance, spec) {
     if (!spec.componentProperties || Object.keys(spec.componentProperties).length === 0) return;
     try {
@@ -1006,7 +1034,7 @@
     }
     applyComponentProperties(instance, spec);
     applyNodeOverrides(instance, spec);
-    applyInnerOverrides(instance, spec);
+    await applyInnerOverrides(instance, spec);
     return instance;
   }
 
@@ -1299,6 +1327,7 @@
       if (childExport.layoutGrow && childExport.layoutGrow > 0) child.layoutGrow = childExport.layoutGrow;
     } catch {
     }
+    if (childExport.type === "FRAME") reassertAxisSizing(childNode, childExport);
   }
   async function createFrameNode(exportNode, colorStyles, tokenVars) {
     const frame = figma.createFrame();

@@ -53,6 +53,16 @@ export interface FigmaKeyedBinding {
 export interface FigmaInnerOverride {
   childKey: string;
   fields: Record<string, string | number>;
+  /**
+   * When the inner child is an INSTANCE, the main component it currently points at.
+   * A user can SWAP an inner slot's component without detaching the outer instance —
+   * the swap is the override, and it is invisible in `fields` (Figma reports the
+   * fields the swap moved, e.g. name/width, not the swap itself). Recording the ref
+   * lets the rebuild replay it with `swapComponent`; a ref equal to the main's own
+   * child resolves to a no-op, so it is recorded unconditionally rather than guessed.
+   */
+  componentKey?: string;
+  componentId?: string;
 }
 
 export interface FigmaExportNode {

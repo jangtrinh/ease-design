@@ -12,6 +12,7 @@
 
 import type { FigmaInnerOverride } from '../../../shared/figma-payload-types';
 import { INNER_OVERRIDE_FIELDS, innerChildKey, keyInnerChildren } from './instance-inner-override-keys';
+import type { MainComponentRef } from './scan-node-instance';
 import { r2, safe } from './scan-node-utils';
 
 /** One override entry as `InstanceNode.overrides` reports it. */
@@ -66,12 +67,46 @@ function readOverriddenValues(
 }
 
 /**
+ * The main-component ref of an inner child that is itself an INSTANCE.
+ *
+ * Recorded UNCONDITIONALLY for every overridden inner instance, not just the ones we
+ * believe were swapped: telling a swap from the main's own child would mean reading
+ * the main's inner tree (async, and a second source of truth to drift). The rebuild
+ * compares against what it actually finds and no-ops when they agree — the decision
+ * lands where the answer is free and certain.
+ *
+ * `mainComps` comes from the same async pre-pass that resolves the instance's own
+ * main: under `documentAccess: "dynamic-page"` the sync getter throws, and this
+ * walker must stay sync + bundleable.
+ */
+function readSwapRef(
+  child: Record<string, unknown>,
+  childId: string | undefined,
+  mainComps?: ReadonlyMap<string, MainComponentRef>,
+): { componentKey?: string; componentId?: string } | undefined {
+  if (safe(() => child.type) !== 'INSTANCE' || !childId) return undefined;
+  const ref = mainComps?.get(childId);
+  if (!ref) return undefined;
+  const out: { componentKey?: string; componentId?: string } = {};
+  if (ref.key) out.componentKey = ref.key;
+  if (ref.id) out.componentId = ref.id;
+  return out.componentKey || out.componentId ? out : undefined;
+}
+
+/**
  * The instance's inner overrides, as (childKey → field values) pairs.
  * Sorted by childKey, fields in a stable order, so a rescan of a rebuild compares
  * equal to the original — the mirror asks for a fixed point, not a set.
  */
-export function readInnerOverrides(n: Record<string, unknown>, selfId: string): FigmaInnerOverride[] {
-  const entries = overrideEntries(n).filter((o) => o && o.id !== selfId && o.overriddenFields?.length);
+export function readInnerOverrides(
+  n: Record<string, unknown>,
+  selfId: string,
+  mainComps?: ReadonlyMap<string, MainComponentRef>,
+): FigmaInnerOverride[] {
+  // NOT filtered on `overriddenFields.length`: a SWAPPED inner child can be listed
+  // with no field names at all (the swap is the override, and Figma does not name it),
+  // and dropping that entry is exactly how P11 rebuilt the wrong component in silence.
+  const entries = overrideEntries(n).filter((o) => o && o.id !== selfId);
   if (!entries.length) return [];
   const byKey = keyInnerChildren(n, selfId);
   const out: FigmaInnerOverride[] = [];
@@ -82,7 +117,11 @@ export function readInnerOverrides(n: Record<string, unknown>, selfId: string): 
     // twin. figmaScanInnerOverrides still names the fields: a loss, still visible.
     if (key === undefined || !child) continue;
     const fields = readOverriddenValues(child, entry.overriddenFields ?? []);
-    if (Object.keys(fields).length) out.push({ childKey: key, fields });
+    const swap = readSwapRef(child, entry.id, mainComps);
+    // An entry earns its place if EITHER half is reversible: a swapped inner slot can
+    // carry no replayable field at all (live P5: every field of the swapped child
+    // equalled the main's, so the fields alone rebuilt a byte-identical WRONG node).
+    if (Object.keys(fields).length || swap) out.push({ childKey: key, fields, ...swap });
   }
   return out.sort((a, b) => (a.childKey < b.childKey ? -1 : a.childKey > b.childKey ? 1 : 0));
 }

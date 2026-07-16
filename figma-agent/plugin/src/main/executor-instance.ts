@@ -13,26 +13,10 @@
 import type { FigmaExportNode } from '../../../shared/figma-payload-types';
 import { applyInnerOverrides } from './executor-instance-inner-overrides';
 import { exportFillToPaint, mapExportEffects, pushImportWarning } from './executor-styles';
+import { resolveMainComponent } from './resolve-main-component';
 
 /** Builds the degrade-to-frame placeholder — injected to avoid an import cycle. */
 export type FrameFallback = (spec: FigmaExportNode) => Promise<SceneNode | null>;
-
-/** Resolve the spec's main component: library/published key first, local id second. */
-async function resolveMainComponent(spec: FigmaExportNode): Promise<ComponentNode | null> {
-  if (spec.componentKey) {
-    try {
-      return await figma.importComponentByKeyAsync(spec.componentKey);
-    } catch { /* not a published/reachable key → try the local id */ }
-  }
-  if (spec.componentId) {
-    try {
-      const local = await figma.getNodeByIdAsync(spec.componentId);
-      if (local && local.type === 'COMPONENT') return local;
-      if (local && local.type === 'COMPONENT_SET') return local.defaultVariant;
-    } catch { /* id from another file / stale → unresolvable */ }
-  }
-  return null;
-}
 
 /** Variant selection + component-property values (a no-op when the spec has none). */
 function applyComponentProperties(instance: InstanceNode, spec: FigmaExportNode): void {
@@ -124,6 +108,6 @@ export async function createInstanceNode(
 
   applyComponentProperties(instance, spec); // properties FIRST — a variant swap resets visuals
   applyNodeOverrides(instance, spec);
-  applyInnerOverrides(instance, spec); // …and the inner children LAST (spec-005 P11)
+  await applyInnerOverrides(instance, spec); // …and the inner children LAST (spec-005 P11/P12)
   return instance;
 }

@@ -19,6 +19,7 @@
 
 import type { FigmaExportNode, FigmaInnerOverride } from '../../../shared/figma-payload-types';
 import { keyInnerChildren } from './instance-inner-override-keys';
+import { resolveMainComponent } from './resolve-main-component';
 import { pushImportWarning } from './executor-styles';
 import { safe } from './scan-node-utils';
 
@@ -85,6 +86,48 @@ function applyChildFields(child: Child, fields: Record<string, string | number>,
 }
 
 /**
+ * Replay a swapped inner slot (spec-005 P12).
+ *
+ * The live P5 gate's lesson, and the reason `fields` alone was not enough: a user can
+ * SWAP the component behind an inner slot without detaching the outer instance, and
+ * Figma reports that swap as overrides on the fields the swap MOVED (name, width,
+ * height, sizing) — never as the swap itself. On the gate's own file every one of
+ * those fields happened to EQUAL the main's, so replaying them rebuilt a child that
+ * matched field-for-field and still pointed at the wrong component.
+ *
+ * Compares before writing: the recorded ref is captured for every overridden inner
+ * instance, so the common case is "already correct" and must stay a no-op — swapping
+ * a node to what it already is would churn the user's file for nothing.
+ */
+async function applyChildSwap(child: Child, o: FigmaInnerOverride, name: string): Promise<void> {
+  if (!o.componentKey && !o.componentId) return;
+  if (safe(() => child.type) !== 'INSTANCE') return;
+  const node = child as unknown as InstanceNode;
+  let current: ComponentNode | null = null;
+  try {
+    current = await node.getMainComponentAsync();
+  } catch { /* unreadable main → fall through and let the swap decide */ }
+  if (current && ((o.componentKey && current.key === o.componentKey)
+    || (o.componentId && current.id === o.componentId))) {
+    return; // already the right main — the main's own child, not a swap
+  }
+  const target = await resolveMainComponent(o);
+  if (!target) {
+    pushImportWarning(
+      `instance "${name}": inner slot "${o.childKey}" was swapped to a component that `
+      + `cannot be resolved (key=${o.componentKey ?? '—'}, id=${o.componentId ?? '—'}) — `
+      + `left on the main's default, swap lost`,
+    );
+    return;
+  }
+  try {
+    node.swapComponent(target);
+  } catch (err) {
+    pushImportWarning(`instance "${name}": inner slot "${o.childKey}" swap failed (${String(err)})`);
+  }
+}
+
+/**
  * Re-apply `spec.innerOverrides` onto a freshly created instance.
  *
  * MUST run after setProperties: a variant swap rebuilds the inner tree and would
@@ -92,7 +135,7 @@ function applyChildFields(child: Child, fields: Record<string, string | number>,
  * (unresolvable id shape, a main that changed since the scan) is reported and
  * skipped — the scan's `figmaScanInnerOverrides` still names the loss.
  */
-export function applyInnerOverrides(instance: InstanceNode, spec: FigmaExportNode): void {
+export async function applyInnerOverrides(instance: InstanceNode, spec: FigmaExportNode): Promise<void> {
   const overrides: FigmaInnerOverride[] | undefined = spec.innerOverrides;
   if (!overrides || !overrides.length) return; // the pre-P11 path, byte for byte
   const byKey = keyInnerChildren(instance as unknown as Record<string, unknown>, instance.id);
@@ -100,6 +143,9 @@ export function applyInnerOverrides(instance: InstanceNode, spec: FigmaExportNod
   for (const o of overrides) {
     const child = byKey.get(o.childKey);
     if (!child) { missed.push(o.childKey); continue; }
+    // The swap FIRST: it replaces the child's whole inner tree, so any field written
+    // before it would be thrown away with the node it was written on.
+    await applyChildSwap(child, o, spec.name);
     applyChildFields(child, o.fields, spec.name);
   }
   if (missed.length) {
