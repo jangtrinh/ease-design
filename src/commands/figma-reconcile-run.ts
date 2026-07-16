@@ -1,10 +1,16 @@
 /**
- * `ui figma reconcile` runner (spec 004 P2 dry-run + P4 apply) — the IO layer.
- * Owns ALL fs IO; the transforms are pure (figma-reconcile.ts preview, figma-apply.ts
- * apply). Zero network, zero LLM. Split from figma.ts to keep it a thin shell.
- *   --dry-run (default) → preview the delta; write nothing; cursor untouched.
- *   --apply             → commit (soft-deprecate deletes, refresh scope / un-deprecate
- *                         re-touches) and advance the apply cursor. Adds stay `pending`.
+ * `ui figma reconcile` runner (spec 004 P2 dry-run + P4 apply, spec 005 P4 mirror) —
+ * the IO layer. Owns ALL fs IO; the transforms are pure (figma-reconcile.ts preview,
+ * figma-apply.ts apply). Zero network, zero LLM. Split from figma.ts to keep it a shell.
+ *   --dry-run (default)  → preview the delta; write nothing; cursor untouched.
+ *   --apply              → commit (soft-deprecate deletes, refresh scope / un-deprecate
+ *                          re-touches) and advance the apply cursor.
+ *   --mirror-file <path> → (with --apply) node specs captured from the live plugin by the
+ *                          broker's sync-apply orchestration; apply replaces each
+ *                          component's sidecar 1:1 and points the record at it. Absent =
+ *                          no capture ran → the log-only commit still lands, every
+ *                          un-mirrored component named in the report. The live scan never
+ *                          happens here: the kernel stays pure (Art I.2).
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -27,11 +33,15 @@ import {
   scopeSummary,
 } from "../core/figma-reconcile.js";
 import type { RegistryView } from "../core/figma-reconcile.js";
-import { applyDelta, type ApplyReport } from "../core/figma-apply.js";
+import { applyDelta, type SidecarWrite } from "../core/figma-apply.js";
+import { indexCaptures, parseMirrorCapture, type MirrorIndex } from "../core/figma-mirror-capture.js";
+import { writeFigmaNode } from "../core/figma-node-reader.js";
 import { readCursor, syncStatePath, writeCursor } from "../core/figma-sync-state.js";
+import { renderApply, renderDryRun } from "./figma-reconcile-render.js";
 
 const CHANGE_LOG_RELPATH = ["design", "figma.changes.jsonl"] as const;
 const REGISTRY_RELPATH = ["design", "component-registry.json"] as const;
+const DESIGN_DIR = "design";
 const SUB = "figma reconcile";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,13 +54,6 @@ function flagString(parsed: ParsedArgs, key: string): string | undefined {
 function projectDir(parsed: ParsedArgs): string {
   const dir = flagString(parsed, "dir");
   return dir !== undefined ? resolve(dir) : process.cwd();
-}
-
-/** Strip control chars / collapse newlines so untrusted node names can't spoof text output. */
-function safeText(s: string, max = 80): string {
-  // eslint-disable-next-line no-control-regex
-  const cleaned = s.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim();
-  return cleaned.length > max ? cleaned.slice(0, max - 1) + "…" : cleaned;
 }
 
 /** Parse --since into a non-negative integer, or null if malformed. undefined → null (not given). */
@@ -69,6 +72,12 @@ export function runReconcile(parsed: ParsedArgs): CommandResult {
 
   if (apply && dryRunFlag) {
     const msg = "--apply cannot be combined with --dry-run";
+    return useJson ? errJson(SUB, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
+  }
+
+  const mirrorPath = flagString(parsed, "mirror-file");
+  if (mirrorPath !== undefined && !apply) {
+    const msg = "--mirror-file only applies with --apply (a dry-run writes no sidecars)";
     return useJson ? errJson(SUB, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
   }
 
@@ -133,9 +142,27 @@ export function runReconcile(parsed: ParsedArgs): CommandResult {
     return useJson ? okJson(SUB, data) : { exitCode: 0, stdout: renderDryRun(data) };
   }
 
-  // ── APPLY: mutate the registry, persist it (if changed), advance the cursor ──
-  const { registry: next, report, changed } = applyDelta(registry, delta);
+  // ── APPLY: sidecars first, then the registry, then the cursor ───────────────
+  // A pointer must never outlive the file it points at, so the sidecars land BEFORE the
+  // registry: a failed write aborts with nothing committed and the cursor unmoved, and
+  // the next apply retries the same slice.
+  let mirror: MirrorIndex | undefined;
+  if (mirrorPath !== undefined) {
+    try {
+      const raw = readFileSync(resolve(mirrorPath), "utf8");
+      mirror = indexCaptures(parseMirrorCapture(raw, mirrorPath));
+    } catch (e) {
+      if (e instanceof ReconcileError) {
+        return useJson ? errJson(SUB, e.code, e.message) : errText(`ui: ${e.message}\n`);
+      }
+      const msg = `cannot read mirror capture '${mirrorPath}': ${e instanceof Error ? e.message : String(e)}`;
+      return useJson ? errJson(SUB, "READ_ERROR", msg) : errText(`ui: ${msg}\n`);
+    }
+  }
+
+  const { registry: next, report, sidecarWrites, changed } = applyDelta(registry, delta, mirror);
   try {
+    writeSidecars(join(dir, DESIGN_DIR), sidecarWrites);
     if (changed) saveRegistry(registryPath, next);
     writeCursor(statePath, cursorTo);
   } catch (e) {
@@ -150,48 +177,7 @@ export function runReconcile(parsed: ParsedArgs): CommandResult {
   return useJson ? okJson(SUB, data) : { exitCode: 0, stdout: renderApply(data, report) };
 }
 
-// ─── Text rendering (JSON envelope is the authoritative form) ─────────────────
-
-interface DeltaText {
-  cursor_from: number;
-  cursor_to: number;
-  delta: {
-    added: { name: string; scope: string }[];
-    updated: { name: string; scope: string; fields: string[] }[];
-    deprecated: { name: string; scope: string }[];
-  };
-  scope_summary: { local: number; global: number };
-  caps?: { unresolved: { nodeId: string; reason: string }[] };
-}
-
-function renderDeltaLines(data: DeltaText, header: string): string[] {
-  const lines: string[] = [];
-  lines.push(header);
-  lines.push(
-    `  ${data.delta.added.length} added · ${data.delta.updated.length} updated · ${data.delta.deprecated.length} deprecated ` +
-      `(scope: ${data.scope_summary.local} local, ${data.scope_summary.global} global)`,
-  );
-  for (const e of data.delta.added) lines.push(`  + ${safeText(e.name)} (${e.scope})`);
-  for (const e of data.delta.updated) {
-    const fields = e.fields.length > 0 ? ` [${e.fields.join(", ")}]` : "";
-    lines.push(`  ~ ${safeText(e.name)} (${e.scope})${fields}`);
-  }
-  for (const e of data.delta.deprecated) lines.push(`  - ${safeText(e.name)} (${e.scope}) deprecated`);
-  if (data.caps !== undefined) lines.push(`  ! ${data.caps.unresolved.length} unresolved (no component name)`);
-  return lines;
-}
-
-function renderDryRun(data: DeltaText): string {
-  const lines = renderDeltaLines(data, `figma reconcile (dry-run) — cursor ${data.cursor_from}..${data.cursor_to}`);
-  return lines.join("\n") + "\n";
-}
-
-function renderApply(data: DeltaText, report: ApplyReport): string {
-  const lines = renderDeltaLines(data, `figma reconcile (applied) — cursor ${data.cursor_from}..${data.cursor_to}`);
-  lines.push(
-    `  → ${report.deprecated.length} deprecated · ${report.updated.length} updated · ` +
-      `${report.pending.length} pending re-ingest · ${report.skipped.length} skipped`,
-  );
-  for (const p of report.pending) lines.push(`  · pending ${safeText(p.name)} — ${p.reason}`);
-  return lines.join("\n") + "\n";
+/** Write every captured sidecar (content-guarded by writeFigmaNode). Throws RegistryError. */
+function writeSidecars(designDir: string, writes: readonly SidecarWrite[]): void {
+  for (const w of writes) writeFigmaNode(designDir, w.name, w.node);
 }

@@ -162,8 +162,13 @@ syncNowBtn.addEventListener('click', () => {
 syncLaterBtn.addEventListener('click', () => { syncPrompt.hidden = true; });
 
 window.addEventListener('figma-agent:sync-result', (ev) => {
-  const d = (ev as CustomEvent).detail as { ok?: boolean; summary?: string } | undefined;
-  syncMsg.textContent = syncResultLabel(d?.ok === true, typeof d?.summary === 'string' ? d.summary : '');
+  const d = (ev as CustomEvent).detail as { ok?: boolean; summary?: string; landed?: boolean } | undefined;
+  // `landed` absent (an older broker) → assume it landed; a present `false` is honoured.
+  syncMsg.textContent = syncResultLabel(
+    d?.ok === true,
+    typeof d?.summary === 'string' ? d.summary : '',
+    d?.landed !== false,
+  );
   syncPrompt.hidden = false;
   setTimeout(() => { syncPrompt.hidden = true; }, 4000); // auto-dismiss the confirmation
 });

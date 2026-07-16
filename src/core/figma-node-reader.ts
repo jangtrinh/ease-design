@@ -76,6 +76,35 @@ export function figmaNodeRelPath(name: string): string {
   return `${SIDECAR_DIR}/${toSafeFilename(name)}${FIGMA_NODE_SUFFIX}`;
 }
 
+function isObject(x: unknown): x is Record<string, unknown> {
+  return x !== null && typeof x === "object" && !Array.isArray(x);
+}
+
+/**
+ * Validate an unknown value as a captured node spec (the sidecar payload).
+ *
+ * Shallow by design (see {@link FigmaNodeSpec}): assert the node's discriminant, pass
+ * the tree through. Shared, not sidecar-private: every consumer of a captured spec —
+ * the sidecar reader here AND the reconcile mirror-capture file (spec 005 P4) — needs
+ * the same "is this actually a FigmaExportNode" floor, so the check lives once (Art IV).
+ *
+ * @param code Error code the caller's boundary reports (`BAD_SIDECAR` / `BAD_MIRROR_CAPTURE`).
+ * @throws RegistryError(code) on any violation.
+ */
+export function validateFigmaNodeSpec(value: unknown, source: string, code: string): FigmaNodeSpec {
+  const bad = (msg: string): never => {
+    throw new RegistryError(code, `${msg}: '${source}'`);
+  };
+  if (!isObject(value)) return bad("figma node spec must be an object");
+  if (typeof value["type"] !== "string" || !VALID_NODE_TYPES.has(value["type"])) {
+    return bad(
+      `node.type '${String(value["type"])}' must be one of: ${[...VALID_NODE_TYPES].join(", ")}`,
+    );
+  }
+  if (typeof value["name"] !== "string") return bad("node.name is required and must be a string");
+  return value as FigmaNodeSpec;
+}
+
 /**
  * Validate an unknown value as a sidecar envelope.
  *
@@ -88,8 +117,6 @@ export function validateFigmaNodeSidecar(value: unknown, source: string): FigmaN
   const bad = (msg: string): never => {
     throw new RegistryError("BAD_SIDECAR", `${msg}: '${source}'`);
   };
-  const isObject = (x: unknown): x is Record<string, unknown> =>
-    x !== null && typeof x === "object" && !Array.isArray(x);
 
   if (!isObject(value)) return bad("figma node sidecar root must be an object");
   if (typeof value["version"] !== "string" || value["version"].length === 0) {
@@ -98,17 +125,10 @@ export function validateFigmaNodeSidecar(value: unknown, source: string): FigmaN
   if (typeof value["name"] !== "string" || value["name"].length === 0) {
     return bad("sidecar missing required 'name' string");
   }
+  if (!isObject(value["node"])) return bad("sidecar 'node' must be an object");
 
-  const node = value["node"];
-  if (!isObject(node)) return bad("sidecar 'node' must be an object");
-  if (typeof node["type"] !== "string" || !VALID_NODE_TYPES.has(node["type"])) {
-    return bad(
-      `sidecar node.type '${String(node["type"])}' must be one of: ${[...VALID_NODE_TYPES].join(", ")}`,
-    );
-  }
-  if (typeof node["name"] !== "string") return bad("sidecar node.name is required and must be a string");
-
-  return { version: value["version"], name: value["name"], node: node as FigmaNodeSpec };
+  const node = validateFigmaNodeSpec(value["node"], source, "BAD_SIDECAR");
+  return { version: value["version"], name: value["name"], node };
 }
 
 // ─── I/O boundary ─────────────────────────────────────────────────────────────

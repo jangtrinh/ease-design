@@ -724,9 +724,10 @@ code {
     const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
     return `${n} change${n === 1 ? "" : "s"} ready`;
   }
-  function syncResultLabel(ok, summary) {
+  function syncResultLabel(ok, summary, landed = true) {
     const clean = typeof summary === "string" && summary.trim().length > 0 ? summary.trim() : ok ? "done" : "failed";
-    return ok ? `Synced \u2713 \u2014 ${clean}` : `Sync failed \u2014 ${clean}`;
+    if (!ok) return `Sync failed \u2014 ${clean}`;
+    return landed ? `Synced \u2713 \u2014 ${clean}` : `Nothing synced \u2014 ${clean}`;
   }
   function compactMeta(state) {
     return state === "disconnected" ? "First CLI command starts it" : null;
@@ -862,7 +863,11 @@ code {
   });
   window.addEventListener("figma-agent:sync-result", (ev) => {
     const d = ev.detail;
-    syncMsg.textContent = syncResultLabel(d?.ok === true, typeof d?.summary === "string" ? d.summary : "");
+    syncMsg.textContent = syncResultLabel(
+      d?.ok === true,
+      typeof d?.summary === "string" ? d.summary : "",
+      d?.landed !== false
+    );
     syncPrompt.hidden = false;
     setTimeout(() => {
       syncPrompt.hidden = true;

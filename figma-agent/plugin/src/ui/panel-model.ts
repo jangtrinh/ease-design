@@ -162,10 +162,19 @@ export function syncPromptLabel(count: number): string {
   return `${n} change${n === 1 ? '' : 's'} ready`;
 }
 
-/** Post-apply confirmation line for the prompt (success → ✓, failure → the reason). */
-export function syncResultLabel(ok: boolean, summary: string): string {
+/**
+ * Post-apply confirmation line for the prompt.
+ *
+ * `landed` is what the kernel actually wrote to the registry (spec 005 P4) — NOT the
+ * number of canvas events that were sent. An apply can succeed and change nothing (every
+ * new component still pending re-ingest), and calling that "Synced ✓" is the dishonesty
+ * this argument exists to kill (Art VIII). The summary itself comes from
+ * shared/figma-sync-summary.ts, so the broker and this line make the same claim.
+ */
+export function syncResultLabel(ok: boolean, summary: string, landed = true): string {
   const clean = typeof summary === 'string' && summary.trim().length > 0 ? summary.trim() : (ok ? 'done' : 'failed');
-  return ok ? `Synced ✓ — ${clean}` : `Sync failed — ${clean}`;
+  if (!ok) return `Sync failed — ${clean}`;
+  return landed ? `Synced ✓ — ${clean}` : `Nothing synced — ${clean}`;
 }
 
 /**
