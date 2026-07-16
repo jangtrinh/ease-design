@@ -470,6 +470,39 @@
     return { id: node.id, field, variable: variable.name };
   }
 
+  // plugin/src/main/executor-library-vars.ts
+  var importedByKey = /* @__PURE__ */ new Map();
+  function resetLibraryVariableCache() {
+    importedByKey.clear();
+  }
+  async function importVariable(key) {
+    const cached = importedByKey.get(key);
+    if (cached !== void 0) return cached;
+    let variable = null;
+    try {
+      variable = await figma.variables.importVariableByKeyAsync(key);
+    } catch (err) {
+      pushImportWarning(`library variable import failed for key ${key}: ${String(err)}`);
+    }
+    importedByKey.set(key, variable);
+    return variable;
+  }
+  async function applyLibraryBindings(node, bindings) {
+    for (const [field, ref] of Object.entries(bindings)) {
+      if (!ref || typeof ref.key !== "string" || !ref.key) continue;
+      const variable = await importVariable(ref.key);
+      if (!variable) {
+        pushImportWarning(`library bind ${field}\u2192${ref.name ?? ref.key} skipped on "${node.name}": key not importable \u2014 literal value kept`);
+        continue;
+      }
+      try {
+        bindVariableToField(node, field, variable);
+      } catch (err) {
+        pushImportWarning(`library bind ${field}\u2192${ref.name ?? ref.key} failed on "${node.name}": ${String(err)}`);
+      }
+    }
+  }
+
   // plugin/src/main/executor-token-var-resolve.ts
   function tokensAreEmpty(tokens) {
     return !(tokens.colors?.length || tokens.spacing?.length || tokens.radii?.length);
@@ -999,6 +1032,9 @@
       default:
         node = await createFrameNode(exportNode, colorStyles, tokenVars);
         break;
+    }
+    if (node && exportNode.libraryBindings) {
+      await applyLibraryBindings(node, exportNode.libraryBindings);
     }
     if (node && exportNode.motion && exportNode.motion.steps && exportNode.motion.steps.length >= 2) {
       applyMotionTracks(node, exportNode.motion.steps, exportNode.motion.durationSec, exportNode.motion.easing);
@@ -1924,6 +1960,7 @@
       throw withCode(new Error("IMPORT_PAYLOAD requires params.payload (FigmaExportPayload with rootNode)"), "E_INVALID_ARGS");
     }
     resetImportWarnings();
+    resetLibraryVariableCache();
     const tokens = payload.tokens ?? { colors: [], typography: [], spacing: [], radii: [], shadows: [] };
     const colorStyles = await createColorStyles(tokens.colors ?? []);
     await createTextStyles(tokens.typography ?? []);

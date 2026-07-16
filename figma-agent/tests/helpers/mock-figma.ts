@@ -19,6 +19,10 @@
 //      getter is why the P2 round-trip passed offline and lost every component ref live.
 //   6. `name` is a REQUIRED property: assigning undefined/'' throws, as Figma does.
 //      The permissive mock let a nameless spec build here and crash the live rebuild.
+//   7. a PUBLISHED (library) variable is invisible to getLocalVariablesAsync but
+//      answers getVariableByIdAsync with remote=true + a publish key, and
+//      importVariableByKeyAsync links THAT SAME variable back (throwing on an
+//      unpublished key). This split is the whole of the spec-005 P7 gap.
 // It does NOT emulate Figma's layout re-flow (a child's FILL coercing the parent's
 // sizing mode), nor `InstanceNode.overrides` bookkeeping (tests set it by hand).
 // Those are exactly the classes of loss the LIVE half (P5) must confirm.
@@ -153,12 +157,16 @@ function setBoundVariableForPaint(paint: Record<string, unknown>, _field: 'color
   return { ...paint, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: variable.id } } };
 }
 
-/** A local Variable, as the plugin API models one: identity + a value per mode. */
+/** A Variable, as the plugin API models one: identity + a value per mode.
+ * `remote`/`key` are the PUBLISHED (library) variable's identity — Figma sets
+ * remote=true and a stable publish key on a variable that lives in another file. */
 export interface FakeVariable {
   id: string;
   name: string;
   resolvedType?: string;
   variableCollectionId?: string;
+  remote?: boolean;
+  key?: string;
   valuesByMode?: Record<string, unknown>;
   setValueForMode?(modeId: string, value: unknown): void;
 }
@@ -175,6 +183,20 @@ export function setMockLocalVariables(vars: FakeVariable[]): void {
  * must find by name (spec-005 P6). */
 export function makeMockVariable(name: string, resolvedType = 'COLOR'): FakeVariable {
   return { id: `VariableID:${idSeq++}`, name, resolvedType };
+}
+
+/** PUBLISHED variables living in a subscribed library. The contract that matters:
+ * they are NOT in the local list (getLocalVariablesAsync never reports them — the
+ * spec-005 P7 gap), they DO answer getVariableByIdAsync with remote=true + a key,
+ * and importVariableByKeyAsync links that same variable back by key. */
+let libraryVariables: FakeVariable[] = [];
+export function setMockLibraryVariables(vars: FakeVariable[]): void {
+  libraryVariables = vars;
+}
+
+/** A published library variable: bound by id on the canvas, reattached by key. */
+export function makeMockLibraryVariable(name: string, key: string, resolvedType = 'COLOR'): FakeVariable {
+  return { id: `VariableID:${idSeq++}`, name, key, remote: true, resolvedType };
 }
 
 /** The file's variable COLLECTIONS, as the token-import path finds/creates them. */
@@ -243,6 +265,8 @@ export interface MockFigma {
   variables: {
     setBoundVariableForPaint: typeof setBoundVariableForPaint;
     getLocalVariablesAsync(type?: string): Promise<FakeVariable[]>;
+    getVariableByIdAsync(id: string): Promise<FakeVariable | null>;
+    importVariableByKeyAsync(key: string): Promise<FakeVariable>;
     getLocalVariableCollectionsAsync(): Promise<FakeCollection[]>;
     createVariableCollection(name: string): FakeCollection;
     createVariable(name: string, collection: FakeCollection, type: string): FakeVariable;
@@ -252,6 +276,7 @@ export interface MockFigma {
 /** Install a fresh mock on globalThis.figma; returns it. Call once per test file. */
 export function installMockFigma(): MockFigma {
   localVariables = [];
+  libraryVariables = [];
   collections = [];
   const mk = (type: string): FakeNode => {
     const n = new FakeNode(type);
@@ -278,6 +303,15 @@ export function installMockFigma(): MockFigma {
       // answers only the untyped query.
       getLocalVariablesAsync: async (type?: string) =>
         (type ? localVariables.filter((v) => v.resolvedType === type) : localVariables),
+      // Answers for LOCAL and REMOTE alike — the one call that can see a published
+      // variable at all, and therefore the only source of its publish key.
+      getVariableByIdAsync: async (id: string) =>
+        [...localVariables, ...libraryVariables].find((v) => v.id === id) ?? null,
+      importVariableByKeyAsync: async (key: string) => {
+        const found = libraryVariables.find((v) => v.key === key);
+        if (!found) throw new Error(`variable key not found: ${key}`); // unpublished / unsubscribed
+        return found; // LINKS the same variable — never a copy, never a new local var
+      },
       getLocalVariableCollectionsAsync: async () => collections,
       createVariableCollection,
       createVariable,

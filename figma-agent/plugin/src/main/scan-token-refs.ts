@@ -14,8 +14,11 @@
 // remote variable, which `getLocalVariablesAsync` does not list — yields no
 // tokenRef. The raw id stays in `figmaScanBindings`, so the loss is visible
 // rather than silent, and such a node is NOT a round-trip fixed point.
+// CLOSED since spec-005 P7 for the PUBLISHED case: those ids resolve to a publish
+// key instead, through bindingsToLibraryBindings below (the same shape of join,
+// against the id→key map scan-library-vars.readLibraryVariableMap builds).
 
-import type { FigmaExportNode } from '../../../shared/figma-payload-types';
+import type { FigmaExportNode, FigmaLibraryBinding } from '../../../shared/figma-payload-types';
 
 type TokenRefs = NonNullable<FigmaExportNode['tokenRefs']>;
 
@@ -60,4 +63,27 @@ export function bindingsToTokenRefs(
   }
 
   return Object.keys(refs).length > 0 ? refs : undefined;
+}
+
+/**
+ * spec-005 P7 — the library twin of bindingsToTokenRefs: field→variable-id
+ * bindings + the id→key map → `libraryBindings`.
+ *
+ * Deliberately field-for-field, where the token join maps through a slot
+ * vocabulary: a library binding is replayed with the very field it was read from
+ * (executor-library-vars → bindVariableToField), so there is nothing to squeeze —
+ * per-side padding and width/height survive here, having no tokenRefs slot at all.
+ * Returns undefined when nothing resolved, so the caller can leave the key off.
+ */
+export function bindingsToLibraryBindings(
+  bindings: Record<string, string>,
+  libraryVars: ReadonlyMap<string, FigmaLibraryBinding> | undefined,
+): Record<string, FigmaLibraryBinding> | undefined {
+  if (!libraryVars || libraryVars.size === 0) return undefined;
+  const out: Record<string, FigmaLibraryBinding> = {};
+  for (const [field, id] of Object.entries(bindings)) {
+    const ref = libraryVars.get(id);
+    if (ref) out[field] = ref;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }

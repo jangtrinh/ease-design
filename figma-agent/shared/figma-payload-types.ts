@@ -25,6 +25,16 @@ export interface FigmaExportEffect {
   color?: FigmaColor;
 }
 
+/**
+ * A binding to a PUBLISHED (library / remote) variable, addressed by publish key.
+ * `name` is trace only — never used to resolve the variable (the key is the join;
+ * a name would re-open the same local-lookup dead end this type exists to escape).
+ */
+export interface FigmaLibraryBinding {
+  key: string;
+  name?: string;
+}
+
 export interface FigmaExportNode {
   type: 'FRAME' | 'TEXT' | 'RECTANGLE' | 'IMAGE' | 'GROUP' | 'INSTANCE';
   name: string;
@@ -119,6 +129,17 @@ export interface FigmaExportNode {
 
   // Styled text segments
   textSegments?: FigmaTextSegment[];
+
+  // Library / remote variable bindings (spec 005 P7) — the OTHER half of a binding.
+  // A tokenRef is a NAME, resolvable only against a variable this file owns; a
+  // published library variable has no local name to look up, so the reversible
+  // identity is its publish `key` (the variable twin of `componentKey`), which
+  // `figma.variables.importVariableByKeyAsync` links back to the SAME variable.
+  // Keys are the RAW Figma node fields the scanner saw bound (fills, strokes,
+  // cornerRadius, itemSpacing, paddingTop…), NOT tokenRefs slots: a library binding
+  // is replayed field-for-field, so it needs no lossy slot mapping (per-side padding
+  // and width/height survive here where tokenRefs has no slot for them).
+  libraryBindings?: Record<string, FigmaLibraryBinding>;
 
   // Token bindings (P3): names reference entries in FigmaExportTokens by `name`.
   // Executor resolves each via resolve-or-create (de-duped) then setBoundVariable.

@@ -12,19 +12,17 @@
 // The rebuild is scratch: it is removed again unless `--keep` is passed, so the
 // gate never litters the owner's canvas.
 //
-// KNOWN, DELIBERATE LIMITATION — variable bindings (spec-005 P1):
-// the payload carries EMPTY tokens, and the import path binds tokenRefs ONLY
-// through the map `createVariablesFromTokens(payload.tokens)` returns (see
-// plugin/src/main/main.ts importPayload → executor-variables.applyTokenRefs). It
-// does NOT look up a same-named variable that already exists in the file. So on a
-// token-bound node, the rebuild keeps the literal values, drops the bindings, and
-// this command HONESTLY reports `tokenRefs.*` / `figmaScanBindings.*` diffs plus
-// the import's own "no variable named X" warnings (surfaced as `warnings`).
-// Non-empty tokens are NOT the fix: `createVariablesFromTokens` resolves by VALUE
-// inside its own collection, so it would mint duplicate variables in the owner's
-// file — a verification gate must not mutate what it verifies. Closing this needs
-// a resolve-existing-by-name step in the import path, which is a spec-005 P5
-// decision, not a thing this command may invent.
+// VARIABLE BINDINGS — why the payload still carries EMPTY tokens:
+// non-empty tokens would be a bug, not a feature. `createVariablesFromTokens`
+// resolves by VALUE inside its own collection, so shipping tokens here would mint
+// duplicate variables in the owner's file — a verification gate must not mutate
+// what it verifies. The rebuild reattaches bindings WITHOUT them, through the
+// import path's own two joins: a LOCAL variable by name (spec-005 P6,
+// executor-token-var-resolve) and a PUBLISHED library variable by publish key
+// (spec-005 P7, executor-library-vars → importVariableByKeyAsync, which links the
+// existing variable rather than creating one). What neither join can reach — an id
+// that is local to no file this one can see — still surfaces honestly as a
+// `figmaScanBindings.*` diff plus the import's own warnings (see `warnings`).
 import { COMMAND_TIMEOUTS } from '../../../shared/protocol.ts';
 import type { CommandArgs } from '../figma-agent.ts';
 import { CliError } from '../transport/protocol-helpers.ts';

@@ -64,7 +64,10 @@ export function resolveScanTimeout(requested?: number): number {
  * variable bindings come back as reversible tokenRefs (spec-005 P1). The main
  * component of every INSTANCE is resolved by the same trick — one async pre-pass
  * (getMainComponentAsync; the sync getter throws under dynamic-page) whose map the
- * sync walker reads, so component refs survive the scan.
+ * sync walker reads, so component refs survive the scan. A THIRD pre-pass
+ * (readLibraryVariableMap, spec-005 P7) resolves the ids the local name map cannot
+ * — bindings into a published library — to their publish keys, which is the only
+ * handle a rebuild can reattach them by.
  */
 export async function scanNodeSpec(
   nodeId: string,
@@ -76,7 +79,8 @@ const node = await figma.getNodeByIdAsync(${JSON.stringify(nodeId)});
 if (!node) throw new Error('node not found: ' + ${JSON.stringify(nodeId)});
 const tokenNames = await __scan.readTokenNameMap();
 const mainComps = await __scan.readMainComponentMap(node);
-return __scan.nodeToSpec(node, tokenNames, mainComps);`;
+const libraryVars = await __scan.readLibraryVariableMap(node, tokenNames);
+return __scan.nodeToSpec(node, tokenNames, mainComps, libraryVars);`;
   const reply = await run('EXEC_JS', { code, timeoutMs }, { timeoutMs: timeoutMs + WIRE_MARGIN_MS });
   return unwrapExecJsReply(reply);
 }

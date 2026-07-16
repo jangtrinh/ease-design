@@ -13,11 +13,12 @@
 // SCOPE — reversible since spec-005 P1: variable bindings (`nodeToSpec` takes the
 // file's id→name token map, see readTokenNameMap, and rebuilds `tokenRefs`, which
 // the build path reattaches by name). Reversible since P2: INSTANCE nodes, as
-// ref + overrides (see scan-node-instance.ts). Still captured as extensions only,
-// with no reversible slot: COMPONENT / COMPONENT_SET definitions, library variable
-// bindings, and an instance's INNER (per-child) overrides.
+// ref + overrides (see scan-node-instance.ts). Reversible since P7: bindings to
+// PUBLISHED library variables, as publish keys (see scan-library-vars.ts). Still
+// captured as extensions only, with no reversible slot: COMPONENT / COMPONENT_SET
+// definitions and an instance's INNER (per-child) overrides.
 
-import type { FigmaExportEffect, FigmaExportNode } from '../../../shared/figma-payload-types';
+import type { FigmaExportEffect, FigmaExportNode, FigmaLibraryBinding } from '../../../shared/figma-payload-types';
 import type { ScannedNode } from './scan-node-types';
 import { readExtensions, readInstance, type MainComponentRef } from './scan-node-instance';
 import { readLayout, readSelfSizing } from './scan-node-layout';
@@ -27,6 +28,9 @@ import { r2, safe } from './scan-node-utils';
 
 export type { ScanExtensions, ScannedNode } from './scan-node-types';
 export type { MainComponentRef } from './scan-node-instance';
+// Re-exported so the bundled walker (`__scan.*`, see cli/src/commands/scan-node.ts)
+// can run the THIRD async pre-pass alongside the other two.
+export { readLibraryVariableMap } from './scan-library-vars';
 
 /** Figma node.type → FigmaExportNode.type (the only ones the schema models). */
 function mapType(t: string): FigmaExportNode['type'] {
@@ -134,6 +138,9 @@ function readFrameVisuals(n: Record<string, unknown>, out: ScannedNode): void {
  * `mainComps` (from readMainComponentMap) carries each INSTANCE's main-component
  * ref; omit it and the walker falls back to the sync getter, which resolves nothing
  * under a dynamic-page manifest.
+ * `libraryVars` (from readLibraryVariableMap) turns the ids `tokenNames` cannot name
+ * — bindings into a PUBLISHED library — into reversible `libraryBindings`; omit it
+ * and those bindings degrade to raw ids, as before spec-005 P7.
  * INSTANCE composition is NOT recursed: an instance is captured as a reference to
  * its main component plus its overrides (spec-005 P2) — the inner tree is the
  * component's definition, and the builder rebuilds it via createInstance().
@@ -142,6 +149,7 @@ export function nodeToSpec(
   node: SceneNode,
   tokenNames?: Map<string, string>,
   mainComps?: Map<string, MainComponentRef>,
+  libraryVars?: ReadonlyMap<string, FigmaLibraryBinding>,
 ): ScannedNode {
   const n = node as unknown as Record<string, unknown>;
   const type = node.type;
@@ -170,13 +178,13 @@ export function nodeToSpec(
   if (typeof n.opacity === 'number' && n.opacity < 1 && n.opacity > 0) out.opacity = n.opacity;
   if (typeof n.rotation === 'number' && Math.abs(n.rotation) > 0.001) out.rotation = n.rotation;
 
-  readExtensions(n, out, tokenNames);
+  readExtensions(n, out, tokenNames, libraryVars);
   if (type === 'INSTANCE') readInstance(n, out, node.id, mainComps?.get(node.id));
 
   // Children — recurse, EXCEPT into an instance (composition is the component's).
   if (type !== 'INSTANCE' && 'children' in node) {
     const kids = (node as SceneNode & ChildrenMixin).children;
-    if (kids.length) out.children = kids.map((c) => nodeToSpec(c as SceneNode, tokenNames, mainComps));
+    if (kids.length) out.children = kids.map((c) => nodeToSpec(c as SceneNode, tokenNames, mainComps, libraryVars));
   }
 
   return out;

@@ -17,6 +17,7 @@ import {
   resetImportWarnings, getImportWarnings, withCode,
 } from './executor-styles';
 import { opCreateVariable, opBindVariable } from './executor-variables';
+import { resetLibraryVariableCache } from './executor-library-vars';
 import { resolveTokenVars } from './executor-token-var-resolve';
 import { createFigmaNode } from './executor-frame';
 import { serializeDesignSystem } from './serialize-node';
@@ -220,6 +221,7 @@ async function importPayload(params: Params): Promise<{ id: string; name: string
     throw withCode(new Error('IMPORT_PAYLOAD requires params.payload (FigmaExportPayload with rootNode)'), 'E_INVALID_ARGS');
   }
   resetImportWarnings();
+  resetLibraryVariableCache(); // spec-005 P7: one import per library key, per import run
 
   // 1. Local styles + variables from tokens (variables are de-duped on re-import);
   //    tokenVars (name → Variable) feeds tokenRefs binding during node build (P3 leg B).
