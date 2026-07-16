@@ -8,6 +8,7 @@ import {
   stateView, formatAge, formatDuration, timeAgo, humanizeTool,
   toActivityRecord, pushActivity, troubleshootHint, showOnboarding,
   togglePanelMode, detailsLabel, compactMeta, PANEL_WIDTH, PANEL_HEIGHT,
+  syncPromptLabel, syncResultLabel,
   type ActivityRecord,
 } from '../plugin/src/ui/panel-model.ts';
 import type { ConnectionState } from '../shared/protocol.ts';
@@ -150,5 +151,22 @@ describe('panel mode (P5.1) — compact-first, expand on demand', () => {
     expect(compactMeta('connected')).toBeNull();
     expect(compactMeta('probing')).toBeNull();
     expect(compactMeta('handshake')).toBeNull();
+  });
+});
+
+describe('idle-commit prompt labels (spec 004 P4)', () => {
+  it('syncPromptLabel pluralizes and floors count at 1', () => {
+    expect(syncPromptLabel(1)).toBe('1 change ready');
+    expect(syncPromptLabel(3)).toBe('3 changes ready');
+    expect(syncPromptLabel(0)).toBe('1 change ready'); // never shows "0 changes"
+    expect(syncPromptLabel(2.9)).toBe('2 changes ready'); // floored
+    expect(syncPromptLabel(Number.NaN)).toBe('1 change ready');
+  });
+  it('syncResultLabel marks success with ✓ and surfaces the failure reason', () => {
+    expect(syncResultLabel(true, 'synced — 2 updated, 1 deprecated, 0 pending'))
+      .toBe('Synced ✓ — synced — 2 updated, 1 deprecated, 0 pending');
+    expect(syncResultLabel(false, 'ui not runnable')).toBe('Sync failed — ui not runnable');
+    expect(syncResultLabel(true, '')).toBe('Synced ✓ — done'); // empty summary → sane default
+    expect(syncResultLabel(false, '   ')).toBe('Sync failed — failed');
   });
 });

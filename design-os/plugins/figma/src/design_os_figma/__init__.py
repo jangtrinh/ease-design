@@ -23,7 +23,7 @@ from typing import Annotated, Any, NoReturn
 import typer
 
 from design_os.envelope import JsonFlag, emit, err_env, ok_env
-from design_os.kernel import resolve_bin
+from design_os.kernel import KernelNotFound, resolve_bin, run_ui
 
 _BIN_NAME = "figma-agent"
 _BIN_ENV = "DESIGN_OS_FIGMA_AGENT_BIN"
@@ -194,6 +194,68 @@ def scan(
     )
     data = {"out": str(out), "result": result, "next": _NEXT_HINT}
     emit(ok_env("figma scan", data), json_mode=json_, text=_scan_text(out), exit_code=0)
+
+
+def _reconcile_text(data: dict[str, Any]) -> str:
+    """One-line summary of the kernel's reconcile envelope (dry-run preview or applied)."""
+    delta = data.get("delta") if isinstance(data.get("delta"), dict) else {}
+    added = len(delta.get("added", [])) if isinstance(delta.get("added"), list) else 0
+    updated = len(delta.get("updated", [])) if isinstance(delta.get("updated"), list) else 0
+    deprecated = len(delta.get("deprecated", [])) if isinstance(delta.get("deprecated"), list) else 0
+    mode = "applied" if data.get("applied") else "dry-run"
+    frm = data.get("cursor_from", "?")
+    to = data.get("cursor_to", "?")
+    return (
+        f"figma reconcile ({mode}) — cursor {frm}..{to}\n"
+        f"  {added} added · {updated} updated · {deprecated} deprecated\n"
+    )
+
+
+@app.command(name="reconcile")
+def reconcile(
+    apply: Annotated[
+        bool, typer.Option("--apply", help="Commit the delta into the registry (default: dry-run preview)")
+    ] = False,
+    since: Annotated[
+        int | None, typer.Option("--since", help="Line-count cursor to start from")
+    ] = None,
+    dir_: Annotated[
+        Path | None, typer.Option("--dir", help="Project directory holding design/")
+    ] = None,
+    json_: JsonFlag = False,
+) -> None:
+    """Reconcile the Figma change-log into the component registry. (deterministic `ui` kernel; no network)
+
+    The ONE deterministic-kernel member of the `figma` group: it shells to `ui figma reconcile`
+    (contract §1 — never reimplemented), NOT the figma-agent hand. Undo = replay to a prior cursor.
+    """
+    args = ["figma", "reconcile", "--apply" if apply else "--dry-run"]
+    if since is not None:
+        args += ["--since", str(since)]
+    if dir_ is not None:
+        args += ["--dir", str(dir_)]
+    try:
+        result = run_ui([*args, "--json"])
+    except KernelNotFound as exc:
+        _fail("figma reconcile", "KERNEL_NOT_FOUND", str(exc), json_)
+    env = result.envelope
+    if env is None:
+        _fail("figma reconcile", "BAD_KERNEL_OUTPUT", "ui did not print a JSON envelope", json_)
+    if not env.get("ok", False):
+        error = env.get("error") if isinstance(env.get("error"), dict) else {}
+        _fail(
+            "figma reconcile",
+            str(error.get("code") or "RECONCILE_FAILED"),
+            str(error.get("message") or "reconcile failed"),
+            json_,
+        )
+    data = env.get("data") if isinstance(env.get("data"), dict) else {}
+    emit(
+        ok_env("figma reconcile", {"result": data}),
+        json_mode=json_,
+        text=_reconcile_text(data),
+        exit_code=0,
+    )
 
 
 @app.command(name="audit")

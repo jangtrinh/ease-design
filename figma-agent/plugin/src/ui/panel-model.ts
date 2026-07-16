@@ -151,6 +151,23 @@ export function detailsLabel(mode: PanelMode): string {
   return mode === 'expanded' ? 'Details ▴' : 'Details ▾';
 }
 
+// ─── Idle-commit sync prompt (spec 004 P4) ────────────────────────────────────
+// The panel gains ONE line at the idle point: "N changes ready — Sync now / Later"
+// (reuses the existing status surface; no new panel). These pure helpers format that
+// line + the post-sync confirmation; panel-ui.ts is the DOM glue that shows/hides it.
+
+/** "3 changes ready" / "1 change ready" — pluralized, count floored at 1 for display. */
+export function syncPromptLabel(count: number): string {
+  const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
+  return `${n} change${n === 1 ? '' : 's'} ready`;
+}
+
+/** Post-apply confirmation line for the prompt (success → ✓, failure → the reason). */
+export function syncResultLabel(ok: boolean, summary: string): string {
+  const clean = typeof summary === 'string' && summary.trim().length > 0 ? summary.trim() : (ok ? 'done' : 'failed');
+  return ok ? `Synced ✓ — ${clean}` : `Sync failed — ${clean}`;
+}
+
 /**
  * Compact-mode meta-line override. Compact drops the status sentence, so the
  * disconnected wait must still communicate on the ONE remaining line (spec §3).

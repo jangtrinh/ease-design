@@ -327,6 +327,44 @@ body {
 .status-pill[data-tone="info"]    { background: var(--color-info);    color: var(--color-info-foreground); }
 .status-pill[data-tone="muted"]   { background: var(--color-muted);   color: var(--color-foreground); }
 
+/* Idle-commit prompt (spec 004 P4) — a flat 2px-bordered strip carrying the burnt-
+   orange call to action. Hidden until IDLE_READY; brutalist geometry (radius 0). */
+.sync-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-top: 2px solid var(--color-foreground);
+  border-bottom: 2px solid var(--color-foreground);
+  background: var(--color-accent);
+}
+.sync-prompt[hidden] { display: none; }
+.sync-msg {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  color: var(--color-foreground);
+}
+.sync-actions { display: flex; gap: var(--space-1); flex: 0 0 auto; }
+.sync-btn {
+  padding: 4px var(--space-1);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  border: 2px solid var(--color-foreground);
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  cursor: pointer;
+}
+.sync-btn:hover { background: var(--color-foreground); color: var(--color-accent); }
+.sync-btn.sync-later { background: transparent; color: var(--color-foreground); }
+.sync-btn.sync-later:hover { background: var(--color-foreground); color: var(--color-accent); }
+
 .status-sentence { margin: 0; color: var(--color-foreground); }
 .status-sentence:empty { display: none; }
 .status-meta {
@@ -517,6 +555,16 @@ code {
     </div>
     <p class="status-sentence" id="fga-sentence">The broker starts automatically on your first CLI command.</p>
     <p class="status-meta" id="fga-meta"></p>
+  </section>
+
+  <!-- Live-sync idle-commit prompt (spec 004 P4): one line, shown only at the idle
+       point. "Sync now" applies the change-log via the deterministic kernel. -->
+  <section class="sync-prompt" id="fga-sync" aria-live="polite" hidden>
+    <p class="sync-msg" id="fga-sync-msg">changes ready</p>
+    <div class="sync-actions">
+      <button class="sync-btn" id="fga-sync-now" type="button">Sync now</button>
+      <button class="sync-btn sync-later" id="fga-sync-later" type="button">Later</button>
+    </div>
   </section>
 
   <div id="fga-expanded" hidden>

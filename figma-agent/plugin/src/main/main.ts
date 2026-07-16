@@ -6,6 +6,7 @@
 // live here; single-command executors live in executor-*.ts.
 
 import type { CommandName, ErrorCode } from '../../../shared/protocol';
+import { DEFAULT_IDLE_MS, MIN_IDLE_MS } from '../../../shared/protocol';
 import type { FigmaExportPayload } from '../../../shared/figma-payload-types';
 import {
   coalesceChanges, mapChangeType,
@@ -88,6 +89,30 @@ function resolveComponentIdentity(node: SceneNode | RemovedNode): ComponentIdent
   return null;
 }
 
+// ─── Idle-commit timer (spec 004 P4) ────────────────────────────────
+// Every captured documentchange resets a debounce; after IDLE_MS of quiet the plugin
+// posts IDLE_READY {count} to its iframe, which shows the "N changes — Sync now /
+// Later" prompt. IDLE_MS defaults to 5 min and is overridden by SYNC_CONFIG (the
+// project's design/figma-sync.json, relayed by the broker). The change-log the broker
+// already persisted is the source of truth — the timer only decides WHEN to prompt.
+let idleMs = DEFAULT_IDLE_MS;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+let changesSinceCommit = 0;
+
+function resetIdleTimer(): void {
+  if (idleTimer !== null) clearTimeout(idleTimer);
+  idleTimer = setTimeout(fireIdle, idleMs);
+}
+
+function fireIdle(): void {
+  idleTimer = null;
+  if (changesSinceCommit <= 0) return; // nothing accumulated — no prompt
+  figma.ui.postMessage({ type: 'IDLE_READY', data: { count: changesSinceCommit } });
+  // Reset here: the displayed count means "changes since this prompt". The log/cursor
+  // stay authoritative — Sync applies EVERYTHING past the cursor regardless of count.
+  changesSinceCommit = 0;
+}
+
 function onDocumentChange(event: DocumentChangeEvent): void {
   const raw: ComponentChange[] = [];
   for (const dc of event.documentChanges) {
@@ -110,6 +135,8 @@ function onDocumentChange(event: DocumentChangeEvent): void {
     type: 'DOC_CHANGE',
     data: { changes, page: figma.currentPage.name, fileKey: figma.fileKey ?? null },
   });
+  changesSinceCommit += changes.length;
+  resetIdleTimer(); // each edit pushes the idle-commit prompt further out
 }
 
 // Subscribe only after all pages are loaded (dynamic-page requirement).
@@ -124,10 +151,22 @@ interface UiRequest { requestId: string; cmd: CommandName; params?: Params }
 figma.ui.onmessage = async (msg: unknown) => {
   // P5.1 panel chrome: the DETAILS toggle asks for an iframe resize. Height is
   // clamped to the mode range so a malformed message can never blow up the panel.
-  const chrome = msg as { type?: unknown; h?: unknown } | null;
+  const chrome = msg as { type?: unknown; h?: unknown; data?: unknown } | null;
   if (chrome && chrome.type === 'PANEL_RESIZE') {
     const raw = typeof chrome.h === 'number' && Number.isFinite(chrome.h) ? chrome.h : PANEL_HEIGHT.compact;
     figma.ui.resize(PANEL_WIDTH, Math.round(Math.min(PANEL_HEIGHT.expanded, Math.max(PANEL_HEIGHT.compact, raw))));
+    return;
+  }
+  // Live-sync (spec 004 P4): the broker's idle window, relayed by the iframe.
+  if (chrome && chrome.type === 'SYNC_CONFIG') {
+    const raw = (chrome.data as { idleMs?: unknown } | undefined)?.idleMs;
+    if (typeof raw === 'number' && Number.isFinite(raw)) idleMs = Math.max(MIN_IDLE_MS, Math.floor(raw));
+    return;
+  }
+  // The panel's "Sync now" click committed — reset the local counter (the log/cursor
+  // remain the real state). The iframe already forwarded SYNC_REQUEST to the broker.
+  if (chrome && chrome.type === 'SYNC_DONE') {
+    changesSinceCommit = 0;
     return;
   }
   const req = msg as Partial<UiRequest> | null;

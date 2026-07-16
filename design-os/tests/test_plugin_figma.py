@@ -234,3 +234,59 @@ def test_figma_help_lists_audit(runner: CliRunner) -> None:
     res = runner.invoke(figma_app, ["--help"])
     assert res.exit_code == 0
     assert "audit" in res.stdout
+
+
+# ── Case 13: `reconcile` shells to the `ui` KERNEL (not figma-agent) and re-emits its data. ──
+def test_reconcile_forwards_to_ui_kernel_and_reemits(
+    runner: CliRunner, figma_env, tmp_path: Path
+) -> None:
+    """`design-os figma reconcile` is the deterministic-kernel member of the group: it runs
+    `ui figma reconcile` (contract §1) and re-emits the kernel envelope's data verbatim."""
+    argv_log = tmp_path / "argv.txt"
+    env_obj = (
+        '{"ok": true, "command": "figma reconcile", "data": '
+        '{"cursor_from": 0, "cursor_to": 2, "applied": true, "dry_run": false, '
+        '"delta": {"added": [], "updated": [], "deprecated": [{"name": "Card/Basic"}]}, '
+        '"apply": {"deprecated": ["Card/Basic"], "updated": [], "pending": [], "skipped": []}}}'
+    )
+    body = 'echo "$@" > "' + str(argv_log) + '"\n' "echo '" + env_obj + "'\n" "exit 0\n"
+    figma_env.make_stub("ui", body)
+
+    res = runner.invoke(figma_app, ["reconcile", "--apply", "--json"])
+    assert res.exit_code == 0, res.stdout
+    env = json.loads(res.stdout)
+    assert env["ok"] is True
+    assert env["command"] == "figma reconcile"
+    assert env["data"]["result"]["apply"]["deprecated"] == ["Card/Basic"]
+    # The kernel got EXACTLY the argv the plugin promises to forward (apply + json).
+    assert argv_log.read_text().strip() == "figma reconcile --apply --json"
+
+
+# ── Case 14: `reconcile` (no --apply) forwards --dry-run. ──
+def test_reconcile_default_is_dry_run(runner: CliRunner, figma_env, tmp_path: Path) -> None:
+    argv_log = tmp_path / "argv.txt"
+    env_obj = '{"ok": true, "command": "figma reconcile", "data": {"cursor_from": 0, "cursor_to": 0, "dry_run": true, "delta": {"added": [], "updated": [], "deprecated": []}}}'
+    body = 'echo "$@" > "' + str(argv_log) + '"\n' "echo '" + env_obj + "'\n" "exit 0\n"
+    figma_env.make_stub("ui", body)
+
+    res = runner.invoke(figma_app, ["reconcile", "--since", "3", "--json"])
+    assert res.exit_code == 0, res.stdout
+    assert argv_log.read_text().strip() == "figma reconcile --dry-run --since 3 --json"
+
+
+# ── Case 15: `reconcile` with no `ui` kernel on PATH → KERNEL_NOT_FOUND, exit 1. ──
+def test_reconcile_kernel_not_found(runner: CliRunner, figma_env) -> None:
+    figma_env.remove("ui")  # drop the default kernel stub → run_ui raises KernelNotFound
+    res = runner.invoke(figma_app, ["reconcile", "--json"])
+    assert res.exit_code == 1
+    env = json.loads(res.stdout)
+    assert env["ok"] is False
+    assert env["command"] == "figma reconcile"
+    assert env["error"]["code"] == "KERNEL_NOT_FOUND"
+
+
+# ── Case 16: `figma --help` lists the new `reconcile` leaf. ──
+def test_figma_help_lists_reconcile(runner: CliRunner) -> None:
+    res = runner.invoke(figma_app, ["--help"])
+    assert res.exit_code == 0
+    assert "reconcile" in res.stdout

@@ -13,6 +13,7 @@ import {
   stateView, formatAge, formatDuration, timeAgo, humanizeTool,
   toActivityRecord, pushActivity, troubleshootHint, showOnboarding,
   togglePanelMode, detailsLabel, compactMeta, PANEL_HEIGHT,
+  syncPromptLabel, syncResultLabel,
   type ActivityRecord, type PanelMode,
 } from './panel-model';
 
@@ -35,6 +36,10 @@ const dAttempts = el('fga-d-attempts');
 const dFile = el('fga-d-file');
 const dPage = el('fga-d-page');
 const copyBtn = el('fga-copy');
+const syncPrompt = el('fga-sync');
+const syncMsg = el('fga-sync-msg');
+const syncNowBtn = el('fga-sync-now');
+const syncLaterBtn = el('fga-sync-later');
 
 let payload: ConnectionStatePayload | null = null;
 let hadConnection = false; // ever reached `connected` — flips onboarding off + drop-hint on
@@ -130,10 +135,37 @@ window.addEventListener('figma-agent:activity', (ev) => {
 // also forwards it to the broker. This listener is read-only and independent.
 window.addEventListener('message', (ev: MessageEvent) => {
   const pm = (ev.data as { pluginMessage?: { type?: string; data?: Record<string, unknown> } } | null)?.pluginMessage;
-  if (!pm || pm.type !== 'FILE_INFO' || !pm.data) return;
+  if (!pm) return;
+  // Live-sync idle prompt (spec 004 P4): main fired IDLE_READY → show "N changes ready".
+  if (pm.type === 'IDLE_READY' && pm.data) {
+    const count = typeof pm.data.count === 'number' ? pm.data.count : 1;
+    syncMsg.textContent = syncPromptLabel(count);
+    syncPrompt.hidden = false;
+    return;
+  }
+  if (pm.type !== 'FILE_INFO' || !pm.data) return;
   if (typeof pm.data.fileName === 'string') sceneFile = pm.data.fileName;
   if (typeof pm.data.page === 'string') scenePage = pm.data.page;
   renderDetails();
+});
+
+// ─── Idle-commit prompt actions (spec 004 P4) ─────────────────────────────────
+// "Sync now" → ask the relay to send SYNC_REQUEST to the broker (which runs `ui figma
+// reconcile --apply`) AND tell main the batch was acknowledged. "Later" just hides it —
+// the next documentchange restarts the idle timer. SYNC_RESULT confirms in place.
+syncNowBtn.addEventListener('click', () => {
+  syncMsg.textContent = 'Syncing…';
+  try { window.dispatchEvent(new CustomEvent('figma-agent:sync-request')); } catch { /* no DOM events */ }
+  parent.postMessage({ pluginMessage: { type: 'SYNC_DONE' } }, '*');
+});
+
+syncLaterBtn.addEventListener('click', () => { syncPrompt.hidden = true; });
+
+window.addEventListener('figma-agent:sync-result', (ev) => {
+  const d = (ev as CustomEvent).detail as { ok?: boolean; summary?: string } | undefined;
+  syncMsg.textContent = syncResultLabel(d?.ok === true, typeof d?.summary === 'string' ? d.summary : '');
+  syncPrompt.hidden = false;
+  setTimeout(() => { syncPrompt.hidden = true; }, 4000); // auto-dismiss the confirmation
 });
 
 // ─── Copy status (support hand-off) ───────────────────────────────────────────

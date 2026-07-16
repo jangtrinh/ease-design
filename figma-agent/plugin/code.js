@@ -1,5 +1,11 @@
 "use strict";
 (() => {
+  // shared/protocol.ts
+  var DEFAULT_IDLE_MS = 3e5;
+  var MIN_IDLE_MS = 1e3;
+  var CHUNK_LIMIT = 512 * 1024;
+  var BROKER_IDLE_SHUTDOWN_MS = 30 * 6e4;
+
   // shared/figma-changes.ts
   function mapChangeType(type) {
     switch (type) {
@@ -1667,6 +1673,19 @@
     }
     return null;
   }
+  var idleMs = DEFAULT_IDLE_MS;
+  var idleTimer = null;
+  var changesSinceCommit = 0;
+  function resetIdleTimer() {
+    if (idleTimer !== null) clearTimeout(idleTimer);
+    idleTimer = setTimeout(fireIdle, idleMs);
+  }
+  function fireIdle() {
+    idleTimer = null;
+    if (changesSinceCommit <= 0) return;
+    figma.ui.postMessage({ type: "IDLE_READY", data: { count: changesSinceCommit } });
+    changesSinceCommit = 0;
+  }
   function onDocumentChange(event) {
     const raw = [];
     for (const dc of event.documentChanges) {
@@ -1689,6 +1708,8 @@
       type: "DOC_CHANGE",
       data: { changes, page: figma.currentPage.name, fileKey: figma.fileKey ?? null }
     });
+    changesSinceCommit += changes.length;
+    resetIdleTimer();
   }
   figma.loadAllPagesAsync().then(() => figma.on("documentchange", onDocumentChange)).catch((err) => figma.notify(`live-sync capture disabled: ${err instanceof Error ? err.message : String(err)}`));
   figma.ui.onmessage = async (msg) => {
@@ -1696,6 +1717,15 @@
     if (chrome && chrome.type === "PANEL_RESIZE") {
       const raw = typeof chrome.h === "number" && Number.isFinite(chrome.h) ? chrome.h : PANEL_HEIGHT.compact;
       figma.ui.resize(PANEL_WIDTH, Math.round(Math.min(PANEL_HEIGHT.expanded, Math.max(PANEL_HEIGHT.compact, raw))));
+      return;
+    }
+    if (chrome && chrome.type === "SYNC_CONFIG") {
+      const raw = chrome.data?.idleMs;
+      if (typeof raw === "number" && Number.isFinite(raw)) idleMs = Math.max(MIN_IDLE_MS, Math.floor(raw));
+      return;
+    }
+    if (chrome && chrome.type === "SYNC_DONE") {
+      changesSinceCommit = 0;
       return;
     }
     const req = msg;

@@ -73,9 +73,26 @@ export interface EventMsg {
   // DOC_CHANGE (spec 004 P1): the plugin's coalesced documentchange batch, carried
   // plugin → broker; the broker appends it to design/figma.changes.jsonl. Payload
   // shape: { changes: ComponentChange[], page: string, fileKey: string|null }.
-  type: 'BROKER_HELLO' | 'PLUGIN_HELLO' | 'FILE_INFO' | 'PLUGIN_GONE' | 'PING' | 'PONG' | 'DOC_CHANGE';
+  //
+  // Live-sync idle-commit (spec 004 P4) adds three wire events:
+  //   SYNC_CONFIG   broker → plugin: the idle window { idleMs } for this project's
+  //                 design/figma-sync.json (sent right after PLUGIN_HELLO).
+  //   SYNC_REQUEST  plugin → broker: the panel's "Sync now" click; the broker spawns
+  //                 `ui figma reconcile --apply` (apply stays in the deterministic kernel).
+  //   SYNC_RESULT   broker → plugin: { ok, summary } of that apply, for the panel to confirm.
+  // (IDLE_READY / SYNC_DONE are plugin-INTERNAL postMessage types between the main
+  // thread and its iframe — they never cross this wire, so they are not listed here.)
+  type:
+    | 'BROKER_HELLO' | 'PLUGIN_HELLO' | 'FILE_INFO' | 'PLUGIN_GONE' | 'PING' | 'PONG'
+    | 'DOC_CHANGE' | 'SYNC_CONFIG' | 'SYNC_REQUEST' | 'SYNC_RESULT';
   data: Record<string, unknown>;
 }
+
+// Default idle window (ms) before the plugin prompts to sync — 5 minutes (spec 004).
+// Overridable per-project in design/figma-sync.json {"idleMs": N} (or the broker's
+// FIGMA_AGENT_IDLE_MS env for fast manual testing). The plugin clamps to a floor.
+export const DEFAULT_IDLE_MS = 300_000;
+export const MIN_IDLE_MS = 1_000;
 
 // ── Multi-plugin registry (P4) ──────────────────────────────────────
 // A plugin instance's scene identity, carried on PLUGIN_HELLO and grown by

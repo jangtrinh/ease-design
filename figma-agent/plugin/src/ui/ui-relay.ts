@@ -124,6 +124,16 @@ function handleWireData(raw: string): void {
     return; // malformed frame — ignore
   }
   if (msg.type === 'PONG') { lastPongAt = Date.now(); return; } // heartbeat ack
+  // Live-sync (spec 004 P4). SYNC_CONFIG → main's idle timer; SYNC_RESULT → the panel.
+  if (msg.type === 'SYNC_CONFIG') {
+    parent.postMessage({ pluginMessage: { type: 'SYNC_CONFIG', data: msg.data ?? {} } }, '*');
+    return;
+  }
+  if (msg.type === 'SYNC_RESULT') {
+    try { window.dispatchEvent(new CustomEvent('figma-agent:sync-result', { detail: msg.data ?? {} })); }
+    catch { /* no DOM event support */ }
+    return;
+  }
   if (typeof msg.chunk === 'string' && typeof msg.seq === 'number' && typeof msg.id === 'string') {
     handleChunk(msg as unknown as ChunkMsg);
     return;
@@ -342,5 +352,12 @@ async function connectLoop(): Promise<void> {
     scheduleReconnect();
   }
 }
+
+// Live-sync (spec 004 P4): the panel's "Sync now" click dispatches this DOM event;
+// forward it to the broker as SYNC_REQUEST (the broker then runs `ui figma reconcile
+// --apply`). Same-iframe hop — panel-ui.ts owns the button, this owns the socket.
+window.addEventListener('figma-agent:sync-request', () => {
+  wsSend({ type: 'SYNC_REQUEST', data: {} });
+});
 
 void connectLoop();

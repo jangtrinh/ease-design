@@ -19,6 +19,8 @@ import { isChunkMsg, isEventMsg, isReplyMsg, isRequestMsg, parseWireMsg, rawToSt
 import { PluginRegistry } from './plugin-registry.ts';
 import { buildBrokerHelloData, noPluginMessage } from './broker-status.ts';
 import { appendChangeFrames, changeLogPath } from './change-log.ts';
+import { projectDir as syncProjectDir, readIdleMs } from './figma-sync-config.ts';
+import { spawnReconcileApply } from './figma-sync-apply.ts';
 import type { ComponentChange } from '../../../shared/figma-changes.ts';
 
 const LOG_FILE = '/tmp/figma-agent-broker.log';
@@ -143,6 +145,33 @@ export async function runBrokerDaemon(): Promise<void> {
   // FIGMA_AGENT_CHANGES_DIR). Each DOC_CHANGE batch is appended here; reconcile
   // (P2/P4) walks it. Path fixed for the daemon's life — cwd never changes.
   const changesPath = changeLogPath();
+
+  // Live-sync idle-commit (spec 004 P4): the idle window sent to each plugin, and a
+  // debounce so a double-click never launches two overlapping `ui figma reconcile
+  // --apply` processes.
+  const idleMs = readIdleMs();
+  const applyProjectDir = syncProjectDir();
+  let syncInFlight = false;
+
+  /** Send one unsolicited EventMsg to a single socket (best-effort). */
+  const sendEvent = (ws: WebSocket, type: EventMsg['type'], data: Record<string, unknown>): void => {
+    try { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type, data } satisfies EventMsg)); }
+    catch { /* socket already gone */ }
+  };
+
+  // SYNC_REQUEST → run the deterministic kernel apply, then report SYNC_RESULT back to
+  // the requesting plugin. Registry-write logic stays in `ui` (Art I) — the broker only
+  // spawns it. Debounced: a click mid-apply is ignored (the panel just waits).
+  const handleSyncRequest = (ws: WebSocket): void => {
+    if (syncInFlight) { sendEvent(ws, 'SYNC_RESULT', { ok: false, summary: 'a sync is already running' }); return; }
+    syncInFlight = true;
+    log(`SYNC_REQUEST → spawning: ui figma reconcile --apply --dir ${applyProjectDir}`);
+    spawnReconcileApply(applyProjectDir, (r) => {
+      syncInFlight = false;
+      log(`SYNC_RESULT ok=${r.ok} — ${r.summary}`);
+      sendEvent(ws, 'SYNC_RESULT', { ...r });
+    });
+  };
 
   const shutdown = (code: number, reason: string): never => {
     log(`shutdown (${reason})`);
@@ -273,6 +302,9 @@ export async function runBrokerDaemon(): Promise<void> {
         if (superseded) { try { superseded.close(); } catch { /* already gone */ } }
         st.lastBusyAt = Date.now();
         log(`plugin registered [${instanceId}]${replaced ? ' (replaced — same instance re-hello)' : ''}: ${JSON.stringify(msg.data)}`);
+        // Live-sync (spec 004 P4): hand this plugin the idle window so its debounce
+        // timer matches the project's design/figma-sync.json.
+        sendEvent(ws, 'SYNC_CONFIG', { idleMs });
         flushWaiting(); // deliver any requests parked during the reconnect gap
       } else if (msg.type === 'PING') {
         // App-level heartbeat from the plugin — answer so it knows the socket lives.
@@ -288,6 +320,10 @@ export async function runBrokerDaemon(): Promise<void> {
         // it catches edits even when no CLI command is running. Best-effort: a log
         // write failure must never disrupt the relay.
         if (isPlugin) appendDocChange(changesPath, msg.data);
+      } else if (msg.type === 'SYNC_REQUEST') {
+        // Live-sync commit (spec 004 P4): the panel's "Sync now" click → run the
+        // deterministic kernel apply and report the result back to this plugin.
+        if (isPlugin) handleSyncRequest(ws);
       } else if (isPlugin) {
         broadcastToClients(text); // other plugin events fan out to CLI clients
       }

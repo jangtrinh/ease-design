@@ -327,6 +327,44 @@ body {
 .status-pill[data-tone="info"]    { background: var(--color-info);    color: var(--color-info-foreground); }
 .status-pill[data-tone="muted"]   { background: var(--color-muted);   color: var(--color-foreground); }
 
+/* Idle-commit prompt (spec 004 P4) — a flat 2px-bordered strip carrying the burnt-
+   orange call to action. Hidden until IDLE_READY; brutalist geometry (radius 0). */
+.sync-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-top: 2px solid var(--color-foreground);
+  border-bottom: 2px solid var(--color-foreground);
+  background: var(--color-accent);
+}
+.sync-prompt[hidden] { display: none; }
+.sync-msg {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  color: var(--color-foreground);
+}
+.sync-actions { display: flex; gap: var(--space-1); flex: 0 0 auto; }
+.sync-btn {
+  padding: 4px var(--space-1);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  border: 2px solid var(--color-foreground);
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  cursor: pointer;
+}
+.sync-btn:hover { background: var(--color-foreground); color: var(--color-accent); }
+.sync-btn.sync-later { background: transparent; color: var(--color-foreground); }
+.sync-btn.sync-later:hover { background: var(--color-foreground); color: var(--color-accent); }
+
 .status-sentence { margin: 0; color: var(--color-foreground); }
 .status-sentence:empty { display: none; }
 .status-meta {
@@ -519,6 +557,16 @@ code {
     <p class="status-meta" id="fga-meta"></p>
   </section>
 
+  <!-- Live-sync idle-commit prompt (spec 004 P4): one line, shown only at the idle
+       point. "Sync now" applies the change-log via the deterministic kernel. -->
+  <section class="sync-prompt" id="fga-sync" aria-live="polite" hidden>
+    <p class="sync-msg" id="fga-sync-msg">changes ready</p>
+    <div class="sync-actions">
+      <button class="sync-btn" id="fga-sync-now" type="button">Sync now</button>
+      <button class="sync-btn sync-later" id="fga-sync-later" type="button">Later</button>
+    </div>
+  </section>
+
   <div id="fga-expanded" hidden>
     <section class="onboarding" id="fga-onboarding" aria-label="Getting started">
       <ul class="onboarding-list">
@@ -672,6 +720,14 @@ code {
   function detailsLabel(mode2) {
     return mode2 === "expanded" ? "Details \u25B4" : "Details \u25BE";
   }
+  function syncPromptLabel(count) {
+    const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
+    return `${n} change${n === 1 ? "" : "s"} ready`;
+  }
+  function syncResultLabel(ok, summary) {
+    const clean = typeof summary === "string" && summary.trim().length > 0 ? summary.trim() : ok ? "done" : "failed";
+    return ok ? `Synced \u2713 \u2014 ${clean}` : `Sync failed \u2014 ${clean}`;
+  }
   function compactMeta(state) {
     return state === "disconnected" ? "First CLI command starts it" : null;
   }
@@ -695,6 +751,10 @@ code {
   var dFile = el("fga-d-file");
   var dPage = el("fga-d-page");
   var copyBtn = el("fga-copy");
+  var syncPrompt = el("fga-sync");
+  var syncMsg = el("fga-sync-msg");
+  var syncNowBtn = el("fga-sync-now");
+  var syncLaterBtn = el("fga-sync-later");
   var payload = null;
   var hadConnection = false;
   var probeAttempts = 0;
@@ -777,10 +837,36 @@ code {
   });
   window.addEventListener("message", (ev) => {
     const pm = ev.data?.pluginMessage;
-    if (!pm || pm.type !== "FILE_INFO" || !pm.data) return;
+    if (!pm) return;
+    if (pm.type === "IDLE_READY" && pm.data) {
+      const count = typeof pm.data.count === "number" ? pm.data.count : 1;
+      syncMsg.textContent = syncPromptLabel(count);
+      syncPrompt.hidden = false;
+      return;
+    }
+    if (pm.type !== "FILE_INFO" || !pm.data) return;
     if (typeof pm.data.fileName === "string") sceneFile = pm.data.fileName;
     if (typeof pm.data.page === "string") scenePage = pm.data.page;
     renderDetails();
+  });
+  syncNowBtn.addEventListener("click", () => {
+    syncMsg.textContent = "Syncing\u2026";
+    try {
+      window.dispatchEvent(new CustomEvent("figma-agent:sync-request"));
+    } catch {
+    }
+    parent.postMessage({ pluginMessage: { type: "SYNC_DONE" } }, "*");
+  });
+  syncLaterBtn.addEventListener("click", () => {
+    syncPrompt.hidden = true;
+  });
+  window.addEventListener("figma-agent:sync-result", (ev) => {
+    const d = ev.detail;
+    syncMsg.textContent = syncResultLabel(d?.ok === true, typeof d?.summary === "string" ? d.summary : "");
+    syncPrompt.hidden = false;
+    setTimeout(() => {
+      syncPrompt.hidden = true;
+    }, 4e3);
   });
   function fallbackCopy(text, done) {
     try {
@@ -2319,6 +2405,17 @@ code {
       lastPongAt = Date.now();
       return;
     }
+    if (msg.type === "SYNC_CONFIG") {
+      parent.postMessage({ pluginMessage: { type: "SYNC_CONFIG", data: msg.data ?? {} } }, "*");
+      return;
+    }
+    if (msg.type === "SYNC_RESULT") {
+      try {
+        window.dispatchEvent(new CustomEvent("figma-agent:sync-result", { detail: msg.data ?? {} }));
+      } catch {
+      }
+      return;
+    }
     if (typeof msg.chunk === "string" && typeof msg.seq === "number" && typeof msg.id === "string") {
       handleChunk(msg);
       return;
@@ -2513,6 +2610,9 @@ code {
       scheduleReconnect();
     }
   }
+  window.addEventListener("figma-agent:sync-request", () => {
+    wsSend({ type: "SYNC_REQUEST", data: {} });
+  });
   void connectLoop();
 })();
 
