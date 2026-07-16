@@ -24,15 +24,25 @@ const CARD = {
  * A runner standing in for the plugin: answers each EXEC_JS scan with the spec
  * queued for it, and IMPORT_PAYLOAD with a rebuilt id. `specs` is consumed in
  * order (specA, then specB).
+ *
+ * EVERY EXEC_JS reply is wrapped in the `{result, console, ms}` envelope, because
+ * that is what the plugin actually returns (executor-ops.opExecJs). The earlier
+ * fake answered with a BARE spec — the one divergence from the real transport, and
+ * the reason a live rebuild died on `in set_name` while this suite stayed green:
+ * mirror-verify was posting the envelope itself as IMPORT_PAYLOAD's rootNode.
  */
+function execJsReply(result: unknown) {
+  return { result, console: [], ms: 1 };
+}
+
 function fakePlugin(specs: unknown[], calls: Call[], warnings: string[] = []) {
   const queue = [...specs];
   return async (cmd: string, params: unknown, opts?: { timeoutMs?: number }) => {
     calls.push({ cmd, params, opts });
     if (cmd === 'IMPORT_PAYLOAD') return { id: '99:1', name: 'Card', warnings };
     const code = String((params as { code: string }).code);
-    if (code.includes('.remove()')) return { removed: true };
-    return queue.shift();
+    if (code.includes('.remove()')) return execJsReply({ removed: true });
+    return execJsReply(queue.shift());
   };
 }
 
@@ -114,8 +124,26 @@ describe('mirror-verify — the verdict envelope', () => {
   });
 
   it('fails loudly when the rebuild returns no id', async () => {
-    const runner = async (cmd: string) => (cmd === 'IMPORT_PAYLOAD' ? {} : CARD);
+    const runner = async (cmd: string) => (cmd === 'IMPORT_PAYLOAD' ? {} : execJsReply(CARD));
     await expect(execute('1:2', OPTS, runner)).rejects.toThrow('no rebuilt node id');
+  });
+
+  // LIVE REGRESSION (node 25575:353653, "Platform - Design System"): the rebuild died
+  // with `in set_name: Property "name" failed validation: Required value missing`,
+  // because rootNode was the EXEC_JS envelope — an object with no type and no name.
+  it('rebuilds from the UNWRAPPED spec, never the EXEC_JS {result, console, ms} envelope', async () => {
+    const calls: Call[] = [];
+    await execute('1:2', OPTS, fakePlugin([CARD, CARD], calls));
+    const root = (calls[1].params as { payload: { rootNode: Record<string, unknown>; name: unknown } }).payload;
+    expect(root.rootNode).not.toHaveProperty('result'); // the envelope must not survive
+    expect(root.rootNode.type).toBe('FRAME');
+    expect(root.rootNode.name).toBe('Card');
+    expect(root.name).toBe('Card'); // the payload name came from the spec, not the 'mirror-verify' fallback
+  });
+
+  it('fails loudly when the scan returns a reply that carries no spec', async () => {
+    const runner = async () => execJsReply(null); // e.g. a walker that returned nothing
+    await expect(execute('1:2', OPTS, runner)).rejects.toThrow('no usable spec');
   });
 });
 

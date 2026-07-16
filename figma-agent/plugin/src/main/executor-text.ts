@@ -3,12 +3,12 @@
 
 import type { FigmaExportNode } from '../../../shared/figma-payload-types';
 import { loadBestFont } from './executor-fonts';
-import { rgbToFigma } from './executor-styles';
+import { rgbToFigma, specNodeName } from './executor-styles';
 import { applyTokenRefs } from './executor-variables';
 
 export async function createTextNode(exportNode: FigmaExportNode, tokenVars?: Map<string, Variable>): Promise<TextNode> {
   const textNode = figma.createText();
-  textNode.name = exportNode.name;
+  textNode.name = specNodeName(exportNode);
 
   const family = exportNode.fontFamily || 'Inter';
   const weight = exportNode.fontWeight || 400;

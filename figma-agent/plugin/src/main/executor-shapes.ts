@@ -4,7 +4,7 @@
 // documentAccess:"dynamic-page": fillStyleId → setFillStyleIdAsync.
 
 import type { FigmaExportNode } from '../../../shared/figma-payload-types';
-import { rgbToFigma, figmaColorToHex, mapExportEffects, pushImportWarning } from './executor-styles';
+import { rgbToFigma, figmaColorToHex, mapExportEffects, pushImportWarning, specNodeName } from './executor-styles';
 import { applyTokenRefs } from './executor-variables';
 
 const PLACEHOLDER_FILL: SolidPaint = { type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 }, opacity: 1 };
@@ -15,7 +15,7 @@ export async function createRectangleNode(
   tokenVars?: Map<string, Variable>,
 ): Promise<RectangleNode> {
   const rect = figma.createRectangle();
-  rect.name = exportNode.name;
+  rect.name = specNodeName(exportNode);
 
   if (exportNode.width) rect.resize(exportNode.width, exportNode.height || exportNode.width);
 
@@ -79,7 +79,7 @@ export async function createRectangleNode(
 /** Fallback: images represented as rectangles with a placeholder fill. */
 export function createImageNode(exportNode: FigmaExportNode): RectangleNode {
   const rect = figma.createRectangle();
-  rect.name = exportNode.name;
+  rect.name = specNodeName(exportNode);
   rect.resize(exportNode.width || 200, exportNode.height || 200);
   rect.fills = [PLACEHOLDER_FILL];
   rect.cornerRadius = exportNode.cornerRadius || 0;
@@ -90,7 +90,7 @@ export function createImageNode(exportNode: FigmaExportNode): RectangleNode {
 export function createSvgNode(exportNode: FigmaExportNode): SceneNode {
   try {
     const frame = figma.createNodeFromSvg(exportNode.svgContent!);
-    frame.name = exportNode.name;
+    frame.name = specNodeName(exportNode);
     const w = exportNode.width || 24;
     const h = exportNode.height || 24;
     frame.resize(w, h);
@@ -105,7 +105,7 @@ export function createSvgNode(exportNode: FigmaExportNode): SceneNode {
 /** Download an image from URL and apply it as an image fill. */
 export async function createImageNodeWithFetch(exportNode: FigmaExportNode): Promise<RectangleNode> {
   const rect = figma.createRectangle();
-  rect.name = exportNode.name;
+  rect.name = specNodeName(exportNode);
   rect.resize(exportNode.width || 200, exportNode.height || 200);
   rect.cornerRadius = exportNode.cornerRadius || 0;
 

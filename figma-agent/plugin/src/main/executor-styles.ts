@@ -4,11 +4,30 @@
 // figmaColorToHex (858-864). Also hosts the cross-executor helpers:
 // error-code tagging and the per-import warnings collector.
 
-import type { FigmaColor, FigmaExportEffect, FigmaExportFill, FigmaExportTokens } from '../../../shared/figma-payload-types';
+import type {
+  FigmaColor, FigmaExportEffect, FigmaExportFill, FigmaExportNode, FigmaExportTokens,
+} from '../../../shared/figma-payload-types';
 import { loadBestFont } from './executor-fonts';
 
 // Folder prefix for generated local styles (EaseUI original used 'EaseUI/').
 export const STYLE_FOLDER = 'EaseDesign';
+
+/**
+ * The name to give a node built from `spec` — NEVER undefined or empty.
+ *
+ * `name` is a required Figma property: `node.name = undefined` throws
+ * `in set_name: Property "name" failed validation: Required value missing`, and
+ * since every create-node path assigns the name FIRST, that one throw aborts the
+ * ENTIRE import — a whole tree lost to one malformed node. A rebuild must degrade,
+ * not die, so the name is coerced here, at the layer every executor shares, rather
+ * than guarded at each of the six assignment sites.
+ */
+export function specNodeName(spec: FigmaExportNode): string {
+  for (const candidate of [spec.name, spec.componentName, spec.type]) {
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return 'Node';
+}
 
 // ── Error tagging (read by main.ts reply envelope) ──────────────────
 export function withCode(err: Error, code: string): Error {

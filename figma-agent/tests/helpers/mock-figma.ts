@@ -13,6 +13,12 @@
 //   4. an INSTANCE mirrors its main component (createInstance clones it) and
 //      setProperties throws on a property the main does not expose — the two
 //      behaviours the spec-005 P2 instance round-trip stands on.
+//   5. the `documentAccess: "dynamic-page"` manifest reality, confirmed on the live
+//      canvas: the SYNC `mainComponent` getter THROWS ("Use node.getMainComponentAsync
+//      instead") — only the async twin resolves a main. A mock that answered the sync
+//      getter is why the P2 round-trip passed offline and lost every component ref live.
+//   6. `name` is a REQUIRED property: assigning undefined/'' throws, as Figma does.
+//      The permissive mock let a nameless spec build here and crash the live rebuild.
 // It does NOT emulate Figma's layout re-flow (a child's FILL coercing the parent's
 // sizing mode), nor `InstanceNode.overrides` bookkeeping (tests set it by hand).
 // Those are exactly the classes of loss the LIVE half (P5) must confirm.
@@ -24,7 +30,6 @@ type Corners = { tl: number; tr: number; br: number; bl: number };
 
 export class FakeNode {
   id = `S:${idSeq++}`;
-  name = 'Node';
   type: string;
   width = 0;
   height = 0;
@@ -34,10 +39,35 @@ export class FakeNode {
   private _corners: Corners = { tl: 0, tr: 0, br: 0, bl: 0 };
   private _lsh: string | undefined;
   private _lsv: string | undefined;
+  private _name = 'Node';
+  private _main: { id?: string; key?: string; name?: string } | null = null;
   [key: string]: unknown;
 
   constructor(type: string) {
     this.type = type;
+  }
+
+  // ── name: REQUIRED (Figma rejects undefined/'' with a set_name validation error) ──
+  set name(v: string) {
+    if (typeof v !== 'string' || v.length === 0) {
+      throw new Error('in set_name: Property "name" failed validation: Required value missing');
+    }
+    this._name = v;
+  }
+  get name(): string { return this._name; }
+
+  // ── mainComponent: sync getter is UNUSABLE under documentAccess: dynamic-page ──
+  set mainComponent(v: { id?: string; key?: string; name?: string } | null) { this._main = v; }
+  get mainComponent(): never {
+    throw new Error(
+      'in get_mainComponent: Cannot call with documentAccess: dynamic-page. '
+      + 'Use node.getMainComponentAsync instead.',
+    );
+  }
+
+  /** InstanceNode.getMainComponentAsync — the ONLY way to reach the main live. */
+  async getMainComponentAsync(): Promise<{ id?: string; key?: string; name?: string } | null> {
+    return this._main;
   }
 
   resize(w: number, h: number): void {
@@ -69,7 +99,7 @@ export class FakeNode {
   createInstance(): FakeNode {
     const inst = this.cloneAs('INSTANCE');
     delete inst.key; // only a main component is publishable
-    inst.mainComponent = { id: this.id, key: this.key, name: this.name };
+    inst.mainComponent = { id: this.id, key: this.key as string | undefined, name: this.name };
     return inst;
   }
 

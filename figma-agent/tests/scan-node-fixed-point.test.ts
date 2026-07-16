@@ -47,7 +47,7 @@ beforeAll(() => { installMockFigma(); });
 // Imported lazily inside tests would also work; static import is safe because the
 // executor modules only touch `figma` inside function bodies.
 const { createFigmaNode } = await import('../plugin/src/main/executor-frame.ts');
-const { nodeToSpec, readTokenNameMap } = await import('../plugin/src/main/scan-node.ts');
+const { nodeToSpec, readTokenNameMap, readMainComponentMap } = await import('../plugin/src/main/scan-node.ts');
 const { resolveTokenVars } = await import('../plugin/src/main/executor-token-var-resolve.ts');
 
 type Vars = Map<string, { id: string; name: string }>;
@@ -56,11 +56,22 @@ type Vars = Map<string, { id: string; name: string }>;
 const namesOf = (vars?: Vars): Map<string, string> =>
   new Map([...(vars?.values() ?? [])].map((v) => [v.id, v.name]));
 
+/**
+ * Scan a live node exactly as the CLI does: the two ASYNC pre-passes first
+ * (readTokenNameMap / readMainComponentMap), then the sync walker over their maps.
+ * Calling nodeToSpec WITHOUT the main map is what shipped, and it is unscannable —
+ * the sync `mainComponent` getter throws under dynamic-page — so the harness has to
+ * use the same seam scan-node.ts injects, or it proves nothing about the live path.
+ */
+async function scan(node: SceneNode, tokenNames: Map<string, string>): Promise<ScannedNode> {
+  return nodeToSpec(node, tokenNames, await readMainComponentMap(node));
+}
+
 async function build(spec: FigmaExportNode, vars?: Vars, tokenNames = namesOf(vars)): Promise<ScannedNode> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const node = await createFigmaNode(spec as any, new Map(), vars as any);
   if (!node) throw new Error('builder returned null');
-  return nodeToSpec(node, tokenNames);
+  return scan(node, tokenNames);
 }
 
 /**
@@ -293,7 +304,7 @@ describe('reversibility GAP that REMAINS — per-side (non-uniform) padding bind
     frame.paddingTop = 12;
     frame.setBoundVariable('paddingTop', { id: 'VariableID:5' });
 
-    const spec1 = nodeToSpec(frame as unknown as SceneNode, new Map([['VariableID:5', 'space/md']]));
+    const spec1 = await scan(frame as unknown as SceneNode, new Map([['VariableID:5', 'space/md']]));
     expect(spec1.figmaScanBindings).toEqual({ paddingTop: 'VariableID:5' });
     expect(spec1.tokenRefs).toBeUndefined();
   });
@@ -400,6 +411,38 @@ describe('fixed point — INSTANCE survives as ref + overrides (spec-005 P2)', (
   });
 });
 
+// LIVE REGRESSION (node 25575:353653, "Platform - Design System"): every scanned
+// INSTANCE came back componentKey/componentId/componentName = null. Cause: the walker
+// read the SYNC `mainComponent` getter, which under the plugin's
+// `documentAccess: "dynamic-page"` manifest throws outright ("Use
+// node.getMainComponentAsync instead") — safe() swallowed it into null, so the ref
+// vanished and the rebuild had nothing to instantiate from. Same deprecated-sync-API
+// class as the getNodeById→getNodeByIdAsync fix.
+describe('instance REF — resolved through the ASYNC pre-pass, not the sync getter', () => {
+  beforeEach(() => { setMockComponents([mainButton()]); resetImportWarnings(); });
+
+  it('captures key/id/name from getMainComponentAsync while the sync getter throws', async () => {
+    const inst = mainButton().createInstance();
+    // The live contract, mirrored by the mock: the sync getter is unusable…
+    expect(() => (inst as unknown as { mainComponent: unknown }).mainComponent).toThrow('getMainComponentAsync');
+    // …and the async pre-pass is what actually resolves the main.
+    const map = await readMainComponentMap(inst as unknown as SceneNode);
+    expect(map.get(inst.id)).toMatchObject({ key: 'KEY-BTN', name: 'Button/Primary' });
+
+    const spec = await scan(inst as unknown as SceneNode, new Map());
+    expect(spec).toMatchObject({ type: 'INSTANCE', componentKey: 'KEY-BTN', componentName: 'Button/Primary' });
+    expect(spec.componentId).toBeTruthy();
+  });
+
+  it('loses the ref when the map is withheld — the exact shape of the live bug', async () => {
+    const inst = mainButton().createInstance();
+    const spec = nodeToSpec(inst as unknown as SceneNode); // no pre-pass = what shipped
+    expect(spec.componentKey).toBeUndefined();
+    expect(spec.componentId).toBeUndefined();
+    expect(spec.componentName).toBeUndefined();
+  });
+});
+
 describe('instance EDGE — a property the main does not expose', () => {
   beforeEach(() => { setMockComponents([mainButton()]); resetImportWarnings(); });
 
@@ -429,6 +472,31 @@ describe('instance GAP that REMAINS — main component not resolvable', () => {
   });
 });
 
+// LIVE REGRESSION: `name` is a REQUIRED Figma property and every create-node path
+// assigns it FIRST, so ONE nameless node used to throw `in set_name: … Required value
+// missing` and abort the whole import (live: it left a single default-named 100×100
+// orphan frame and lost the entire tree). A rebuild degrades; it does not die.
+describe('rebuild ROBUSTNESS — a node with no usable name', () => {
+  beforeEach(() => { setMockComponents([]); resetImportWarnings(); });
+
+  it('builds every node with a valid name instead of crashing the tree', async () => {
+    const spec1 = await build({
+      type: 'FRAME', name: '', width: 200, height: 100, layoutMode: 'VERTICAL',
+      children: [
+        { type: 'TEXT', characters: 'Hi', fontSize: 14 } as unknown as FigmaExportNode,
+        { type: 'INSTANCE', componentName: 'Button/Primary' } as unknown as FigmaExportNode,
+        { type: 'RECTANGLE', name: '', width: 10, height: 10 },
+      ],
+    });
+    expect(spec1.name).toBe('FRAME');                       // fell back to the type
+    expect(spec1.children?.[0]?.name).toBe('TEXT');
+    expect(spec1.children?.[1]?.name).toBe('Button/Primary'); // componentName beats the type
+    expect(spec1.children?.[2]?.name).toBe('RECTANGLE');
+    // The unresolvable main still degrades visibly — robustness is not silence.
+    expect(getImportWarnings().join('\n')).toContain('component link lost');
+  });
+});
+
 describe('instance GAP that REMAINS — INNER (per-child) ad-hoc overrides', () => {
   it('reports them in figmaScanInnerOverrides; a rebuild drops them', async () => {
     const main = mainButton();
@@ -441,7 +509,7 @@ describe('instance GAP that REMAINS — INNER (per-child) ad-hoc overrides', () 
       { id: `${inst.id};child`, overriddenFields: ['characters', 'fontSize'] },
     ];
 
-    const spec1 = nodeToSpec(inst as unknown as SceneNode);
+    const spec1 = await scan(inst as unknown as SceneNode, new Map());
     expect(spec1.figmaScanInnerOverrides).toEqual(['characters', 'fontSize']); // deduped + sorted
     expect(spec1.figmaScanBindings).toBeUndefined();
 

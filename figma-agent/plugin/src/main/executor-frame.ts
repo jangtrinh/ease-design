@@ -8,7 +8,7 @@
 import type { FigmaExportNode } from '../../../shared/figma-payload-types';
 import { createTextNode } from './executor-text';
 import { createRectangleNode, createImageNode, createSvgNode, createImageNodeWithFetch, resolveImagePaint } from './executor-shapes';
-import { rgbToFigma, figmaColorToHex, exportFillToPaint, mapExportEffects, pushImportWarning } from './executor-styles';
+import { rgbToFigma, figmaColorToHex, exportFillToPaint, mapExportEffects, pushImportWarning, specNodeName } from './executor-styles';
 import { createInstanceNode } from './executor-instance';
 import { applyTokenRefs } from './executor-variables';
 import { backgroundSizeToScaleMode } from './background-fill';
@@ -169,7 +169,7 @@ export async function createFrameNode(
   tokenVars?: Map<string, Variable>,
 ): Promise<FrameNode> {
   const frame = figma.createFrame();
-  frame.name = exportNode.name;
+  frame.name = specNodeName(exportNode);
 
   // Auto-Layout (flex or native GRID)
   if (exportNode.layoutMode && exportNode.layoutMode !== 'NONE') {

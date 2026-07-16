@@ -54,11 +54,28 @@ function readInnerOverrideFields(n: Record<string, unknown>, selfId: string): st
   return [...fields].sort();
 }
 
-/** The instance reference + property overrides — everything a rebuild needs. */
-export function readInstance(n: Record<string, unknown>, out: ScannedNode, selfId: string): void {
-  // `mainComponent` is the sync getter (the async twin can't be used: the walker is
-  // injected as a sync EXEC_JS function). Null for a main outside the loaded page.
-  const main = safe(() => n.mainComponent as { id?: string; key?: string; name?: string } | null);
+/** A main component's identity, as the async pre-pass resolved it. */
+export interface MainComponentRef { key?: string; id?: string; name?: string }
+
+/**
+ * The instance reference + property overrides — everything a rebuild needs.
+ *
+ * `mainRef` comes from scan-node.readMainComponentMap, an ASYNC pre-pass keyed by
+ * instance id. It is the only reliable source: under the plugin's
+ * `documentAccess: "dynamic-page"` manifest the sync `mainComponent` getter THROWS
+ * ("Use node.getMainComponentAsync instead"), `safe()` swallows that into null, and
+ * every component ref silently vanished — the same deprecated-sync-API class as
+ * getNodeById→getNodeByIdAsync. The sync read stays as a fallback for callers that
+ * pass no map (and for a non-dynamic-page manifest, where it still answers).
+ */
+export function readInstance(
+  n: Record<string, unknown>,
+  out: ScannedNode,
+  selfId: string,
+  mainRef?: MainComponentRef,
+): void {
+  const main = mainRef
+    ?? safe(() => n.mainComponent as { id?: string; key?: string; name?: string } | null);
   if (main) {
     if (typeof main.key === 'string' && main.key) out.componentKey = main.key;
     if (typeof main.id === 'string' && main.id) out.componentId = main.id;

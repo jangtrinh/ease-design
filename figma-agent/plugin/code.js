@@ -195,6 +195,12 @@
 
   // plugin/src/main/executor-styles.ts
   var STYLE_FOLDER = "EaseDesign";
+  function specNodeName(spec) {
+    for (const candidate of [spec.name, spec.componentName, spec.type]) {
+      if (typeof candidate === "string" && candidate.length > 0) return candidate;
+    }
+    return "Node";
+  }
   function withCode(err, code) {
     err.code = code;
     return err;
@@ -491,7 +497,7 @@
   // plugin/src/main/executor-text.ts
   async function createTextNode(exportNode, tokenVars) {
     const textNode = figma.createText();
-    textNode.name = exportNode.name;
+    textNode.name = specNodeName(exportNode);
     const family = exportNode.fontFamily || "Inter";
     const weight = exportNode.fontWeight || 400;
     const isItalic = exportNode.fontStyle === "italic";
@@ -594,7 +600,7 @@
   var PLACEHOLDER_FILL = { type: "SOLID", color: { r: 0.85, g: 0.85, b: 0.85 }, opacity: 1 };
   async function createRectangleNode(exportNode, colorStyles, tokenVars) {
     const rect = figma.createRectangle();
-    rect.name = exportNode.name;
+    rect.name = specNodeName(exportNode);
     if (exportNode.width) rect.resize(exportNode.width, exportNode.height || exportNode.width);
     if (exportNode.fills && exportNode.fills.length > 0) {
       const fill = exportNode.fills[0];
@@ -641,7 +647,7 @@
   }
   function createImageNode(exportNode) {
     const rect = figma.createRectangle();
-    rect.name = exportNode.name;
+    rect.name = specNodeName(exportNode);
     rect.resize(exportNode.width || 200, exportNode.height || 200);
     rect.fills = [PLACEHOLDER_FILL];
     rect.cornerRadius = exportNode.cornerRadius || 0;
@@ -650,7 +656,7 @@
   function createSvgNode(exportNode) {
     try {
       const frame = figma.createNodeFromSvg(exportNode.svgContent);
-      frame.name = exportNode.name;
+      frame.name = specNodeName(exportNode);
       const w = exportNode.width || 24;
       const h = exportNode.height || 24;
       frame.resize(w, h);
@@ -662,7 +668,7 @@
   }
   async function createImageNodeWithFetch(exportNode) {
     const rect = figma.createRectangle();
-    rect.name = exportNode.name;
+    rect.name = specNodeName(exportNode);
     rect.resize(exportNode.width || 200, exportNode.height || 200);
     rect.cornerRadius = exportNode.cornerRadius || 0;
     const url = exportNode.imageUrl || "";
@@ -1102,7 +1108,7 @@
   }
   async function createFrameNode(exportNode, colorStyles, tokenVars) {
     const frame = figma.createFrame();
-    frame.name = exportNode.name;
+    frame.name = specNodeName(exportNode);
     if (exportNode.layoutMode && exportNode.layoutMode !== "NONE") {
       applyAutoLayout(frame, exportNode, true);
     }
