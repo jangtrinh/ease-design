@@ -9,14 +9,14 @@
 // degradation P2 exists to remove. What the ref+overrides model cannot carry is
 // recorded in `figmaScanInnerOverrides` so the loss stays visible.
 
-import type { FigmaExportNode, FigmaLibraryBinding } from '../../../shared/figma-payload-types';
+import type { FigmaExportNode, FigmaKeyedBinding } from '../../../shared/figma-payload-types';
 import type { ScannedNode } from './scan-node-types';
 import { aliasId, safe } from './scan-node-utils';
-import { bindingsToLibraryBindings, bindingsToTokenRefs } from './scan-token-refs';
+import { bindingsToKeyedBindings, bindingsToTokenRefs } from './scan-token-refs';
 
 /**
  * field→variable-id for every bound field the walker can see (node + paints).
- * Exported since spec-005 P7: the library-key pre-pass (scan-library-vars) must
+ * Exported since spec-005 P7: the publish-key pre-pass (scan-keyed-vars) must
  * collect the SAME ids the walker will later ask it about — one reader, no drift.
  */
 export function readBindings(n: Record<string, unknown>): Record<string, string> {
@@ -102,24 +102,27 @@ export function readInstance(
 
 /**
  * Capture bindings + un-modelled component types.
- * A binding leaves here through ONE of two reversible slots, never both: a LOCAL
- * variable resolves to a name (`tokenRefs`, P1); a PUBLISHED one resolves to a
- * publish key (`libraryBindings`, P7). Anything neither map names stays a raw id
+ * A binding leaves here through ONE of two reversible paths, never both (the key
+ * join drops any field the token join claimed): a LOCAL variable in one of the five
+ * tokenRefs slots resolves to a name (`tokenRefs`, P1); everything else — a
+ * PUBLISHED variable, or any variable on a field with no slot — resolves to a
+ * publish key (`keyedBindings`, P7/P8). Anything neither map names stays a raw id
  * in `figmaScanBindings` — still the honest record of a loss, just a much rarer one.
  */
 export function readExtensions(
   n: Record<string, unknown>,
   out: ScannedNode,
   tokenNames: Map<string, string> | undefined,
-  libraryVars?: ReadonlyMap<string, FigmaLibraryBinding>,
+  keyedVars?: ReadonlyMap<string, FigmaKeyedBinding>,
 ): void {
   const rec = readBindings(n);
   if (Object.keys(rec).length) {
     out.figmaScanBindings = rec;
-    const refs = bindingsToTokenRefs(rec, out.type as FigmaExportNode['type'], tokenNames);
+    const nodeType = out.type as FigmaExportNode['type'];
+    const refs = bindingsToTokenRefs(rec, nodeType, tokenNames);
     if (refs) out.tokenRefs = refs;
-    const lib = bindingsToLibraryBindings(rec, libraryVars);
-    if (lib) out.libraryBindings = lib;
+    const keyed = bindingsToKeyedBindings(rec, keyedVars, nodeType, tokenNames);
+    if (keyed) out.keyedBindings = keyed;
   }
   const type = n.type as string;
   // COMPONENT / COMPONENT_SET have no payload representation (they ARE definitions,

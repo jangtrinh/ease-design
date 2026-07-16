@@ -23,6 +23,11 @@
 //      answers getVariableByIdAsync with remote=true + a publish key, and
 //      importVariableByKeyAsync links THAT SAME variable back (throwing on an
 //      unpublished key). This split is the whole of the spec-005 P7 gap.
+//   8. a LOCAL variable carries a publish key TOO (remote:false + key — what the
+//      live probe found on the font fields), and importVariableByKeyAsync REFUSES
+//      that key: nothing published it. So the only road home for a local key is the
+//      local list, matched by key — the spec-005 P8 gap. A mock whose import
+//      answered for any known key would hide exactly that.
 // It does NOT emulate Figma's layout re-flow (a child's FILL coercing the parent's
 // sizing mode), nor `InstanceNode.overrides` bookkeeping (tests set it by hand).
 // Those are exactly the classes of loss the LIVE half (P5) must confirm.
@@ -183,6 +188,15 @@ export function setMockLocalVariables(vars: FakeVariable[]): void {
  * must find by name (spec-005 P6). */
 export function makeMockVariable(name: string, resolvedType = 'COLOR'): FakeVariable {
   return { id: `VariableID:${idSeq++}`, name, resolvedType };
+}
+
+/** A LOCAL variable that carries a publish key — what the live probe of
+ * 25575:353653 actually found bound to the font fields (remote:false + a key).
+ * The strict half of the contract: it IS in the local list and DOES answer
+ * getVariableByIdAsync, but importVariableByKeyAsync refuses its key (nothing
+ * published it), so a rebuild that leans on the import road alone loses it. */
+export function makeMockKeyedLocalVariable(name: string, key: string, resolvedType = 'COLOR'): FakeVariable {
+  return { id: `VariableID:${idSeq++}`, name, key, remote: false, resolvedType };
 }
 
 /** PUBLISHED variables living in a subscribed library. The contract that matters:

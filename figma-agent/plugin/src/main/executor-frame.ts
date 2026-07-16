@@ -10,7 +10,7 @@ import { createTextNode } from './executor-text';
 import { createRectangleNode, createImageNode, createSvgNode, createImageNodeWithFetch, resolveImagePaint } from './executor-shapes';
 import { rgbToFigma, figmaColorToHex, exportFillToPaint, mapExportEffects, pushImportWarning, specNodeName } from './executor-styles';
 import { createInstanceNode } from './executor-instance';
-import { applyLibraryBindings } from './executor-library-vars';
+import { applyKeyedBindings } from './executor-keyed-vars';
 import { applyTokenRefs } from './executor-variables';
 import { backgroundSizeToScaleMode } from './background-fill';
 import { applyMotionTracks } from './executor-motion';
@@ -47,8 +47,8 @@ export async function createFigmaNode(
   // builder applies itself, this is async, and the per-type builders' visuals are
   // all written by the time they return here, which is exactly when a paint-copy
   // binding must run.
-  if (node && exportNode.libraryBindings) {
-    await applyLibraryBindings(node, exportNode.libraryBindings);
+  if (node && exportNode.keyedBindings) {
+    await applyKeyedBindings(node, exportNode.keyedBindings);
   }
   // Track 5 Commit-4 wiring: apply captured Motion keyframes to the built node.
   // applyMotionTracks is metronome-gated + per-field try/catch — a no-op when the

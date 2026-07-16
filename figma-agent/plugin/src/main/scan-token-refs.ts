@@ -14,11 +14,12 @@
 // remote variable, which `getLocalVariablesAsync` does not list — yields no
 // tokenRef. The raw id stays in `figmaScanBindings`, so the loss is visible
 // rather than silent, and such a node is NOT a round-trip fixed point.
-// CLOSED since spec-005 P7 for the PUBLISHED case: those ids resolve to a publish
-// key instead, through bindingsToLibraryBindings below (the same shape of join,
-// against the id→key map scan-library-vars.readLibraryVariableMap builds).
+// CLOSED since spec-005 P7 (published variables) and P8 (local ones, and every
+// field with no slot at all): those ids resolve to a publish KEY instead, through
+// bindingsToKeyedBindings below — the same shape of join, against the id→key map
+// scan-keyed-vars.readKeyedVariableMap builds.
 
-import type { FigmaExportNode, FigmaLibraryBinding } from '../../../shared/figma-payload-types';
+import type { FigmaExportNode, FigmaKeyedBinding } from '../../../shared/figma-payload-types';
 
 type TokenRefs = NonNullable<FigmaExportNode['tokenRefs']>;
 
@@ -34,55 +35,96 @@ function slotForField(field: string, nodeType: FigmaExportNode['type']): keyof T
   return null; // padding is handled as a group; anything else has no tokenRefs slot
 }
 
+/** One binding the token join CAN carry: the field it was read from, the slot it
+ * travels in, and the token name that slot holds. */
+interface TokenSlot {
+  field: string;
+  slot: keyof TokenRefs;
+  name: string;
+}
+
+/**
+ * The token join, resolved but not yet shaped — the single source of truth for
+ * "which bindings does tokenRefs actually claim". bindingsToTokenRefs shapes it
+ * into the payload slots; bindingsToKeyedBindings reads the FIELDS off it to stay
+ * out of their way (one binding, one reversible path — never both, which would
+ * bind the same field twice on the rebuild).
+ *
+ * `padding` only resolves when ALL FOUR sides are bound to the SAME variable —
+ * tokenRefs models uniform padding only; a per-side binding has no slot here and
+ * is left to the key join (P8), which is field-for-field and needs no slot.
+ */
+function resolveTokenSlots(
+  bindings: Record<string, string>,
+  nodeType: FigmaExportNode['type'],
+  tokenNames: Map<string, string> | undefined,
+): TokenSlot[] {
+  if (!tokenNames || tokenNames.size === 0) return [];
+  const out: TokenSlot[] = [];
+
+  for (const [field, id] of Object.entries(bindings)) {
+    const slot = slotForField(field, nodeType);
+    if (!slot) continue;
+    const name = tokenNames.get(id);
+    if (name) out.push({ field, slot, name });
+  }
+
+  const padIds = PADDING_FIELDS.map((f) => bindings[f]);
+  if (padIds.every((id) => id && id === padIds[0])) {
+    const name = tokenNames.get(padIds[0]);
+    // All four sides claimed together: applyTokenRefs replays `padding` onto each.
+    if (name) for (const field of PADDING_FIELDS) out.push({ field, slot: 'padding', name });
+  }
+
+  return out;
+}
+
 /**
  * field→variable-id bindings + id→name token map → tokenRefs.
  * Returns undefined when nothing resolved (so the caller can leave the key off).
- * `padding` only resolves when ALL FOUR sides are bound to the SAME variable —
- * tokenRefs models uniform padding only; a per-side binding has no slot and is
- * left to `figmaScanBindings` (known edge, not reversible).
  */
 export function bindingsToTokenRefs(
   bindings: Record<string, string>,
   nodeType: FigmaExportNode['type'],
   tokenNames: Map<string, string> | undefined,
 ): TokenRefs | undefined {
-  if (!tokenNames || tokenNames.size === 0) return undefined;
   const refs: TokenRefs = {};
-
-  for (const [field, id] of Object.entries(bindings)) {
-    const slot = slotForField(field, nodeType);
-    if (!slot) continue;
-    const name = tokenNames.get(id);
-    if (name) refs[slot] = name;
-  }
-
-  const padIds = PADDING_FIELDS.map((f) => bindings[f]);
-  if (padIds.every((id) => id && id === padIds[0])) {
-    const name = tokenNames.get(padIds[0]);
-    if (name) refs.padding = name;
-  }
-
+  for (const { slot, name } of resolveTokenSlots(bindings, nodeType, tokenNames)) refs[slot] = name;
   return Object.keys(refs).length > 0 ? refs : undefined;
 }
 
 /**
- * spec-005 P7 — the library twin of bindingsToTokenRefs: field→variable-id
- * bindings + the id→key map → `libraryBindings`.
+ * spec-005 P7/P8 — the key twin of bindingsToTokenRefs: field→variable-id bindings
+ * + the id→key map → `keyedBindings`.
  *
  * Deliberately field-for-field, where the token join maps through a slot
- * vocabulary: a library binding is replayed with the very field it was read from
- * (executor-library-vars → bindVariableToField), so there is nothing to squeeze —
- * per-side padding and width/height survive here, having no tokenRefs slot at all.
+ * vocabulary: a keyed binding is replayed with the very field it was read from
+ * (executor-keyed-vars → bindVariableToField), so there is nothing to squeeze —
+ * fontFamily/fontSize/fontWeight/lineHeight, maxWidth, per-side padding and
+ * width/height all survive here, having no tokenRefs slot at all. That is the
+ * whole P8 gap: the live probe's 15 remaining diffs were LOCAL variables on font
+ * fields, reachable by neither join before now.
+ *
+ * A field the token join already claimed is dropped: it is reattached by name on
+ * the rebuild (applyTokenRefs), and binding it a second time by key would be a
+ * redundant write of the same variable at best, a fight over the paint array at
+ * worst. The raw id of every binding travels in `figmaScanBindings` regardless,
+ * so nothing goes unrecorded either way.
+ *
  * Returns undefined when nothing resolved, so the caller can leave the key off.
  */
-export function bindingsToLibraryBindings(
+export function bindingsToKeyedBindings(
   bindings: Record<string, string>,
-  libraryVars: ReadonlyMap<string, FigmaLibraryBinding> | undefined,
-): Record<string, FigmaLibraryBinding> | undefined {
-  if (!libraryVars || libraryVars.size === 0) return undefined;
-  const out: Record<string, FigmaLibraryBinding> = {};
+  keyedVars: ReadonlyMap<string, FigmaKeyedBinding> | undefined,
+  nodeType: FigmaExportNode['type'],
+  tokenNames: Map<string, string> | undefined,
+): Record<string, FigmaKeyedBinding> | undefined {
+  if (!keyedVars || keyedVars.size === 0) return undefined;
+  const claimedByTokenRefs = new Set(resolveTokenSlots(bindings, nodeType, tokenNames).map((s) => s.field));
+  const out: Record<string, FigmaKeyedBinding> = {};
   for (const [field, id] of Object.entries(bindings)) {
-    const ref = libraryVars.get(id);
+    if (claimedByTokenRefs.has(field)) continue;
+    const ref = keyedVars.get(id);
     if (ref) out[field] = ref;
   }
   return Object.keys(out).length > 0 ? out : undefined;

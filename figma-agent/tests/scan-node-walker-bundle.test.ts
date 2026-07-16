@@ -26,7 +26,7 @@ describe('scan-node walker bundle', () => {
     expect(SCAN_NODE_WALKER_BUNDLE).toContain('nodeToSpec');
     expect(SCAN_NODE_WALKER_BUNDLE).toContain('readTokenNameMap');
     expect(SCAN_NODE_WALKER_BUNDLE).toContain('readMainComponentMap');
-    expect(SCAN_NODE_WALKER_BUNDLE).toContain('readLibraryVariableMap'); // spec-005 P7
+    expect(SCAN_NODE_WALKER_BUNDLE).toContain('readKeyedVariableMap'); // spec-005 P7/P8
     // Self-contained = the sub-walkers are inlined, not imported at run time.
     expect(SCAN_NODE_WALKER_BUNDLE).not.toMatch(/\brequire\(|\bfrom ['"]\.\//);
   });

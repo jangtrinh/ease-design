@@ -26,11 +26,14 @@ export interface FigmaExportEffect {
 }
 
 /**
- * A binding to a PUBLISHED (library / remote) variable, addressed by publish key.
+ * A binding addressed by its variable's publish KEY — the reversible path for any
+ * binding tokenRefs cannot carry: a PUBLISHED (library / remote) variable, and a
+ * LOCAL one bound to a field with no tokenRefs slot (fontFamily, fontSize,
+ * fontWeight, lineHeight, maxWidth, per-side padding…).
  * `name` is trace only — never used to resolve the variable (the key is the join;
- * a name would re-open the same local-lookup dead end this type exists to escape).
+ * a name would re-open the same lookup dead ends this type exists to escape).
  */
-export interface FigmaLibraryBinding {
+export interface FigmaKeyedBinding {
   key: string;
   name?: string;
 }
@@ -130,16 +133,19 @@ export interface FigmaExportNode {
   // Styled text segments
   textSegments?: FigmaTextSegment[];
 
-  // Library / remote variable bindings (spec 005 P7) — the OTHER half of a binding.
-  // A tokenRef is a NAME, resolvable only against a variable this file owns; a
-  // published library variable has no local name to look up, so the reversible
-  // identity is its publish `key` (the variable twin of `componentKey`), which
-  // `figma.variables.importVariableByKeyAsync` links back to the SAME variable.
-  // Keys are the RAW Figma node fields the scanner saw bound (fills, strokes,
-  // cornerRadius, itemSpacing, paddingTop…), NOT tokenRefs slots: a library binding
-  // is replayed field-for-field, so it needs no lossy slot mapping (per-side padding
-  // and width/height survive here where tokenRefs has no slot for them).
-  libraryBindings?: Record<string, FigmaLibraryBinding>;
+  // Key-addressed variable bindings (spec 005 P7/P8) — the OTHER half of a binding.
+  // A tokenRef is a NAME in one of five slots, and BOTH of those limits lose
+  // bindings: a published library variable has no local name to look up, and a
+  // field with no slot (font*, maxWidth, per-side padding…) has nowhere to travel
+  // even when its variable is local. The reversible identity that clears both is the
+  // variable's publish `key` (the variable twin of `componentKey`) — matched against
+  // this file's local variables first, else linked back to the SAME variable by
+  // `figma.variables.importVariableByKeyAsync`.
+  // Keys are the RAW Figma node fields the scanner saw bound (fontFamily, fontSize,
+  // cornerRadius, paddingTop…), NOT tokenRefs slots: a keyed binding is replayed
+  // field-for-field, so it needs no lossy slot mapping. A field tokenRefs already
+  // claims never appears here — one binding travels ONE reversible path.
+  keyedBindings?: Record<string, FigmaKeyedBinding>;
 
   // Token bindings (P3): names reference entries in FigmaExportTokens by `name`.
   // Executor resolves each via resolve-or-create (de-duped) then setBoundVariable.

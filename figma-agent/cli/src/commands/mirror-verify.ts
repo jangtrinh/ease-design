@@ -17,11 +17,12 @@
 // resolves by VALUE inside its own collection, so shipping tokens here would mint
 // duplicate variables in the owner's file — a verification gate must not mutate
 // what it verifies. The rebuild reattaches bindings WITHOUT them, through the
-// import path's own two joins: a LOCAL variable by name (spec-005 P6,
-// executor-token-var-resolve) and a PUBLISHED library variable by publish key
-// (spec-005 P7, executor-library-vars → importVariableByKeyAsync, which links the
-// existing variable rather than creating one). What neither join can reach — an id
-// that is local to no file this one can see — still surfaces honestly as a
+// import path's own two joins: a LOCAL variable in a tokenRefs slot, by name
+// (spec-005 P6, executor-token-var-resolve), and EVERY other binding by publish key
+// (spec-005 P7/P8, executor-keyed-vars — matched against this file's local variables
+// first, else importVariableByKeyAsync, which links the existing published variable
+// rather than creating one). What neither join can reach — a keyless variable, or an
+// id local to no file this one can see — still surfaces honestly as a
 // `figmaScanBindings.*` diff plus the import's own warnings (see `warnings`).
 import { COMMAND_TIMEOUTS } from '../../../shared/protocol.ts';
 import type { CommandArgs } from '../figma-agent.ts';
