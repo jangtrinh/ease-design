@@ -180,7 +180,8 @@ describe('spec-005 P14 — the mirror normalizer', () => {
     );
     expect(equal).toBe(false);
     expect(diffs).toEqual([
-      { path: 'innerOverrides[0].figmaScanFillSize.height', left: 836, right: 700 },
+      // Addressed by childKey, not by position — see structural-diff-keyed (P16).
+      { path: 'innerOverrides[childKey=25575:353482].figmaScanFillSize.height', left: 836, right: 700 },
     ]);
   });
 
@@ -192,6 +193,6 @@ describe('spec-005 P14 — the mirror normalizer', () => {
     const { equal, diffs } = diffNormalized(a, rebuilt({ width: 1108, height: 836 }));
     expect(equal).toBe(false);
     expect(diffs.some((d) => d.path.includes('figmaScanInnerOverrides'))).toBe(true);
-    expect(diffs.some((d) => d.path === 'innerOverrides[0].fields.height')).toBe(true);
+    expect(diffs.some((d) => d.path === 'innerOverrides[childKey=25575:353482].fields.height')).toBe(true);
   });
 });
