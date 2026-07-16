@@ -5,8 +5,7 @@
 > isolation: worktree (spec 003 P3/P5 race lesson).
 
 - [x] P1 — Capture read-only (code + unit-gates) — ✓ 2026-07-16 merged (PR #35, CI 5/5, figma-agent 200 tests). JSONL contract locked. ⚠ LIVE dogfood (documentchange on real Figma) = owner-in-the-loop, still pending.
-- [ ] P2 — reconcile --dry-run: deterministic preview-delta from the log (coalesce → ds-diff →
-      scope-map) — stage:spec · depends P1
+- [x] P2 — reconcile --dry-run — ✓ 2026-07-16 merged (PR #36, CI 5/5, suite 1831; dry-run proven byte-identical). Split-follow-up filed (Art IX).
 - [x] P3 — Registry schema (scope + deprecated) — ✓ 2026-07-16 merged (PR #34, CI 5/5, suite 1810; shadcn-standard migrates clean)
 - [ ] P4 — Idle-commit + panel prompt + apply: idle timer (config, default 5 min) → panel
       "N changes — Sync/Later" 1-click → reconcile --apply (local+global); deletion
