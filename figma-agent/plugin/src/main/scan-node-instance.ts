@@ -10,6 +10,7 @@
 // recorded in `figmaScanInnerOverrides` so the loss stays visible.
 
 import type { FigmaExportNode, FigmaKeyedBinding } from '../../../shared/figma-payload-types';
+import { unbindableFields } from '../../../shared/figma-unbindable-fields';
 import type { ScannedNode } from './scan-node-types';
 import { aliasId, safe } from './scan-node-utils';
 import { bindingsToKeyedBindings, bindingsToTokenRefs } from './scan-token-refs';
@@ -108,6 +109,12 @@ export function readInstance(
  * PUBLISHED variable, or any variable on a field with no slot — resolves to a
  * publish key (`keyedBindings`, P7/P8). Anything neither map names stays a raw id
  * in `figmaScanBindings` — still the honest record of a loss, just a much rarer one.
+ *
+ * A THIRD outcome joined them in P9: a field Figma itself refuses to bind on this
+ * node type (maxWidth on TEXT). It takes neither reversible path — not because we
+ * cannot address it, but because `setBoundVariable` throws for it on any rebuild —
+ * so it is named in `figmaScanUnbindable`. That list is what lets the mirror charge
+ * the loss to Figma's API rather than to us, WITHOUT hiding that it happened.
  */
 export function readExtensions(
   n: Record<string, unknown>,
@@ -123,6 +130,8 @@ export function readExtensions(
     if (refs) out.tokenRefs = refs;
     const keyed = bindingsToKeyedBindings(rec, keyedVars, nodeType, tokenNames);
     if (keyed) out.keyedBindings = keyed;
+    const refused = unbindableFields(nodeType, Object.keys(rec));
+    if (refused.length) out.figmaScanUnbindable = refused;
   }
   const type = n.type as string;
   // COMPONENT / COMPONENT_SET have no payload representation (they ARE definitions,

@@ -29,6 +29,7 @@ import type { CommandArgs } from '../figma-agent.ts';
 import { CliError } from '../transport/protocol-helpers.ts';
 import { runCommand } from '../transport/broker-client.ts';
 import { structuralDiff, type StructuralDiffEntry } from '../util/structural-diff.ts';
+import { stripUnbindableBindings, unbindableNotes } from '../util/mirror-normalize.ts';
 import {
   resolveScanTimeout, scanNodeSpec, type Runner, type ScannedSpec,
 } from './scan-node.ts';
@@ -45,7 +46,10 @@ export interface MirrorVerifyResult {
   keptRebuild: boolean;
   /** The rebuild's own import warnings (bindings skipped, main lost, …). */
   warnings: string[];
-  /** Spec fields dropped before the diff — see normalizeForDiff. */
+  /** Everything dropped before the diff, said out loud: the root's absolute
+   * position (normalizeForDiff) plus each binding Figma itself refuses to replay
+   * (util/mirror-normalize). A reader must never have to guess what `equal: true`
+   * forgave. */
   normalized: string[];
 }
 
@@ -111,7 +115,13 @@ export async function execute(
     if (!opts.keep) await removeNode(rebuiltId, opts.timeoutMs, run);
   }
 
-  const { equal, diffs } = structuralDiff(normalizeForDiff(specA), normalizeForDiff(specB));
+  // 4. Normalize, then diff. Bindings Figma REFUSES on this node type are dropped
+  //    from both sides (spec-005 P9) — but only where the walker itself named the
+  //    refusal, and every one of them is reported below. See util/mirror-normalize.
+  const { equal, diffs } = structuralDiff(
+    stripUnbindableBindings(normalizeForDiff(specA)),
+    stripUnbindableBindings(normalizeForDiff(specB)),
+  );
   return {
     nodeId,
     rebuiltId,
@@ -120,7 +130,7 @@ export async function execute(
     diffs,
     keptRebuild: opts.keep,
     warnings: imported?.warnings ?? [],
-    normalized: NORMALIZED_FIELDS,
+    normalized: [...NORMALIZED_FIELDS, ...unbindableNotes(specA)],
   };
 }
 

@@ -20,6 +20,7 @@
 // scan-keyed-vars.readKeyedVariableMap builds.
 
 import type { FigmaExportNode, FigmaKeyedBinding } from '../../../shared/figma-payload-types';
+import { isUnbindableField } from '../../../shared/figma-unbindable-fields';
 
 type TokenRefs = NonNullable<FigmaExportNode['tokenRefs']>;
 
@@ -111,6 +112,13 @@ export function bindingsToTokenRefs(
  * worst. The raw id of every binding travels in `figmaScanBindings` regardless,
  * so nothing goes unrecorded either way.
  *
+ * A field Figma PROVABLY refuses on this node type (maxWidth on TEXT — see
+ * shared/figma-unbindable-fields) is dropped too, for the opposite reason: the
+ * rebuild cannot bind it however it is addressed, so offering it here buys nothing
+ * but a guaranteed `setBoundVariable` throw and a warning per node. The refusal is
+ * recorded as `figmaScanUnbindable` by the caller, so it stays visible rather than
+ * silently vanishing.
+ *
  * Returns undefined when nothing resolved, so the caller can leave the key off.
  */
 export function bindingsToKeyedBindings(
@@ -124,6 +132,7 @@ export function bindingsToKeyedBindings(
   const out: Record<string, FigmaKeyedBinding> = {};
   for (const [field, id] of Object.entries(bindings)) {
     if (claimedByTokenRefs.has(field)) continue;
+    if (isUnbindableField(nodeType, field)) continue;
     const ref = keyedVars.get(id);
     if (ref) out[field] = ref;
   }
