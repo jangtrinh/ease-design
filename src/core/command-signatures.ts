@@ -452,6 +452,22 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
     },
   },
 
+  figma: {
+    summary: "Deterministic Figma live-sync: reconcile the change-log into the registry",
+    subcommands: {
+      reconcile: {
+        summary: "Preview the registry delta implied by the change-log (dry-run only)",
+        positionals: [],
+        flags: [
+          { name: "since", type: "string", summary: "Line-count cursor to start from (default 0 = whole log)" },
+          { name: "dry-run", type: "boolean", summary: "Preview only; never writes (P2 is always dry-run; --apply arrives in P4)" },
+          { name: "dir", type: "string", summary: "Project directory holding design/ (default: current directory)" },
+        ],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "BAD_CHANGE_LOG", "BAD_REGISTRY", "READ_ERROR"],
+      },
+    },
+  },
+
   ds: {
     summary: "Compile, inspect, and mutate the project's design system",
     subcommands: {
