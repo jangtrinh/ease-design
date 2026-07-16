@@ -50,3 +50,9 @@ The rules below summarize repo practice; the constitution wins on conflict.
   (L1→L4). Extract the helper; don't patch where it surfaced.
 - **Generated artifacts run the FULL linter set in their own tests.** The generated specimen page
   shipped an unguarded animation because its gate ran 3 of 4 linters (missed taste-lint).
+- **A mock must reproduce the STRICT API contract — what throws, what's required — not the happy path.**
+  Two spec-005 bugs survived a green suite because the test mock was more lenient than Figma: the sync
+  `.mainComponent` getter *throws* under `documentAccess: "dynamic-page"` (mock returned a value), and
+  `set_name` *rejects* an empty/undefined name (mock accepted it). Both only surfaced on the first live
+  round-trip. When you mock an external API, encode its refusals; a permissive mock is a green light
+  that means nothing.

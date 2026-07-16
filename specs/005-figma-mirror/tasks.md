@@ -35,9 +35,18 @@
       fallback binds only to existing vars (no dupes). Test-with-teeth: point rebuild back at old path →
       5/5 reattach tests FAIL. Follow-ups: executor-frame.ts 301 / executor-variables.ts 216 over Art IX;
       plugin code under no lint gate; dup-name-across-collections = first-wins.
-- [ ] P5 — Live round-trip GATE (owner-in-the-loop) — stage:spec · READY, waiting on owner's Figma.
-      All code merged + plugin rebuilt (code.js has binding-reattach). Broker up on :9410.
-      OWNER 2-STEP: (1) run the freshly-built plugin in Figma Desktop (loads new code.js, connects
-      :9410); (2) select a token-bound DS component → `mirror-verify <nodeId>` → expect `equal:true`
-      on core+bindings; known-degradation diffs (library vars, per-edge padding, nested variant, real
-      InstanceNode.overrides) are documented-acceptable, not failures. Procedure: plans/p5-live-procedure.md.
+- [x] instance-async-mainComponent — ✓ 2026-07-16 merged (PR #53, CI 5/5, figma-agent 300).
+      P5 LIVE (node 25575:353653, "Platform - Design System") found it: sync `.mainComponent` THROWS
+      under `documentAccess: "dynamic-page"` (safe() swallowed → null) → all 4 INSTANCEs lost
+      componentKey/id/name → rebuild set_name crash. Fixes: (A) `readMainComponentMap` async pre-pass
+      (getMainComponentAsync, mirrors readTokenNameMap); (B) THE real set_name cause = `scanNodeSpec`
+      returned the whole `{result,console,ms}` EXEC_JS envelope as the spec → unwrapExecJsReply;
+      (C) `specNodeName` fallback at all 6 name sites. Same async-getter class as #50's getNodeByIdAsync.
+- [~] P5 — Live round-trip GATE — INSTANCES PASS (2026-07-16). Post-fix live run on 25575:353653:
+      rebuild end-to-end, **warnings=0, zero component-ref diffs** — instances survive. Remaining 24
+      diffs are ALL documented edges, dominated by **library/remote variable bindings (15)**: this DS
+      binds to PUBLISHED library variables; rebuild's `resolveTokenVars` sees only LOCAL variables, so
+      library bindings don't reattach (scan records the id, rebuild can't resolve by name). Also: inner
+      overrides (2, P2 edge), font-var fallback (2), sizing (3). CORE + INSTANCES + LOCAL bindings are a
+      fixed point. Library-variable reattach = open decision (needs importVariableByKeyAsync + scan
+      records the library key) → candidate P7 / spec 006.
