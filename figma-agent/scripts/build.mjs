@@ -21,7 +21,9 @@ async function buildCli() {
     banner: { js: '#!/usr/bin/env node' },
     // ws + the capture-only optional deps stay external (resolved at runtime;
     // playwright is heavy + has native deps and must not be inlined).
-    external: ['ws', 'playwright', 'playwright-core', 'puppeteer-core', 'pixelmatch', 'pngjs'],
+    // esbuild stays external: the `scan-node` spike bundles the reverse-walker at
+    // runtime, so the CLI must resolve esbuild from node_modules, not inline it.
+    external: ['ws', 'esbuild', 'playwright', 'playwright-core', 'puppeteer-core', 'pixelmatch', 'pngjs'],
   });
 }
 

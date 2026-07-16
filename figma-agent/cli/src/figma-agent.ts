@@ -16,6 +16,7 @@ import * as exportPng from './commands/export-png.ts';
 import * as getSelection from './commands/get-selection.ts';
 import * as htmlToFigma from './commands/html-to-figma.ts';
 import * as scanDesignSystem from './commands/scan-design-system.ts';
+import * as scanNode from './commands/scan-node.ts';
 import * as scanConventions from './commands/scan-conventions.ts';
 import * as auditDs from './commands/audit-ds.ts';
 import * as setAutolayout from './commands/set-autolayout.ts';
@@ -33,6 +34,7 @@ const COMMAND_MODULES: Record<string, { run(args: CommandArgs): Promise<unknown>
   seat,
   'get-selection': getSelection,
   'scan-design-system': scanDesignSystem,
+  'scan-node': scanNode,
   'scan-conventions': scanConventions,
   'audit-ds': auditDs,
   'create-frame': createFrame,
@@ -59,6 +61,7 @@ Commands:
   seat                 Probe seat → {seat, bridge, reason} [--seat free|paid skips the probe]
   get-selection        Serialize the current selection [--depth 1]
   scan-design-system   Components/variables/styles registry [--out file.json --timeout ms]
+  scan-node            [SPIKE] Reverse-walk one node → FigmaExportNode spec <nodeId> [--timeout ms]
   scan-conventions     Convention-DNA walk over sections → usage-dna.json [<sectionId...> --out file.json --budget 14000 --timeout ms]
   audit-ds             DS-hygiene audit of the open file's component library [--out file.json --sections "01 A,02 B" --facts raw.json --from-facts raw.json --timeout ms]
   create-frame         --name n --w 400 --h 300 [--parent id --x 0 --y 0]
