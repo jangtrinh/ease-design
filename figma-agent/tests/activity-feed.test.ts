@@ -5,7 +5,7 @@
 // human watching the plugin work, so a wrong one is a lie, not a cosmetic bug.
 import { describe, it, expect } from 'vitest';
 import {
-  activityLabel, humanizeTool, formatClock, formatDuration, timeAgo,
+  activityLabel, activityMeta, humanizeTool, formatClock, formatDuration, timeAgo,
   toActivityRecord, toActivityResult, pushActivity, resolveActivity,
   type ActivityRecord,
 } from '../plugin/src/ui/activity-feed.ts';
@@ -53,6 +53,27 @@ describe('formatClock / formatDuration / timeAgo', () => {
     expect(timeAgo(now, now - 5_000)).toBe('5s ago');
     expect(timeAgo(now, now - 180_000)).toBe('3m ago');
     expect(timeAgo(now, now - 7_200_000)).toBe('2h ago');
+  });
+});
+
+describe('activityMeta — the row FOOTNOTE: outcome + timing on one line, never the label', () => {
+  it('folds outcome, duration and age into one sentence', () => {
+    const r = rec({ at: 1_000, ms: 173, pending: false, result: '→ 42 nodes' });
+    expect(activityMeta(r, 121_000)).toBe('→ 42 nodes · 173ms · 2m ago');
+  });
+  it('an in-flight row has no duration to report — it says so instead of "0ms"', () => {
+    expect(activityMeta(rec({ at: 1_000 }), 1_000)).toBe('running… · just now');
+  });
+  it('a failure reads its own error, not a generic "failed"', () => {
+    const r = rec({ at: 1_000, ms: 8, pending: false, ok: false, result: '✗ node not found' });
+    expect(activityMeta(r, 4_000)).toBe('✗ node not found · 8ms · 3s ago');
+  });
+  it('a command with nothing countable to report still times itself', () => {
+    expect(activityMeta(rec({ at: 1_000, ms: 40, pending: false }), 6_000)).toBe('40ms · 5s ago');
+  });
+  it('carries NO wall-clock stamp — the age already answers "when", and the stamp is what crowded out the label', () => {
+    const meta = activityMeta(rec({ at: new Date(2026, 6, 16, 9, 5, 3).getTime(), ms: 5, pending: false }), Date.now());
+    expect(meta).not.toContain('09:05:03');
   });
 });
 

@@ -418,7 +418,9 @@ code {
   color: var(--color-muted-foreground);
 }
 
-/* Activity band — mono, uppercase-tracked rows. */
+/* Activity band — mono rows, but SENTENCE-case and untracked: this is the one place
+   in the chrome a human READS prose rather than scans a data chip, and the brand's
+   uppercase tracking cost more legibility here than it bought identity. */
 .activity {
   border-top: 2px solid var(--color-foreground);
   padding: var(--space-1) var(--space-2);
@@ -433,19 +435,19 @@ code {
   max-height: 180px;
   overflow-y: auto;
 }
-/* A row is [dot][body], where body stacks the head line over the result line. */
+/* A row is [dot][body], where body stacks the LABEL over the meta line. Nothing
+   shares the label's line: on a ~300px panel a side-by-side stamp and duration
+   squeezed it to a single ellipsised letter, which is what this band is FOR. */
 .activity-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
-  padding: 2px 0;
+  gap: var(--space-1);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
 }
 .log-dot {
   width: 6px;
   height: 6px;
-  margin-top: 4px; /* optically centred on the head line, not the whole row */
+  margin-top: 5px; /* optically centred on the label line, not the whole row */
   flex: 0 0 auto;
   background: var(--color-success);
 }
@@ -454,43 +456,30 @@ code {
 .log-dot[data-pending="true"] { background: var(--color-warning); }
 .log-body {
   flex: 1 1 auto;
-  min-width: 0; /* lets the ellipsis in .log-tool / .log-result actually engage */
+  min-width: 0; /* lets the ellipsis in .log-label / .log-meta actually engage */
 }
-.log-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-.log-time {
-  flex: 0 0 auto;
-  color: var(--color-muted-foreground);
-  font-variant-numeric: tabular-nums;
-}
-.log-tool {
-  font-weight: var(--font-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+/* The hero line — what the plugin is doing, on what. Owns the full row width. */
+.log-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
   color: var(--color-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The footnote — outcome + duration + age, one muted line under the label. */
 .log-meta {
-  margin-left: auto;
-  flex: 0 0 auto;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
   color: var(--color-muted-foreground);
   font-variant-numeric: tabular-nums;
-}
-/* Result line — indented under the label, one line, truncated. */
-.log-result {
-  color: var(--color-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.log-result[data-ok="false"] { color: var(--color-danger); }
+/* A failure's outcome IS this line ("✗ node not found · …") — colour the whole line. */
+.log-meta[data-ok="false"] { color: var(--color-danger); }
 .activity-empty {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);

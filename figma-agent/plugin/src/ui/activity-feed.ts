@@ -41,7 +41,7 @@ export function activityLabel(rec: ActivityRecord): string {
   return label !== '' ? label : humanizeTool(rec.tool);
 }
 
-/** Wall-clock stamp for a row: "14:32:07" (local time, zero-padded). */
+/** Wall-clock stamp for a row: "14:32:07" (local time, zero-padded). Kept for the status snapshot. */
 export function formatClock(at: number): string {
   if (!Number.isFinite(at)) return '--:--:--';
   const d = new Date(at);
@@ -64,6 +64,21 @@ export function timeAgo(nowMs: number, atMs: number): string {
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m ago`;
   return `${Math.floor(m / 60)}h ago`;
+}
+
+/**
+ * The row's SECOND line — outcome and timing folded into ONE muted sentence:
+ *   "→ 42 nodes · 173ms · 2m ago" | "running… · just now" | "✗ node not found · 8ms · 3s ago"
+ * Deliberately carries no wall-clock stamp: the relative age already answers "when",
+ * and the absolute time is what used to crowd the label — the only line that says WHAT
+ * the plugin is doing — off the row entirely on a narrow panel.
+ */
+export function activityMeta(rec: ActivityRecord, now: number): string {
+  const parts: string[] = [];
+  if (rec.result) parts.push(rec.result);
+  parts.push(rec.pending ? 'running…' : formatDuration(rec.ms));
+  parts.push(timeAgo(now, rec.at));
+  return parts.join(' · ');
 }
 
 /**

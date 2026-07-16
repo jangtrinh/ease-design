@@ -16,7 +16,7 @@ import {
   type PanelMode,
 } from './panel-model';
 import {
-  activityLabel, formatClock, formatDuration, timeAgo,
+  activityLabel, activityMeta,
   toActivityRecord, toActivityResult, pushActivity, resolveActivity,
   type ActivityRecord,
 } from './activity-feed';
@@ -85,11 +85,12 @@ function renderDetails(): void {
 const ACTIVITY_ROWS = 20;
 
 /**
- * One feed row — two lines:
- *   ● 14:32:07  MIRROR-VERIFY · REBUILD            1.2s · 5s ago
- *               → Hero card, 2 warnings
- * The second line is omitted while a request is in flight (no outcome yet) and
- * whenever the command had nothing countable to report.
+ * One feed row — the LABEL is the hero, the timing is footnote:
+ *   ● Mirror-verify · rebuild
+ *     → Hero card · 2 warnings · 1.2s · 5s ago
+ * The priority is deliberate. The old row laid time/label/duration out on ONE flex
+ * line, so on a ~300px panel the two fixed-width footnotes ate the width and the
+ * label — the only part that says WHAT is happening — ellipsised down to "R".
  */
 function activityRow(r: ActivityRecord, now: number): HTMLElement {
   const li = document.createElement('li');
@@ -100,36 +101,19 @@ function activityRow(r: ActivityRecord, now: number): HTMLElement {
   dot.dataset.ok = String(r.ok);
   dot.dataset.pending = String(r.pending);
 
-  const time = document.createElement('span');
-  time.className = 'log-time';
-  time.textContent = formatClock(r.at);
+  const label = document.createElement('div');
+  label.className = 'log-label';
+  label.textContent = activityLabel(r);
 
-  const tool = document.createElement('span');
-  tool.className = 'log-tool';
-  tool.textContent = activityLabel(r);
-
-  const m = document.createElement('span');
+  // One muted line: outcome (if any) + duration (or "running…") + relative age.
+  const m = document.createElement('div');
   m.className = 'log-meta';
-  // Pending rows have no duration to report yet — they say so instead of showing "0ms".
-  m.textContent = r.pending
-    ? 'running…'
-    : `${r.ok ? '' : 'failed · '}${formatDuration(r.ms)} · ${timeAgo(now, r.at)}`;
-
-  const head = document.createElement('div');
-  head.className = 'log-head';
-  head.append(time, tool, m);
+  m.dataset.ok = String(r.ok);
+  m.textContent = activityMeta(r, now);
 
   const body = document.createElement('div');
   body.className = 'log-body';
-  body.append(head);
-
-  if (r.result) {
-    const res = document.createElement('div');
-    res.className = 'log-result';
-    res.dataset.ok = String(r.ok);
-    res.textContent = r.result;
-    body.append(res);
-  }
+  body.append(label, m);
 
   li.append(dot, body);
   return li;
