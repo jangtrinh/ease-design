@@ -7,7 +7,11 @@
 // an inner child does not detach it — recursing its STRUCTURE would, which is why P2
 // refused that and this does not do it.
 //
-// Two rules, both bought with real bugs:
+// The subtree-replacing writes (swap, variant set) live in
+// executor-instance-inner-slot.ts; this module owns the plain field writes and the
+// apply loop that sequences all three.
+//
+// Three rules, all bought with real bugs:
 //   - No cascade (P9): every field is its own try/catch. One write Figma refuses must
 //     not take the other six down with it.
 //   - resize() eats AUTO (P10): resizing an auto-layout child forces both sizing
@@ -16,10 +20,13 @@
 //     rebuilt instance would then report MORE inner overrides than the source. So the
 //     side-effect-prone fields are snapshotted off the fresh instance (i.e. the
 //     main's own values) and restored afterwards unless the spec overrides them.
+//   - A stale tree map mis-addresses SILENTLY (P13): a swap or a variant set replaces
+//     every node under the slot, so the map must be re-walked before the next,
+//     deeper override is looked up.
 
 import type { FigmaExportNode, FigmaInnerOverride } from '../../../shared/figma-payload-types';
 import { keyInnerChildren } from './instance-inner-override-keys';
-import { resolveMainComponent } from './resolve-main-component';
+import { applyChildComponentProperties, applyChildSwap } from './executor-instance-inner-slot';
 import { pushImportWarning } from './executor-styles';
 import { safe } from './scan-node-utils';
 
@@ -62,6 +69,20 @@ function applyChildFields(child: Child, fields: Record<string, string | number>,
       const cw = typeof w === 'number' ? w : (child.width as number);
       const ch = typeof h === 'number' ? h : (child.height as number);
       if (typeof resize === 'function') resize.call(child, cw, ch);
+      // resize() on a FILL-sized child is a SILENT no-op — auto-layout recomputes the
+      // size and Figma registers no override at all. PROBED on the live rebuild
+      // (spec-005 P13): resizing a FILL/FILL child to 900x700 left it at 1108x836 and
+      // added no width/height to `overriddenFields`, with nothing thrown. It is a
+      // refusal that looks like a success, so it is named here rather than left to
+      // read as a bug in this code.
+      if (Math.abs((child.width as number) - cw) > 0.01 || Math.abs((child.height as number) - ch) > 0.01) {
+        pushImportWarning(
+          `instance "${name}": inner override resize did not take (asked ${cw}x${ch}, got `
+          + `${String(child.width)}x${String(child.height)}) — the child is sized by its `
+          + `auto-layout parent (layoutSizing ${String(child.layoutSizingHorizontal)}/`
+          + `${String(child.layoutSizingVertical)}), which overrides resize()`,
+        );
+      }
     } catch (err) {
       pushImportWarning(`instance "${name}": inner override resize failed (${String(err)})`);
     }
@@ -86,67 +107,50 @@ function applyChildFields(child: Child, fields: Record<string, string | number>,
 }
 
 /**
- * Replay a swapped inner slot (spec-005 P12).
- *
- * The live P5 gate's lesson, and the reason `fields` alone was not enough: a user can
- * SWAP the component behind an inner slot without detaching the outer instance, and
- * Figma reports that swap as overrides on the fields the swap MOVED (name, width,
- * height, sizing) — never as the swap itself. On the gate's own file every one of
- * those fields happened to EQUAL the main's, so replaying them rebuilt a child that
- * matched field-for-field and still pointed at the wrong component.
- *
- * Compares before writing: the recorded ref is captured for every overridden inner
- * instance, so the common case is "already correct" and must stay a no-op — swapping
- * a node to what it already is would churn the user's file for nothing.
- */
-async function applyChildSwap(child: Child, o: FigmaInnerOverride, name: string): Promise<void> {
-  if (!o.componentKey && !o.componentId) return;
-  if (safe(() => child.type) !== 'INSTANCE') return;
-  const node = child as unknown as InstanceNode;
-  let current: ComponentNode | null = null;
-  try {
-    current = await node.getMainComponentAsync();
-  } catch { /* unreadable main → fall through and let the swap decide */ }
-  if (current && ((o.componentKey && current.key === o.componentKey)
-    || (o.componentId && current.id === o.componentId))) {
-    return; // already the right main — the main's own child, not a swap
-  }
-  const target = await resolveMainComponent(o);
-  if (!target) {
-    pushImportWarning(
-      `instance "${name}": inner slot "${o.childKey}" was swapped to a component that `
-      + `cannot be resolved (key=${o.componentKey ?? '—'}, id=${o.componentId ?? '—'}) — `
-      + `left on the main's default, swap lost`,
-    );
-    return;
-  }
-  try {
-    node.swapComponent(target);
-  } catch (err) {
-    pushImportWarning(`instance "${name}": inner slot "${o.childKey}" swap failed (${String(err)})`);
-  }
-}
-
-/**
  * Re-apply `spec.innerOverrides` onto a freshly created instance.
  *
  * MUST run after setProperties: a variant swap rebuilds the inner tree and would
  * discard anything written before it. A childKey with no twin in this instance
  * (unresolvable id shape, a main that changed since the scan) is reported and
  * skipped — the scan's `figmaScanInnerOverrides` still names the loss.
+ *
+ * THE MAP IS RE-WALKED, not taken once (spec-005 P13). A swap or a variant set on an
+ * inner slot REPLACES every node beneath it, so a map taken before them points at
+ * nodes that no longer exist — and a deeper override addressed against it silently
+ * found nothing. That is exactly what the DS-wide gate reported as "inner override
+ * had no matching child (21174:14662;112:1269)": not a key that could not be derived,
+ * but a slot still sitting on the main's default variant, whose subtree therefore
+ * never contained the node the key named. `overrides` arrives sorted by childKey, so
+ * a parent slot is always applied BEFORE its descendants — re-walking after it has
+ * rebuilt the subtree is what makes those descendants addressable at all.
  */
 export async function applyInnerOverrides(instance: InstanceNode, spec: FigmaExportNode): Promise<void> {
   const overrides: FigmaInnerOverride[] | undefined = spec.innerOverrides;
   if (!overrides || !overrides.length) return; // the pre-P11 path, byte for byte
-  const byKey = keyInnerChildren(instance as unknown as Record<string, unknown>, instance.id);
+  const root = instance as unknown as Record<string, unknown>;
+  let byKey = keyInnerChildren(root, instance.id);
   const missed: string[] = [];
   for (const o of overrides) {
     const child = byKey.get(o.childKey);
+    // FAIL-SAFE: no twin under this key → write NOTHING. A near-miss must never be
+    // resolved onto some other node; the record below keeps the loss visible instead.
     if (!child) { missed.push(o.childKey); continue; }
-    // The swap FIRST: it replaces the child's whole inner tree, so any field written
-    // before it would be thrown away with the node it was written on.
-    await applyChildSwap(child, o, spec.name);
+    // The subtree-replacing writes FIRST: any field written before them would be
+    // thrown away with the node it was written on.
+    //
+    // PROPERTIES BEFORE THE SWAP, and the order is load-bearing. A variant is not a
+    // swap — it is a property — but its main IS a different component, so the swap
+    // ref recorded for a re-varianted slot points at the sibling variant. Setting the
+    // property first moves the child onto exactly that main, and applyChildSwap's own
+    // "already the right main" check then no-ops. Swap-first would instead replay a
+    // property change as a swapComponent — the same answer by the wrong mechanism,
+    // and a real swap layered on top of it would fight the property write.
+    const revariant = applyChildComponentProperties(child, o, spec.name);
+    const swapped = await applyChildSwap(child, o, spec.name);
     applyChildFields(child, o.fields, spec.name);
+    // Only re-walk when the tree actually changed — the common case is a plain field
+    // write, and re-walking a 600-node instance per override would be nonsense.
+    if (swapped || revariant) byKey = keyInnerChildren(root, instance.id);
   }
   if (missed.length) {
     pushImportWarning(

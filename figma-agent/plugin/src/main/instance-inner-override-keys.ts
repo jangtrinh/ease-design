@@ -52,12 +52,28 @@ export function isInnerOverrideField(field: string): field is InnerOverrideField
 }
 
 /**
+ * The prefix every inner descendant of `instanceId` carries.
+ *
+ * PROBED on the live canvas (spec-005 P13) — the `I` is a marker on the OUTERMOST
+ * instance id only, never re-added per level:
+ *   - a top-level instance `25579:376847` → children `I25579:376847;<chain>`
+ *   - a NESTED instance, whose own id is already compound
+ *     (`I25579:377511;21174:14662`) → children `I25579:377511;21174:14662;<child>`,
+ *     i.e. `<selfId>;<child>` with NO second `I`.
+ * Blindly writing `I${id};` therefore produced `II25579:377511;…` and matched
+ * nothing whenever the scan root was itself a nested instance.
+ */
+function innerChildPrefix(instanceId: string): string {
+  return instanceId.startsWith('I') ? `${instanceId};` : `I${instanceId};`;
+}
+
+/**
  * `I<instanceId>;<rest>` → `<rest>`; anything else → undefined.
  * Undefined is the honest answer, not an error: an id that does not carry the
  * prefix cannot be addressed in a rebuilt twin, so it must not be reapplied.
  */
 export function innerChildKey(instanceId: string, nodeId: string): string | undefined {
-  const prefix = `I${instanceId};`;
+  const prefix = innerChildPrefix(instanceId);
   return nodeId.startsWith(prefix) && nodeId.length > prefix.length
     ? nodeId.slice(prefix.length)
     : undefined;

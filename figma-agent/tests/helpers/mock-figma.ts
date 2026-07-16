@@ -69,6 +69,30 @@ const nodesById = new Map<string, FakeNode>();
 const swappedNodes = new WeakSet<FakeNode>();
 
 /**
+ * main component → ("<prop>=<value>" → the component that variant selects).
+ * A variant is not a property of one component, it IS another component; without
+ * this registry the mock would let setProperties change a variant while the inner
+ * tree stayed put — the exact permissiveness that hid spec-005 P13.
+ */
+const variantMainsOf = new WeakMap<FakeNode, Map<string, FakeNode>>();
+
+/** Register the bodies a VARIANT property selects, e.g. `{'State=Disabled': comp}`. */
+export function setVariantMains(main: FakeNode, bodies: Record<string, FakeNode>): void {
+  variantMainsOf.set(main, new Map(Object.entries(bodies)));
+}
+
+/**
+ * The live main component behind an instance — read off the mock's own storage, NOT
+ * the `mainComponent` getter, which throws here exactly as it does under
+ * `documentAccess: "dynamic-page"`. (That refusal caught the first draft of this
+ * helper: strict mocks bite their author too, which is the point of them.)
+ */
+const mainNodeOf = (inst: FakeNode): FakeNode | undefined => {
+  const id = inst.mainRefId;
+  return id ? nodesById.get(id) : undefined;
+};
+
+/**
  * The fields `overrides` compares an instance's nodes against their main twins.
  * A superset of what the P11 replay can write (name/width/height/layoutGrow/
  * textAutoResize/*AxisSizingMode) plus the classes it deliberately cannot
@@ -78,7 +102,36 @@ const OVERRIDE_COMPARED_FIELDS = [
   'name', 'width', 'height', 'layoutGrow', 'textAutoResize',
   'primaryAxisSizingMode', 'counterAxisSizingMode',
   'characters', 'fontSize', 'fills', 'opacity', 'visible',
+  // A variant picked / boolean toggled / text typed INSIDE an inner slot. Figma
+  // reports it as this ONE field name on the inner node, with the values readable
+  // off the node itself — the commonest inner override on a real file (spec-005 P13),
+  // and invisible to this mock until it was compared here.
+  'componentProperties',
 ] as const;
+
+/**
+ * The id an inner node carries, PROBED live (spec-005 P13):
+ * `<parentPath>;<idInTheMain>`, where the outermost segment is `I<instanceId>`.
+ * The `I` marks the instance ROOT only — it is never re-added per level, so a node
+ * three deep reads `I<inst>;<a>;<b>;<c>`, not `I<inst>;<c>` (what this mock used to
+ * produce) and not `II<inst>;…`. The chain is the whole reason a childKey can name a
+ * node underneath a NESTED instance at all.
+ */
+const innerPath = (parentPath: string, mainId: string): string => `${parentPath};${mainId}`;
+
+/**
+ * The segment a twin contributes to that chain: its id IN ITS OWN MAIN.
+ *
+ * A main component can itself contain an instance, and that inner instance's children
+ * already carry a compound id of their own (`I<slot>;<child>`). Live, the chain does
+ * NOT nest those — the gate's key reads `21174:14662;112:1269`, where `112:1269` is
+ * the child's id in the Button main, not `I21174:14662;112:1269`. Every segment is a
+ * node's id in its own main; the `I` belongs to the outermost instance alone.
+ */
+const twinSegment = (main: FakeNode, twin: FakeNode): string => {
+  const prefix = `I${main.id};`;
+  return twin.id.startsWith(prefix) ? twin.id.slice(prefix.length) : twin.id;
+};
 
 const readOrUndefined = (n: FakeNode, f: string): unknown => {
   try {
@@ -128,6 +181,9 @@ export class FakeNode {
     );
   }
 
+  /** The stored main id — the mock's own bookkeeping, never a Plugin-API surface. */
+  get mainRefId(): string | undefined { return this._main?.id; }
+
   /** InstanceNode.getMainComponentAsync — the ONLY way to reach the main live. */
   async getMainComponentAsync(): Promise<{ id?: string; key?: string; name?: string } | null> {
     return this._main;
@@ -138,8 +194,13 @@ export class FakeNode {
    * AFTER applying auto-layout, so without this every AUTO frame round-tripped as
    * AUTO here and rebuilt FIXED on the live canvas (P5 diffs on 25575:353653). */
   resize(w: number, h: number): void {
-    this.width = w;
-    this.height = h;
+    // A FILL axis is owned by the auto-layout PARENT: resize() is a silent no-op on
+    // it — no throw, no change, no override registered. PROBED live (spec-005 P13) on
+    // a FILL/FILL child asked for 900x700: it stayed 1108x836 and `overriddenFields`
+    // gained neither width nor height. Modelling the write as if it landed is what
+    // made the residual width/height mirror diff look like a bug in the executor.
+    if (this._lsh !== 'FILL') this.width = w;
+    if (this._lsv !== 'FILL') this.height = h;
     const m = this.layoutMode as string | undefined;
     if (m && m !== 'NONE') {
       this.primaryAxisSizingMode = 'FIXED';
@@ -212,17 +273,17 @@ export class FakeNode {
     // The COMPOUND inner id — `I<instanceId>;<idOfTheNodeInTheMAIN>` — and the
     // main twin each inner node is measured against. Both are what makes an inner
     // override addressable across two instances of one main (spec-005 P11).
-    const pair = (i: FakeNode, m: FakeNode): void => {
+    const pair = (i: FakeNode, m: FakeNode, path: string): void => {
       mainTwinOf.set(i, m);
       i.children.forEach((child, idx) => {
         const twin = m.children[idx];
         if (!twin) return;
-        child.id = `I${inst.id};${twin.id}`;
+        child.id = innerPath(path, twinSegment(m, twin));
         nodesById.set(child.id, child);
-        pair(child, twin);
+        pair(child, twin, child.id);
       });
     };
-    pair(inst, this);
+    pair(inst, this, `I${inst.id}`);
     nodesById.set(inst.id, inst);
     return inst;
   }
@@ -237,16 +298,37 @@ export class FakeNode {
    */
   swapComponent(target: FakeNode): void {
     if (this.type !== 'INSTANCE') throw new Error('in swapComponent: node is not an instance');
+    // retwin:false — a swapped node's OWN fields stay measured against the twin it
+    // had, which is why the P5 gate's swapped slot still reads its preserved size.
+    this.adoptSubtreeOf(target, false);
+    swappedNodes.add(this);
+  }
+
+  /**
+   * Replace this instance's inner tree with `target`'s — what BOTH a swap and a
+   * variant change do on the live canvas. Ids follow the probed chain rule, rooted at
+   * this node's own path (`I<inst>` at the top, the node's compound id when nested),
+   * which is what makes a deep childKey resolvable after the tree is rebuilt.
+   */
+  private adoptSubtreeOf(target: FakeNode, retwin: boolean): void {
     for (const c of this.children) c.parent = null;
     this.children = [];
-    for (const c of target.children) {
-      const copy = c.cloneAs(c.type);
-      this.appendChild(copy);
-      copy.id = `I${this.id};${c.id}`;
-      nodesById.set(copy.id, copy);
-    }
+    const path = this.id.startsWith('I') ? this.id : `I${this.id}`;
+    const graft = (into: FakeNode, from: FakeNode, at: string): void => {
+      for (const c of from.children) {
+        const copy = c.cloneAs(c.type);
+        into.appendChild(copy);
+        copy.id = innerPath(at, twinSegment(from, c));
+        nodesById.set(copy.id, copy);
+        // The new body IS the twin now — comparing the grafted nodes against the old
+        // main's would report every one of them as overridden, which Figma does not.
+        mainTwinOf.set(copy, c);
+        graft(copy, c, copy.id);
+      }
+    };
+    graft(this, target, path);
+    if (retwin) mainTwinOf.set(this, target);
     this.mainComponent = { id: target.id, key: target.key as string | undefined, name: target.name };
-    swappedNodes.add(this);
   }
 
   // ── InstanceNode.overrides: DERIVED, not bookkept by hand ──
@@ -280,22 +362,57 @@ export class FakeNode {
       // A swapped node's children belong to its NEW main — comparing them against the
       // old twin's would report every one of them as overridden, which Figma does not.
       if (swappedNodes.has(i)) return;
-      i.children.forEach((c, idx) => { const t = m.children[idx]; if (t) visit(c, t); });
+      // Prefer the twin the node was PAIRED with (a variant rebuild re-pairs to the
+      // new body); fall back to position for the ordinary cloned tree.
+      i.children.forEach((c, idx) => { const t = mainTwinOf.get(c) ?? m.children[idx]; if (t) visit(c, t); });
     };
     visit(this, main);
     return out;
   }
 
-  /** InstanceNode.setProperties — throws on a property the main doesn't expose. */
+  /**
+   * InstanceNode.setProperties — the STRICT contract, refusals included.
+   *
+   * Figma refuses more than an unknown key, and setProperties is ALL-OR-NOTHING: it
+   * validates every entry before applying any, so one bad key costs the whole call.
+   * A permissive version of this method is what let spec-005 ship three green suites
+   * over live bugs, so the refusals are modelled first:
+   *   - a property the main does not expose → throw;
+   *   - a value of the wrong type for the definition → throw;
+   *   - a VARIANT value the component set has no variant for → throw.
+   *
+   * And the behaviour the P13 bug actually turned on: changing a VARIANT property
+   * selects a DIFFERENT component, so the inner tree is REBUILT — every id beneath
+   * this node is new afterwards. `setVariantMains` registers those variant bodies.
+   */
   setProperties(props: Record<string, string | boolean>): void {
-    const defs = this.componentPropertyDefinitions as Record<string, unknown> | undefined;
-    const current = (this.componentProperties as Record<string, { value: unknown }>) ?? {};
-    const next: Record<string, { type: string; value: unknown }> = { ...(current as never) };
+    if (this.type !== 'INSTANCE') throw new Error('in setProperties: node is not an instance');
+    const defs = this.componentPropertyDefinitions as
+      Record<string, { type?: string; variantOptions?: string[] }> | undefined;
+    const mainNode = mainNodeOf(this);
+    const variants = mainNode ? variantMainsOf.get(mainNode) : undefined;
+    // Validate EVERYTHING first — no partial application (the all-or-nothing contract).
     for (const [k, v] of Object.entries(props)) {
-      if (defs && !(k in defs)) throw new Error(`property "${k}" not found on the main component`);
-      next[k] = { type: 'VARIANT', value: v };
+      const def = defs?.[k];
+      if (defs && !def) throw new Error(`property "${k}" not found on the main component`);
+      const wantBoolean = def?.type === 'BOOLEAN';
+      if (wantBoolean && typeof v !== 'boolean') throw new Error(`property "${k}" expects a boolean`);
+      if (def && !wantBoolean && typeof v !== 'string') throw new Error(`property "${k}" expects a string`);
+      if (def?.type === 'VARIANT' && def.variantOptions && !def.variantOptions.includes(v as string)) {
+        throw new Error(`property "${k}" has no variant "${String(v)}"`);
+      }
+    }
+    const current = (this.componentProperties as Record<string, { type?: string; value: unknown }>) ?? {};
+    const next: Record<string, { type: string; value: unknown }> = { ...(current as never) };
+    let rebuildTo: FakeNode | undefined;
+    for (const [k, v] of Object.entries(props)) {
+      const type = defs?.[k]?.type ?? current[k]?.type ?? 'VARIANT';
+      if (type === 'VARIANT' && current[k]?.value !== v) rebuildTo = variants?.get(`${k}=${String(v)}`);
+      next[k] = { type, value: v };
     }
     this.componentProperties = next;
+    // A variant IS a different component — take its body, ids and all.
+    if (rebuildTo) this.adoptSubtreeOf(rebuildTo, true);
   }
 
   private get inAutoLayout(): boolean {
@@ -494,6 +611,9 @@ function createVariable(name: string, collection: FakeCollection, resolvedType: 
 let components: FakeNode[] = [];
 export function setMockComponents(comps: FakeNode[]): void {
   components = comps;
+  // A main is a node too: `getNodeByIdAsync` must answer for it (the componentId
+  // fallback when a main is unpublished), and the variant registry is keyed by it.
+  for (const c of comps) nodesById.set(c.id, c);
 }
 
 /** A COMPONENT the instance build-case can resolve + instantiate. */

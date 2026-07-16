@@ -830,8 +830,11 @@
     "counterAxisSizingMode"
   ];
   var FIELD_SET = new Set(INNER_OVERRIDE_FIELDS);
+  function innerChildPrefix(instanceId) {
+    return instanceId.startsWith("I") ? `${instanceId};` : `I${instanceId};`;
+  }
   function innerChildKey(instanceId, nodeId) {
-    const prefix = `I${instanceId};`;
+    const prefix = innerChildPrefix(instanceId);
     return nodeId.startsWith(prefix) && nodeId.length > prefix.length ? nodeId.slice(prefix.length) : void 0;
   }
   function keyInnerChildren(instance, instanceId, maxNodes = 2e3) {
@@ -872,6 +875,62 @@
     return null;
   }
 
+  // plugin/src/main/executor-instance-inner-slot.ts
+  async function applyChildSwap(child, o, name) {
+    if (!o.componentKey && !o.componentId) return false;
+    if (safe(() => child.type) !== "INSTANCE") return false;
+    const node = child;
+    let current = null;
+    try {
+      current = await node.getMainComponentAsync();
+    } catch {
+    }
+    if (current && (o.componentKey && current.key === o.componentKey || o.componentId && current.id === o.componentId)) {
+      return false;
+    }
+    const target = await resolveMainComponent(o);
+    if (!target) {
+      pushImportWarning(
+        `instance "${name}": inner slot "${o.childKey}" was swapped to a component that cannot be resolved (key=${o.componentKey ?? "\u2014"}, id=${o.componentId ?? "\u2014"}) \u2014 left on the main's default, swap lost`
+      );
+      return false;
+    }
+    try {
+      node.swapComponent(target);
+      return true;
+    } catch (err) {
+      pushImportWarning(`instance "${name}": inner slot "${o.childKey}" swap failed (${String(err)})`);
+      return false;
+    }
+  }
+  function applyChildComponentProperties(child, o, name) {
+    const props = o.componentProperties;
+    if (!props || !Object.keys(props).length) return false;
+    if (safe(() => child.type) !== "INSTANCE") return false;
+    const node = child;
+    const defs = safe(() => node.componentProperties);
+    const changesVariant = Object.keys(props).some(
+      (k) => safe(() => defs?.[k]?.type) === "VARIANT" && safe(() => defs?.[k]?.value) !== props[k]
+    );
+    try {
+      node.setProperties(props);
+      return changesVariant;
+    } catch {
+    }
+    let any = false;
+    for (const [k, v] of Object.entries(props)) {
+      try {
+        node.setProperties({ [k]: v });
+        any = true;
+      } catch (err) {
+        pushImportWarning(
+          `instance "${name}": inner slot "${o.childKey}" property "${k}" failed (${String(err)}) \u2014 left on the main's default`
+        );
+      }
+    }
+    return any && changesVariant;
+  }
+
   // plugin/src/main/executor-instance-inner-overrides.ts
   var SIDE_EFFECT_FIELDS = ["primaryAxisSizingMode", "counterAxisSizingMode", "textAutoResize"];
   function writeField(child, name, field, value) {
@@ -893,6 +952,11 @@
         const cw = typeof w === "number" ? w : child.width;
         const ch = typeof h === "number" ? h : child.height;
         if (typeof resize === "function") resize.call(child, cw, ch);
+        if (Math.abs(child.width - cw) > 0.01 || Math.abs(child.height - ch) > 0.01) {
+          pushImportWarning(
+            `instance "${name}": inner override resize did not take (asked ${cw}x${ch}, got ${String(child.width)}x${String(child.height)}) \u2014 the child is sized by its auto-layout parent (layoutSizing ${String(child.layoutSizingHorizontal)}/${String(child.layoutSizingVertical)}), which overrides resize()`
+          );
+        }
       } catch (err) {
         pushImportWarning(`instance "${name}": inner override resize failed (${String(err)})`);
       }
@@ -908,35 +972,11 @@
     }
     if (typeof fields.layoutGrow === "number") writeField(child, name, "layoutGrow", fields.layoutGrow);
   }
-  async function applyChildSwap(child, o, name) {
-    if (!o.componentKey && !o.componentId) return;
-    if (safe(() => child.type) !== "INSTANCE") return;
-    const node = child;
-    let current = null;
-    try {
-      current = await node.getMainComponentAsync();
-    } catch {
-    }
-    if (current && (o.componentKey && current.key === o.componentKey || o.componentId && current.id === o.componentId)) {
-      return;
-    }
-    const target = await resolveMainComponent(o);
-    if (!target) {
-      pushImportWarning(
-        `instance "${name}": inner slot "${o.childKey}" was swapped to a component that cannot be resolved (key=${o.componentKey ?? "\u2014"}, id=${o.componentId ?? "\u2014"}) \u2014 left on the main's default, swap lost`
-      );
-      return;
-    }
-    try {
-      node.swapComponent(target);
-    } catch (err) {
-      pushImportWarning(`instance "${name}": inner slot "${o.childKey}" swap failed (${String(err)})`);
-    }
-  }
   async function applyInnerOverrides(instance, spec) {
     const overrides = spec.innerOverrides;
     if (!overrides || !overrides.length) return;
-    const byKey = keyInnerChildren(instance, instance.id);
+    const root = instance;
+    let byKey = keyInnerChildren(root, instance.id);
     const missed = [];
     for (const o of overrides) {
       const child = byKey.get(o.childKey);
@@ -944,8 +984,10 @@
         missed.push(o.childKey);
         continue;
       }
-      await applyChildSwap(child, o, spec.name);
+      const revariant = applyChildComponentProperties(child, o, spec.name);
+      const swapped = await applyChildSwap(child, o, spec.name);
       applyChildFields(child, o.fields, spec.name);
+      if (swapped || revariant) byKey = keyInnerChildren(root, instance.id);
     }
     if (missed.length) {
       pushImportWarning(

@@ -67,6 +67,38 @@ function readOverriddenValues(
 }
 
 /**
+ * An inner INSTANCE child's own component/variant property VALUES (spec-005 P13).
+ *
+ * The most common inner override on real files, and the one P11/P12 never carried:
+ * `overrides[].overriddenFields` names the field `componentProperties`, but the
+ * VALUES live on the child, exactly where `readInstance` reads the outer
+ * instance's. Read only when Figma named the field — an instance always exposes
+ * `componentProperties`, so reading it unconditionally would record the main's own
+ * defaults as an override the source never had.
+ *
+ * `string | boolean` only, matching readInstance: an INSTANCE_SWAP value is a node
+ * id (replayed by the swap ref, not here) and a variable-bound value is a
+ * VariableAlias object — neither has a reversible slot, so both are left to
+ * `figmaScanInnerOverrides`.
+ */
+function readChildComponentProperties(
+  child: Record<string, unknown>,
+  fields: string[],
+): Record<string, string | boolean> | undefined {
+  if (!fields.includes('componentProperties')) return undefined;
+  if (safe(() => child.type) !== 'INSTANCE') return undefined;
+  const props = safe(() => child.componentProperties as Record<string, { value?: unknown }>);
+  if (!props || typeof props !== 'object') return undefined;
+  const rec: Record<string, string | boolean> = {};
+  // Sorted: the mirror wants a fixed point, so a rescan must serialise identically.
+  for (const k of Object.keys(props).sort()) {
+    const v = safe(() => props[k]?.value);
+    if (typeof v === 'string' || typeof v === 'boolean') rec[k] = v;
+  }
+  return Object.keys(rec).length ? rec : undefined;
+}
+
+/**
  * The main-component ref of an inner child that is itself an INSTANCE.
  *
  * Recorded UNCONDITIONALLY for every overridden inner instance, not just the ones we
@@ -116,12 +148,17 @@ export function readInnerOverrides(
     // No key (unexpected id shape) or no live child → not addressable in a rebuilt
     // twin. figmaScanInnerOverrides still names the fields: a loss, still visible.
     if (key === undefined || !child) continue;
-    const fields = readOverriddenValues(child, entry.overriddenFields ?? []);
+    const overridden = entry.overriddenFields ?? [];
+    const fields = readOverriddenValues(child, overridden);
     const swap = readSwapRef(child, entry.id, mainComps);
-    // An entry earns its place if EITHER half is reversible: a swapped inner slot can
+    const props = readChildComponentProperties(child, overridden);
+    // An entry earns its place if ANY half is reversible: a swapped inner slot can
     // carry no replayable field at all (live P5: every field of the swapped child
-    // equalled the main's, so the fields alone rebuilt a byte-identical WRONG node).
-    if (Object.keys(fields).length || swap) out.push({ childKey: key, fields, ...swap });
+    // equalled the main's, so the fields alone rebuilt a byte-identical WRONG node),
+    // and a variant picked inside a slot carries ONLY componentProperties (live P13).
+    if (Object.keys(fields).length || swap || props) {
+      out.push({ childKey: key, fields, ...swap, ...(props ? { componentProperties: props } : {}) });
+    }
   }
   return out.sort((a, b) => (a.childKey < b.childKey ? -1 : a.childKey > b.childKey ? 1 : 0));
 }

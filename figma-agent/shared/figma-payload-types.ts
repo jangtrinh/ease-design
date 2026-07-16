@@ -63,6 +63,18 @@ export interface FigmaInnerOverride {
    */
   componentKey?: string;
   componentId?: string;
+  /**
+   * When the inner child is an INSTANCE, its own component/variant property values.
+   * Figma reports this as the single overridden field `componentProperties` on the
+   * inner node, and it is the most common inner override on real files (spec-005
+   * P13): a variant picked, a boolean toggled, a text prop typed INSIDE a slot.
+   *
+   * Only `string | boolean` values are carried — the same reversible subset
+   * `readInstance` takes for the outer instance. An INSTANCE_SWAP prop, or a
+   * variable-bound value (VariableAlias), has no reversible slot and is left out;
+   * `figmaScanInnerOverrides` still names the field, so the loss stays visible.
+   */
+  componentProperties?: Record<string, string | boolean>;
 }
 
 export interface FigmaExportNode {
