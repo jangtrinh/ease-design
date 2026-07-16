@@ -23,6 +23,13 @@
 //      answers getVariableByIdAsync with remote=true + a publish key, and
 //      importVariableByKeyAsync links THAT SAME variable back (throwing on an
 //      unpublished key). This split is the whole of the spec-005 P7 gap.
+//   9. setBoundVariable REFUSES 'maxWidth' on a TEXT node ("invalid field for text
+//      node") while accepting it on a FRAME — proven live, and the reason the P5
+//      footer text could never round-trip its UI-authored maxWidth binding.
+//  10. TextNode.fontName returns figma.mixed on style-linked text even when every
+//      character shares ONE font — the live footer 25575:354192 reports mixed while
+//      getStyledTextSegments gives a single "Be Vietnam Pro"/Regular segment. Only
+//      the segments tell the truth; setMixedFontNameGetter reproduces that state.
 //   8. a LOCAL variable carries a publish key TOO (remote:false + key — what the
 //      live probe found on the font fields), and importVariableByKeyAsync REFUSES
 //      that key: nothing published it. So the only road home for a local key is the
@@ -89,8 +96,45 @@ export class FakeNode {
     this.children.push(child);
   }
 
+  /** Figma REFUSES some fields outright, by node type — encode the refusal, not the
+   * happy path: a permissive mock here is what let the P5 rebuild ship a bind that
+   * could only ever throw on the live canvas. */
   setBoundVariable(field: string, variable: { id: string }): void {
+    if (this.type === 'TEXT' && field === 'maxWidth') {
+      throw new Error(`in setBoundVariable: invalid field for text node: '${field}'`);
+    }
     this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: variable.id };
+  }
+
+  // ── fontName: the node-level getter is figma.mixed on style-linked text ──
+  private _fontName: unknown;
+  private _fontNameMixed = false;
+  private _segments: Array<Record<string, unknown>> | undefined;
+
+  set fontName(v: unknown) { this._fontName = v; }
+  get fontName(): unknown {
+    return this._fontNameMixed ? (FIGMA_MIXED as unknown) : this._fontName;
+  }
+
+  /** Reproduce the live state of 25575:354192: the node-level getter refuses
+   * (figma.mixed) while EVERY character still shares the one font below. */
+  setMixedFontNameGetter(font: FontName): void {
+    this._fontNameMixed = true;
+    this._fontName = font;
+  }
+
+  /** Per-range styling. Absent explicit segments, the node is one uniform run — the
+   * shape a freshly built text node has. */
+  getStyledTextSegments(_fields: string[]): Array<Record<string, unknown>> {
+    if (this._segments) return this._segments;
+    const characters = typeof this.characters === 'string' ? this.characters : '';
+    return [{ start: 0, end: characters.length, characters, fontName: this._fontName }];
+  }
+
+  /** Genuinely mixed text: more than one run, so no single fontName is true. */
+  setStyledTextSegments(segments: Array<Record<string, unknown>>): void {
+    this._fontNameMixed = true;
+    this._segments = segments;
   }
 
   /** Own data props (incl. the private corner/sizing fields) + children, deep-copied. */

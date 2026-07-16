@@ -18,6 +18,11 @@ export interface ScanExtensions {
   // models an instance as ref + node-level overrides only, so these do NOT survive
   // a rebuild — recorded to keep that loss visible (spec-005 P2 documented edge).
   figmaScanInnerOverrides?: string[];
+  // Bound fields Figma's Plugin API REFUSES to replay on this node type (maxWidth
+  // on TEXT — see shared/figma-unbindable-fields). They stay in figmaScanBindings
+  // as raw ids; this names them so the loss reads as Figma's limit rather than
+  // ours, and so the mirror can tell the two apart (spec-005 P9).
+  figmaScanUnbindable?: string[];
 }
 
 export type ScannedNode = FigmaExportNode & ScanExtensions;

@@ -19,11 +19,46 @@ export function styleToWeight(style: string): number | undefined {
   return map[s];
 }
 
+const isFontName = (v: unknown): v is FontName =>
+  !!v && typeof v === 'object' && 'family' in v && typeof (v as FontName).family === 'string';
+
+/**
+ * The node's font — read from the SEGMENTS when the node-level getter refuses.
+ *
+ * `TextNode.fontName` returns `figma.mixed` on real style-linked text even when
+ * every character shares ONE font. Proven on the live footer 25575:354192:
+ * `fontName === figma.mixed`, yet `getStyledTextSegments(['fontName'])` reports a
+ * SINGLE segment spanning all 23 characters with family "Be Vietnam Pro" /
+ * "Regular". Detaching its text style flips the getter back to concrete, so the
+ * style link is what triggers the refusal — a state Figma's own UI authors and the
+ * Plugin API cannot be talked out of.
+ *
+ * `safe()` turns that symbol into undefined, so the scan used to emit NO
+ * fontFamily and NO fontWeight for such a node. That was a loss of the ORIGINAL,
+ * not of the rebuild: the mirror reported `fontFamily: undefined → "Be Vietnam Pro"`
+ * and blamed the rebuild for being RIGHT.
+ *
+ * Exactly ONE segment is the honest condition: it means the whole range shares a
+ * font whatever the node-level getter claims. Two or more segments are genuinely
+ * mixed — no single fontFamily is true of the node, so both fields stay unset, as
+ * before.
+ */
+function readFontName(n: Record<string, unknown>): FontName | undefined {
+  const direct = safe(() => n.fontName as FontName);
+  if (isFontName(direct)) return direct;
+  const read = safe(() => n.getStyledTextSegments as ((fields: string[]) => Array<{ fontName?: unknown }>));
+  if (typeof read !== 'function') return undefined;
+  const segments = safe(() => read.call(n, ['fontName']));
+  if (!Array.isArray(segments) || segments.length !== 1) return undefined;
+  const font = segments[0]?.fontName;
+  return isFontName(font) ? font : undefined;
+}
+
 /** Text-only fields — inverse of executor-text.createTextNode. */
 export function readText(n: Record<string, unknown>, out: ScannedNode): void {
   if (typeof n.characters === 'string') out.characters = n.characters;
-  const font = safe(() => n.fontName as FontName);
-  if (font && typeof font === 'object' && 'family' in font) {
+  const font = readFontName(n);
+  if (font) {
     out.fontFamily = font.family;
     if (font.style.toLowerCase().includes('italic')) out.fontStyle = 'italic';
     const w = styleToWeight(font.style);
