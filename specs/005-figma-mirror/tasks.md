@@ -22,8 +22,22 @@
       `scan-node` self-contained → dist-only install mirrors. Self-containment proven LIVE (dist copied
       to temp, no repo → real `FigmaExportNode`). Bonus: `getNodeById`→`getNodeByIdAsync` (sync getter
       throws under `documentAccess: dynamic-page`) — scan-node had never resolved a real node before.
-- [ ] P5 — Live round-trip GATE: real Figma component, scan→rebuild→structural-diff == fixed
-      point incl. bindings+instances (owner-in-the-loop) — stage:spec · depends P1-P4.
-      Harness = `mirror-verify <nodeId>` (scan → IMPORT_PAYLOAD rebuild → scan → structural-diff),
-      one command. OWNER STEP: run the freshly-built plugin in Figma (connects broker :9410), then
-      `mirror-verify <realNodeId>`. Scan-half already live-proven by the dist-bundle branch.
+- [x] mirror-verify harness — ✓ 2026-07-16 merged (PR #51, CI 5/5, figma-agent 281). One-command
+      P5 gate: `mirror-verify <nodeId>` (scan → IMPORT_PAYLOAD rebuild → scan → structural-diff),
+      `structural-diff.ts` util (epsilon 1e-5, undefined≡absent) = the mirror linter (Art II);
+      `--keep` retains the rebuild for eyeball. bridge `expectFixedPoint()` folds structuralDiff into
+      every fixed-point case. Exposed the binding gap (below) — harness honestly reports tokenRef diffs.
+- [x] P6 — rebuild-from-spec reattaches token bindings by name — ✓ 2026-07-16 merged (PR #52, CI 5/5,
+      figma-agent 295). Closes the Art III gap the harness exposed: rebuild from a record alone dropped
+      bindings (`tokenVars.size>0` gate at 3 sites — frame/shapes/text). `executor-token-var-resolve.ts`:
+      `readLocalVariableMap()` (name→existing Variable, one async read = inverse of the scan join),
+      `resolveTokenVars` layers payload tokens over it. Additive (payload-wins precedence intact);
+      fallback binds only to existing vars (no dupes). Test-with-teeth: point rebuild back at old path →
+      5/5 reattach tests FAIL. Follow-ups: executor-frame.ts 301 / executor-variables.ts 216 over Art IX;
+      plugin code under no lint gate; dup-name-across-collections = first-wins.
+- [ ] P5 — Live round-trip GATE (owner-in-the-loop) — stage:spec · READY, waiting on owner's Figma.
+      All code merged + plugin rebuilt (code.js has binding-reattach). Broker up on :9410.
+      OWNER 2-STEP: (1) run the freshly-built plugin in Figma Desktop (loads new code.js, connects
+      :9410); (2) select a token-bound DS component → `mirror-verify <nodeId>` → expect `equal:true`
+      on core+bindings; known-degradation diffs (library vars, per-edge padding, nested variant, real
+      InstanceNode.overrides) are documented-acceptable, not failures. Procedure: plans/p5-live-procedure.md.
