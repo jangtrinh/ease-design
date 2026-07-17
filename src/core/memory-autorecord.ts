@@ -25,6 +25,13 @@
  * has no design-project artifact to point at (the taste root is a separate tree from
  * design/), so its mirror only fires when cwd itself is a project with design/.
  * `votes.jsonl` stays the system of record either way.
+ *
+ * Convention (spec 006 P2 — Art II, emitter + linter in the same commit): every
+ * outcome-bearing command is listed in src/core/outcome-registry.ts and its call
+ * site wired here via withOutcome/recordOutcome. tests/autorecord-wiring.test.ts is
+ * the paired linter — it fails npm test if a registered command drops its call, or
+ * if an unregistered src/commands file starts making one. Adding a tenth outcome:
+ * add the registry entry, wire the call site, and the linter demands both halves.
  */
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
