@@ -34,6 +34,41 @@ selects the set; anything not matching a named type falls through to **Desktop**
 
 ---
 
+## Breakpoints — the counted scale (spec 010 P1)
+
+`@media (min-width: …)` breakpoints a component reflows across. **Layout constants, NOT
+design tokens** — `@media (min-width: var(--x))` is invalid CSS (a media-query condition
+cannot read a custom property), so the value must be a literal. This is the one deliberate
+exception to token-only: colour, space and typography still resolve through `var(--…)`;
+only the breakpoint boundary itself is a raw number. Do not add a `breakpoint` token
+category and do not invent `@custom-media` — the literal lives directly in each
+component's `@media` rule.
+
+Counted, not guessed: measured across nine real code projects, 684 of 717
+`@media (min-width: …)` occurrences (95%) are exactly Tailwind's default scale, expressed
+in `rem`:
+
+| Name | Value | px equivalent |
+|------|-------|---------------|
+| `sm`  | `40rem` | 640px |
+| `md`  | `48rem` | 768px |
+| `lg`  | `64rem` | 1024px |
+| `xl`  | `80rem` | 1280px |
+| `2xl` | `96rem` | 1536px |
+
+`rem`, not `px` — the corpus is unanimous, and it is the accessible choice: a `rem`
+breakpoint respects the user's font-size zoom; a `px` one overrides it (Art X puts
+accessibility above layout). Mobile-first: write the base (no-media) rule for the
+narrowest layout, then layer `sm`/`md`/`lg`/`xl`/`2xl` upward — matching the Desktop mode's
+own "mobile-first, then layer `sm:` `md:` `lg:`" rule below.
+
+A kit component either reflows through one of these five breakpoints, or carries an
+explicit, reasoned exemption (`<!-- responsive-exempt: <reason> -->` in its markup) — see
+`src/core/component-kit/responsive-lint.ts`. An exemption with no reason is a lint failure,
+not a pass (Art VIII: say exactly what was checked).
+
+---
+
 ## Universal Style Guide (applies to EVERY mode)
 
 These rules hold regardless of which constraint set is active.
