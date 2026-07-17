@@ -46,9 +46,17 @@ export interface ScanResult {
 
 // ─── Tunables ───────────────────────────────────────────────────────────────────
 
+// Ecosystem-scoped, not "plausible": an entry earns its place by files-burned
+// on a real repo (9-project measurement), not by guessing every tool's cache
+// dir. JS/JS-tooling entries predate this comment; .venv/venv/__pycache__
+// (Python) were added after dana-desktop — a polyglot (Electron+React+Python)
+// repo — showed a 8187-file .venv alone was 54% of its whole tree and sorted
+// ahead of the real UI. .vercel/.pytest_cache measured too (<10 files each,
+// noise) and .tox/target/Pods/.gradle/etc. measured 0/9 — none of those ship.
 const SKIP_DIRS = new Set([
   "node_modules", "dist", "build", "out", "coverage", "vendor", ".git",
   ".next", ".turbo", ".cache", ".agent", ".claude", "design",
+  ".venv", "venv", "__pycache__",
 ]);
 const MAX_DEPTH = 6;
 const MAX_ENTRIES = 4000;
