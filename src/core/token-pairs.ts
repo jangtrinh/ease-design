@@ -10,20 +10,31 @@
  * Pure, name-based, separator-agnostic (`.`, `-`, `/`). No IO.
  */
 
-/** Trailing `foreground` segment, e.g. "color.primary-foreground" or "color.foreground". */
-const FOREGROUND_RE = /^(.+?)[.\-/]foreground$/i;
+/**
+ * Trailing foreground-role segment: the literal `foreground`, plus the counted synonyms
+ * `text` / `fg` / `content` / `ink` (role-synonym-dictionary.md, foreground row — synonyms
+ * observed across Carbon/Ant/Base Web/Primer/Polaris/SLDS/USWDS/M3/Fluent/Spectrum). A DS that
+ * declares `{role}-text` + `{role}-bg` (dana's convention) is the SAME declared-pair shape as
+ * shadcn's `{role}` + `{role}-foreground` — just a different suffix word — so it must resolve
+ * through the same base-stripping + same-role-sibling lookup below, never the text×surface
+ * cartesian fallback.
+ */
+const FOREGROUND_RE = /^(.+?)[.\-/](?:foreground|text|fg|content|ink)$/i;
 /** A background/surface sibling under a group, tried in priority order. */
 const SURFACE_SUFFIXES = ["background", "bg", "surface", "base"] as const;
 
 /**
  * Infer `[foregroundPath, surfacePath]` pairs from token paths following the
- * `{role}` / `{role}-foreground` convention.
+ * `{role}` / `{role}-foreground` convention — or any of its counted synonyms
+ * (`{role}-text`, `{role}-fg`, `{role}-content`, `{role}-ink`).
  *
  * - `X-foreground` → its base `X` when that token exists (e.g. primary-foreground → primary).
  * - a bare `…/foreground` whose base is a category (no sibling token) → the app-default pair:
- *   the `background`/`bg`/`surface` token in the same group (e.g. color.foreground → color.background).
+ *   the `background`/`bg`/`surface` token in the SAME group (e.g. color.foreground → color.background,
+ *   badge-danger-text → badge-danger-bg). Same-role only — never a different role's surface.
  *
- * Only emits a pair when BOTH tokens are present in `paths`.
+ * Only emits a pair when BOTH tokens are present in `paths`; a foreground-shaped token with no
+ * matching surface sibling (e.g. `badge-light-text` with no `badge-light-bg`) emits nothing.
  */
 export function inferForegroundPairs(paths: readonly string[]): [string, string][] {
   const set = new Set(paths);
@@ -48,7 +59,7 @@ export function inferForegroundPairs(paths: readonly string[]): [string, string]
   return out;
 }
 
-/** True when any token follows the `-foreground` / `…foreground` convention. */
+/** True when any token follows the `-foreground` convention or a counted synonym (`-text`/`-fg`/`-content`/`-ink`). */
 export function hasForegroundTokens(paths: readonly string[]): boolean {
   return paths.some((p) => FOREGROUND_RE.test(p));
 }
