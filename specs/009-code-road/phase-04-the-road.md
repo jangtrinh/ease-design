@@ -42,9 +42,23 @@
 5. **No variant library to lean on.** CVA / tailwind-variants: **0/3** surveyed projects. dana
    declares variants as a TS union + `Record<Variant, string>`. There is no parser shortcut to
    buy, which is why the host model reads (Art I intact) and the kernel refuses invented tokens.
-6. **`BAD_TOKEN` is the whole safety story.** `registry-store.ts:167-174` rejects any
-   `tokensUsed` entry that is not a real token path. That refusal is what makes a
-   non-deterministic reader safe — **it only works if Phase 3 emitted referencable paths (F6).**
+6. **`BAD_TOKEN` is the safety story — and when this was written it was FALSE.**
+   ~~`registry-store.ts:167-174` rejects any `tokensUsed` entry that is not a real token path.~~
+   **It rejected only the path's FORMAT.** `TOKEN_PATTERN.test(t)` is a regex whose own error
+   message says *"must match `^[a-z][a-z0-9.-]*$`"*. `--tokens color.does-not-exist-anywhere`
+   registered cleanly, exit 0 — found live by this phase's implementer.
+
+   The author of this file read that code, quoted those line numbers, and called a format check
+   an existence check — then built the road's whole safety argument on it, and wrote a
+   *"never touch `validateComponentRecord`'s strictness"* constraint **to protect the misread**.
+   The implementer **stopped and reported instead of improvising** (Art V), which is the only
+   reason it surfaced. **Fixed in this phase**: `registry-token-check.ts` reuses the
+   `loadDesignSystemForReseal` call `registry.ts:198` already makes — DS present ⇒ every
+   `tokensUsed` entry must resolve in the compiled tree, refused with a message distinguishing
+   *unknown* from *malformed*; standalone registry (`--file`) ⇒ format-only, as before.
+
+   It still only works if Phase 3 emitted referencable paths (F6). **Kept above as written, struck
+   through, because a spec that quietly edits its own false premise teaches nothing.**
 7. **A test can enshrine a bug.** `ds-round-trip.test.ts` was literally named
    *"init → context → registry add → DS_TAMPERED"* and asserted the tamper as correct. Phase 1
    fixed it. **When a gate result surprises you here, suspect the assertion before the code.**
@@ -125,8 +139,11 @@ on 1 of the 2 projects its plan required and never said why.
 **Create**
 - `specs/009-code-road/reports/p4-real-data-gate.md` — the evidence artifact
 
-**Never**: `NAME_PATTERN`, `TOKEN_PATTERN`, `validateComponentRecord`'s strictness (it is the
-safety story — Insight 6), `figma-ds-registry.ts` (Figma inventory is a different door, by design).
+**Never**: `NAME_PATTERN`, `TOKEN_PATTERN`, `figma-ds-registry.ts` (Figma inventory is a different
+door, **by design** — its header at `:9-14` says why).
+~~`validateComponentRecord`'s strictness (it is the safety story — Insight 6)~~ — **this
+constraint was written to protect a misread** (Insight 6) and was wrong. The existence check
+landed in this phase, outside `validateComponentRecord`, in `registry-token-check.ts`.
 
 ## Implementation Steps
 
