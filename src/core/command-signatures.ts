@@ -158,6 +158,16 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
     },
   },
 
+  "ds-usage-lint": {
+    summary: "ENFORCEMENT gate — does the page use the design system's own tokens? (not a conformance claim)",
+    signature: {
+      summary: "Check an HTML file's CSS against the project DS's declared tokens; exit 1 on error-severity findings",
+      positionals: [htmlFile("HTML file to lint")],
+      flags: [{ name: "dir", type: "string", summary: "Project directory holding design/ (default: cwd)" }],
+      errorCodes: [...IO_CODES, "DS_NOT_FOUND", "BAD_JSON"],
+    },
+  },
+
   flow: {
     summary: "Lint a multi-screen flow (IA graph) deterministically",
     subcommands: {

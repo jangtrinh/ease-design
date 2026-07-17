@@ -46,6 +46,21 @@ function tokenToCssDecls(token: ResolvedToken): [string, string][] {
   return [[pathToCssVar(token.path), scalarToCss(token.value)]];
 }
 
+/**
+ * Every CSS custom-property name a resolved token map emits (composite
+ * members included, e.g. "text.body" → "--text-body-font-family" AND
+ * "--text-body-font-size"). The declared-token vocabulary ds-usage-lint.ts
+ * checks page CSS against — same expansion emitCss/emitTailwind use, so the
+ * declared set never drifts from what a real `ui tokens compile` would emit.
+ */
+export function declaredCssVarNames(map: ResolvedMap): Set<string> {
+  const out = new Set<string>();
+  for (const token of map) {
+    for (const [varName] of tokenToCssDecls(token)) out.add(varName);
+  }
+  return out;
+}
+
 // ─── CSS emitter ──────────────────────────────────────────────────────────────
 
 /**
