@@ -104,6 +104,20 @@ describe("validateComponentRecord", () => {
     ).toThrow(expect.objectContaining({ code: "BAD_STATE" }));
   });
 
+  // Spec 009 P4 real-data finding (reports/p4-real-data-gate.md §3): BAD_TOKEN checks the
+  // path's FORMAT only, not that it resolves against a compiled token set — a well-formed
+  // but nonexistent path is accepted. This test documents today's actual behaviour so a
+  // future change (in either direction — tightening to an existence check, or a regression
+  // that further loosens the format check) shows up as a diff here rather than silently.
+  // Do not "fix" this test to expect a throw without also resolving the design questions in
+  // §3 of that report (which mode(s) count, how the checker gets the compiled tokens).
+  it("a syntactically valid but nonexistent token path is NOT refused (known gap, P4 finding)", () => {
+    const rec = validateComponentRecord(
+      validRecord({ tokensUsed: ["color.this-token-does-not-exist-anywhere"] }),
+    );
+    expect(rec.tokensUsed).toEqual(["color.this-token-does-not-exist-anywhere"]);
+  });
+
   it("throws BAD_ARG when name is missing", () => {
     expect(() => validateComponentRecord({ category: "action", markup: "", tokensUsed: [] })).toThrow(
       expect.objectContaining({ code: "BAD_ARG" }),
