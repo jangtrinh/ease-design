@@ -110,3 +110,28 @@ patch in 006.
 
 Update memory `living-loop-fuel-line-finding` with the after-state, per phase-05's Next
 Steps: the audit that motivated spec 006 should end with its own answer.
+
+---
+
+## GATE RUN — RESULT (2026-07-17, PASS)
+
+Ran live on **VSF-PCP** with `DESIGN_OS_MODEL_CMD="claude -p --model sonnet …"`.
+
+| Signal | Before | After |
+|--------|--------|-------|
+| ledger events | 159 (ingest-only + 1 lint_run) | **168** |
+| `insight` events | 0 | **4** |
+| `memory.graph.json` insights | 0 | **4** |
+| harvest gate | — | 8 candidates → **4 recorded, 4 dropped** (`evidence-not-in-source`) |
+
+**The 4 insights are real, evidence-grounded lessons** the harvest lifted from the dogfood
+reports (dead-variant false-positives on interaction-only variants; a bound-variable readback is
+not proof of a correct binding; self-reported "0 violations" claims must be independently
+re-audited; reference-duel needs a structurally-inspected benchmark). The verbatim-evidence gate
+dropped 4 fabricated candidates.
+
+**Proof of the whole thesis:** the loop that was dead (0 insight/gap across two real projects,
+ingest-only ledger) is now fed on real data at all three layers — commands (auto-record, 158→159),
+prose (harvest, 159→168), and rhythm (heartbeat harvest/reflect wired). **PASS.** Heartbeat config
+added to VSF-PCP (`harvest` 12h + `reflect` 24h). Fuel-line documented for the project in
+`VSF-PCP/design/LEARNING-LOOP.md`.
