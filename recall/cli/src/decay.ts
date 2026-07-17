@@ -33,13 +33,24 @@ export function decayWeight(t: string, nowIso: string, halfLifeDays: number = HA
   return Math.pow(0.5, ageDays / halfLifeDays);
 }
 
+/**
+ * The clock a lesson decays against: the last time it was SERVED, falling back to when
+ * it was written (Oblivion — a lesson nobody re-queries fades even if freshly written;
+ * one that is used stays sharp). A timeless item ("" — knowledge chunks, knowledge.ts:18)
+ * stays timeless: decayWeight("") is 1 and must not start ticking on first retrieval.
+ */
+export function effectiveTimestamp(item: { t: string; lastRetrievedAt?: string }): string {
+  if (item.t.length === 0) return "";
+  return item.lastRetrievedAt ?? item.t;
+}
+
 /** Build the id → weight map the ranker multiplies by. */
 export function decayWeights(
-  items: readonly { id: string; t: string }[],
+  items: readonly { id: string; t: string; lastRetrievedAt?: string }[],
   nowIso: string,
   halfLifeDays: number = HALF_LIFE_DAYS,
 ): Map<string, number> {
   const m = new Map<string, number>();
-  for (const it of items) m.set(it.id, decayWeight(it.t, nowIso, halfLifeDays));
+  for (const it of items) m.set(it.id, decayWeight(effectiveTimestamp(it), nowIso, halfLifeDays));
   return m;
 }

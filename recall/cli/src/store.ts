@@ -28,9 +28,11 @@ export interface RecallItem {
   entity?: string;
   /** Set when a later event supersedes this item's knowledge; demoted, never deleted. */
   invalidatedBy?: string;
+  /** When this item was last served by `recall query` (absent = never). */
+  lastRetrievedAt?: string;
 }
 
-export const SCHEMA_VERSION = "1";
+export const SCHEMA_VERSION = "2";
 
 /** Pack a float embedding the way vec0 expects it. */
 export function packVector(v: Float32Array): Uint8Array {
@@ -54,6 +56,10 @@ export class RecallStore {
       t TEXT NOT NULL, source TEXT NOT NULL, entity TEXT, invalidatedBy TEXT)`);
     db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(id UNINDEXED, text)`);
     db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_items USING vec0(id TEXT PRIMARY KEY, embedding float[${dims}])`);
+    // Retrieval log (spec 006 P3, Oblivion): decay measures time since a lesson was last
+    // SERVED, not since it was written. Its own table on purpose — `upsert` DELETEs and
+    // re-INSERTs `items` on every re-index, which would wipe a column here.
+    db.exec(`CREATE TABLE IF NOT EXISTS retrievals (id TEXT PRIMARY KEY, t TEXT NOT NULL)`);
 
     const store = new RecallStore(db);
     // Pin the header on first open; refuse to mix embeddings of different shape.
@@ -118,6 +124,15 @@ export class RecallStore {
     return Number(res.changes);
   }
 
+  /** Stamp every id as retrieved now (idempotent per id; last write wins). */
+  touch(ids: readonly string[], nowIso: string): void {
+    if (ids.length === 0) return;
+    const stmt = this.db.prepare(
+      `INSERT INTO retrievals (id, t) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET t = excluded.t`,
+    );
+    for (const id of ids) stmt.run(id, nowIso);
+  }
+
   /** Dense KNN. Returns ids best-first. */
   knn(query: Float32Array, k: number): string[] {
     const rows = this.db
@@ -144,15 +159,22 @@ export class RecallStore {
   getItems(ids: readonly string[]): Map<string, RecallItem> {
     const out = new Map<string, RecallItem>();
     if (ids.length === 0) return out;
-    const stmt = this.db.prepare(`SELECT * FROM items WHERE id = ?`);
+    const stmt = this.db.prepare(
+      `SELECT items.*, retrievals.t AS lastRetrievedAt
+         FROM items LEFT JOIN retrievals ON retrievals.id = items.id
+        WHERE items.id = ?`,
+    );
     for (const id of ids) {
-      const r = stmt.get(id) as (Omit<RecallItem, "refs"> & { refs: string; invalidatedBy: string | null; entity: string | null }) | undefined;
+      const r = stmt.get(id) as
+        | (Omit<RecallItem, "refs"> & { refs: string; invalidatedBy: string | null; entity: string | null; lastRetrievedAt: string | null })
+        | undefined;
       if (r === undefined) continue;
       out.set(id, {
         id: r.id, tier: r.tier, text: r.text, t: r.t, source: r.source,
         refs: JSON.parse(r.refs) as string[],
         ...(r.entity !== null ? { entity: r.entity } : {}),
         ...(r.invalidatedBy !== null ? { invalidatedBy: r.invalidatedBy } : {}),
+        ...(r.lastRetrievedAt !== null && r.lastRetrievedAt !== undefined ? { lastRetrievedAt: r.lastRetrievedAt } : {}),
       });
     }
     return out;

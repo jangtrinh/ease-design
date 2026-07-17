@@ -65,6 +65,10 @@ suites on every push.
 
 1. `dist/cli.js` never imports this workspace or its dependencies.
 2. `*.vec.db` is a **rebuildable cache** over the ledger — delete it and `recall index` restores it.
+   Exception (spec 006 P3): `recall query` writes a `retrievals` row per served id, so decay
+   can measure time since last *use*. That history is the one thing in the DB that is not
+   rebuildable — deleting the DB resets decay to write-time (the pre-006 behaviour). The
+   ledger remains truth for everything else.
 3. Learned knowledge returns to the ledger only via `ui memory record insight --refs …`. `recall
    reflect` prints that command; it never runs a model and never writes the ledger itself.
 4. Embeddings are local by default; there is deliberately no API-embedder path.
