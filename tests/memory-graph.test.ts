@@ -84,3 +84,91 @@ describe("memory-graph — aggregation", () => {
     expect(gg.vibes[0]?.word).toBe("b"); // heavier (2 recent) sorts first
   });
 });
+
+describe("memory-graph — insight recurrence (ExpeL)", () => {
+  it("counts an insight stated twice as one cluster: seen 2, upvotes 1 on both entries", () => {
+    const events: MemoryEvent[] = [
+      ev("e1", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] }),
+      ev("e2", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] }),
+    ];
+    const g = compileGraph(events, NOW);
+    expect(g.insights).toHaveLength(2);
+    for (const entry of g.insights) {
+      expect(entry.seen).toBe(2);
+      expect(entry.upvotes).toBe(1);
+      expect(entry.downvotes).toBe(0);
+    }
+  });
+
+  it("treats a differently-worded restatement as a separate insight (no fuzzy matching)", () => {
+    const events: MemoryEvent[] = [
+      ev("e1", "insight", { text: "prefers calm palettes" }, NOW, { refs: ["e0"] }),
+      ev("e2", "insight", { text: "likes muted colors" }, NOW, { refs: ["e0"] }),
+    ];
+    const g = compileGraph(events, NOW);
+    for (const entry of g.insights) {
+      expect(entry.seen).toBe(1);
+      expect(entry.upvotes).toBe(0);
+    }
+  });
+
+  it("clusters across whitespace, case and a trailing period", () => {
+    const events: MemoryEvent[] = [
+      ev("e1", "insight", { text: "A lesson." }, NOW, { refs: ["e0"] }),
+      ev("e2", "insight", { text: "a  lesson" }, NOW, { refs: ["e0"] }),
+    ];
+    const g = compileGraph(events, NOW);
+    for (const entry of g.insights) expect(entry.seen).toBe(2);
+  });
+
+  it("counts data.vote=down as a downvote and not an upvote", () => {
+    const events: MemoryEvent[] = [
+      ev("e1", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] }),
+      ev("e2", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] }),
+      ev("e3", "insight", { text: "prefers calm", vote: "down" }, NOW, { refs: ["e0"] }),
+    ];
+    const g = compileGraph(events, NOW);
+    for (const entry of g.insights) {
+      expect(entry.seen).toBe(3);
+      expect(entry.upvotes).toBe(1);
+      expect(entry.downvotes).toBe(1);
+    }
+  });
+
+  it("sets lastSeenAt to the newest t in the cluster, not the entry's own t", () => {
+    const older = daysBefore(NOW, 10);
+    const events: MemoryEvent[] = [
+      ev("e1", "insight", { text: "prefers calm" }, older, { refs: ["e0"] }),
+      ev("e2", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] }),
+    ];
+    const g = compileGraph(events, NOW);
+    const olderEntry = g.insights.find((i) => i.id === "e1");
+    expect(olderEntry?.lastSeenAt).toBe(NOW);
+  });
+
+  it("keeps lastSeenAt correct across mixed UTC offsets", () => {
+    const zulu = "2026-07-17T10:00:00Z";
+    const offset = "2026-07-17T12:00:00+07:00"; // = 05:00Z, earlier than zulu
+    const events: MemoryEvent[] = [
+      ev("e1", "insight", { text: "prefers calm" }, offset, { refs: ["e0"] }),
+      ev("e2", "insight", { text: "prefers calm" }, zulu, { refs: ["e0"] }),
+    ];
+    const g = compileGraph(events, NOW);
+    for (const entry of g.insights) expect(entry.lastSeenAt).toBe(zulu);
+  });
+
+  it("a single insight reports seen 1, upvotes 0, downvotes 0", () => {
+    const events: MemoryEvent[] = [ev("e1", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] })];
+    const g = compileGraph(events, NOW);
+    expect(g.insights[0]).toMatchObject({ seen: 1, upvotes: 0, downvotes: 0 });
+  });
+
+  it("compiling the same ledger twice with the same --now is byte-identical", () => {
+    const events: MemoryEvent[] = [
+      ev("e1", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] }),
+      ev("e2", "insight", { text: "prefers calm" }, NOW, { refs: ["e0"] }),
+      ev("e3", "insight", { text: "likes muted colors", vote: "down" }, NOW, { refs: ["e0"] }),
+    ];
+    expect(JSON.stringify(compileGraph(events, NOW))).toBe(JSON.stringify(compileGraph(events, NOW)));
+  });
+});

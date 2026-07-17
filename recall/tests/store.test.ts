@@ -238,6 +238,68 @@ describe('supersedeEntity + invalidatedIds', () => {
   });
 });
 
+describe('touch', () => {
+  it('touch stamps a retrieval and getItems returns it as lastRetrievedAt', () => {
+    const store = RecallStore.open(':memory:', DIMS, MODEL);
+    store.upsert(item({ id: 'e1' }), X);
+    store.touch(['e1'], '2026-07-17T00:00:00.000Z');
+    const got = store.getItems(['e1']).get('e1')!;
+    expect(got.lastRetrievedAt).toBe('2026-07-17T00:00:00.000Z');
+    store.close();
+  });
+
+  it('touch is idempotent per id: the last stamp wins', () => {
+    const store = RecallStore.open(':memory:', DIMS, MODEL);
+    store.upsert(item({ id: 'e1' }), X);
+    store.touch(['e1'], '2026-07-01T00:00:00.000Z');
+    store.touch(['e1'], '2026-07-17T00:00:00.000Z');
+    const got = store.getItems(['e1']).get('e1')!;
+    expect(got.lastRetrievedAt).toBe('2026-07-17T00:00:00.000Z');
+    store.close();
+  });
+
+  it('touch([]) is a no-op', () => {
+    const store = RecallStore.open(':memory:', DIMS, MODEL);
+    store.upsert(item({ id: 'e1' }), X);
+    expect(() => store.touch([], '2026-07-17T00:00:00.000Z')).not.toThrow();
+    const got = store.getItems(['e1']).get('e1')!;
+    expect(got.lastRetrievedAt).toBeUndefined();
+    store.close();
+  });
+
+  it('a re-indexed item KEEPS its retrieval stamp (the DELETE+INSERT upsert cannot wipe it)', () => {
+    const store = RecallStore.open(':memory:', DIMS, MODEL);
+    store.upsert(item({ id: 'e1', text: 'first version' }), X);
+    store.touch(['e1'], '2026-07-17T00:00:00.000Z');
+    store.upsert(item({ id: 'e1', text: 'second version' }), Y);
+    const got = store.getItems(['e1']).get('e1')!;
+    expect(got.text).toBe('second version');
+    expect(got.lastRetrievedAt).toBe('2026-07-17T00:00:00.000Z');
+    store.close();
+  });
+
+  it('getItems returns no lastRetrievedAt for an item that was never touched', () => {
+    const store = RecallStore.open(':memory:', DIMS, MODEL);
+    store.upsert(item({ id: 'e1' }), X);
+    const got = store.getItems(['e1']).get('e1')!;
+    expect('lastRetrievedAt' in got).toBe(false);
+    store.close();
+  });
+
+  it('opens an existing v1 DB and creates the retrievals table without a migration', () => {
+    const dbPath = tmpDbPath();
+    const first = RecallStore.open(dbPath, DIMS, MODEL);
+    first.upsert(item({ id: 'e1' }), X);
+    first.close();
+
+    const second = RecallStore.open(dbPath, DIMS, MODEL);
+    expect(() => second.touch(['e1'], '2026-07-17T00:00:00.000Z')).not.toThrow();
+    const got = second.getItems(['e1']).get('e1')!;
+    expect(got.lastRetrievedAt).toBe('2026-07-17T00:00:00.000Z');
+    second.close();
+  });
+});
+
 describe('deleteByEntity', () => {
   it('removes matching items from all three tables', () => {
     const store = RecallStore.open(':memory:', DIMS, MODEL);

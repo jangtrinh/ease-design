@@ -75,6 +75,10 @@ export async function runQuery(query: string, opts: QueryOptions): Promise<Query
       return item === undefined ? [] : [{ ...r, tier: item.tier, source: item.source, text: item.text, t: item.t }];
     });
 
+    // A retrieval is a use: stamp only what we actually served, so decay measures use,
+    // not neighbourhood. `recall reflect` deliberately does NOT touch (spec 006 P3 D5).
+    store.touch(hits.map((h) => h.id), nowIso);
+
     return {
       query,
       k: opts.k,
