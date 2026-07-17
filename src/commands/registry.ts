@@ -5,10 +5,10 @@
  * Default registry file: ./design/component-registry.json (cwd-relative).
  * --file <path> always overrides.
  *
- * register: auto-creates file if absent; requires --force to overwrite.
- * lookup / list: error if file absent (REGISTRY_NOT_FOUND).
+ * register: auto-creates file if absent; requires --force. Reseals (spec 009 P1) when a
+ * manifest sits next to the registry file. lookup/list: error if file absent (REGISTRY_NOT_FOUND).
  */
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJson } from "../core/output.js";
@@ -23,6 +23,8 @@ import {
   lookupComponent,
   listComponents,
 } from "../core/registry-store.js";
+import { pathsForDir } from "../core/design-system.js";
+import { reseal, loadDesignSystemForReseal } from "../core/ds-reseal.js";
 
 const CMD = "registry";
 const DEFAULT_REGISTRY_PATH = "./design/component-registry.json";
@@ -184,14 +186,22 @@ function runRegister(parsed: ParsedArgs): CommandResult {
     throw e;
   }
 
-  // Save
+  // Save — reseal on a sealed DS, else the plain unsealed write (spec 009 P1).
+  const dsPaths = pathsForDir(dirname(registryPath));
   try {
-    saveRegistry(registryPath, result.registry);
-  } catch (e) {
-    if (e instanceof RegistryError) {
-      return useJson ? errJson(sub, e.code, e.message) : errText(`ui: ${e.message}\n`);
+    const ds = loadDesignSystemForReseal(dsPaths);
+    if (ds !== undefined) {
+      reseal({
+        ds, paths: dsPaths, registry: result.registry, nowIso: new Date().toISOString(),
+        entry: { kind: "register", by: "ui registry register", note: record.name },
+      });
+    } else {
+      saveRegistry(registryPath, result.registry);
     }
-    throw e;
+  } catch (e) {
+    const code = e !== null && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "WRITE_ERROR";
+    const msg = e instanceof Error ? e.message : String(e);
+    return useJson ? errJson(sub, code, msg) : errText(`ui: ${msg}\n`);
   }
 
   if (useJson) {

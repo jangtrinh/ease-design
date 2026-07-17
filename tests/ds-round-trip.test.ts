@@ -32,7 +32,11 @@ function capture(args: string[]): { exitCode: number; stdout: string; stderr: st
 // ─── DS round-trip ────────────────────────────────────────────────────────────
 
 describe("DS round-trip", () => {
-  it("init → context → registry add → DS_TAMPERED (registry hash mismatch)", () => {
+  it("init → context → registry add (reseals) → context still clean (spec 009 P1)", () => {
+    // Pre-spec-009-P1 this ended in DS_TAMPERED: 'registry register' wrote the registry
+    // without ever touching the manifest, so the hash the manifest claimed and the bytes
+    // on disk immediately diverged. 'registry register' now reseals (src/core/ds-reseal.ts)
+    // — this round-trip is the fix's own regression guard.
     const tmp = mkdtempSync(join(tmpdir(), "ease-rt-"));
 
     // 1. init (--bare: this test asserts an empty registry, then registers one component)
@@ -63,7 +67,7 @@ describe("DS round-trip", () => {
     expect(ctx.semantic.length).toBeGreaterThan(10);
     expect(ctx.registry).toHaveLength(0);
 
-    // 4. Add a component via registry register (modifies component-registry.json)
+    // 4. Add a component via registry register (reseals: registry + manifest together)
     const markupFile = join(tmp, "btn.html");
     writeFileSync(markupFile, '<button class="btn">Click</button>');
     r = capture([
@@ -76,10 +80,16 @@ describe("DS round-trip", () => {
     ]);
     expect(r.exitCode).toBe(0);
 
-    // 5. context now sees DS_TAMPERED because registry hash differs from manifest
-    r = capture(["ds", "context", "--dir", tmp, "--json"]);
-    expect(r.exitCode).toBe(1);
-    expect(JSON.parse(r.stdout).error.code).toBe("DS_TAMPERED");
+    // 5. context (and status) stay clean — the seal was never broken.
+    r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const ctxAfter = JSON.parse(r.stdout).data;
+    expect(ctxAfter.registry).toHaveLength(1);
+    expect(ctxAfter.registry[0].name).toBe("Button/Primary");
+
+    r = capture(["ds", "status", "--dir", tmp, "--json"]);
+    expect(r.exitCode).toBe(0);
+    expect(JSON.parse(r.stdout).data.generation).toBe(2); // init(1) + register(2)
   });
 
   it("init → change-token → context shows new value; idempotent no-op", () => {

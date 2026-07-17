@@ -19,7 +19,7 @@ import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
 const CMD = "ds import";
-const KNOWN_FLAGS = ["dir", "name", "force"] as const;
+const KNOWN_FLAGS = ["dir", "name", "force", "reset-registry"] as const;
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
 
 export function runImport(parsed: ParsedArgs): CommandResult {
@@ -44,6 +44,27 @@ export function runImport(parsed: ParsedArgs): CommandResult {
 
   const force = parsed.flags["force"] === true;
   if (!force && existsSync(paths.tokens)) return err("EXISTS", `${paths.tokens} already exists (use --force to overwrite)`);
+
+  // D2: --force alone must not silently wipe a non-empty registry (dana lost 3 components
+  // + 102 changelog entries this way). --reset-registry is the explicit opt-in that
+  // preserves today's wipe behaviour verbatim.
+  const resetRegistry = parsed.flags["reset-registry"] === true;
+  if (force && !resetRegistry && existsSync(paths.registry)) {
+    let existingCount: number;
+    try {
+      const prior = JSON.parse(readFileSync(paths.registry, "utf8")) as { components?: unknown[] };
+      existingCount = Array.isArray(prior.components) ? prior.components.length : 0;
+    } catch {
+      existingCount = 0; // unreadable/corrupt registry — nothing provably non-empty to protect
+    }
+    if (existingCount > 0) {
+      return err(
+        "REGISTRY_NOT_EMPTY",
+        `--force would wipe ${existingCount} registered component(s) at '${paths.registry}' — ` +
+          "pass --reset-registry to confirm, or use 'ui registry register' to add without wiping",
+      );
+    }
+  }
 
   // Read + convert.
   let flat: unknown;
@@ -81,9 +102,10 @@ export function runImport(parsed: ParsedArgs): CommandResult {
   });
   try {
     mkdirSync(designDir, { recursive: true });
-    writeFileSync(paths.tokens, canonicalStringify(dtcg) + "\n");
-    writeFileSync(paths.registry, canonicalStringify(registry) + "\n");
-    writeFileSync(paths.manifest, canonicalStringify(manifest) + "\n");
+    // canonicalStringify already appends a trailing "\n" (ds-manifest.ts) — do not double it.
+    writeFileSync(paths.tokens, canonicalStringify(dtcg));
+    writeFileSync(paths.registry, canonicalStringify(registry));
+    writeFileSync(paths.manifest, canonicalStringify(manifest));
   } catch (e) {
     return err("WRITE_ERROR", `could not write DS store: ${e instanceof Error ? e.message : String(e)}`);
   }

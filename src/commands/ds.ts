@@ -73,6 +73,9 @@ Subcommands:
   --dir <path>       Project directory to write design/ into (default: cwd)
   --name <name>      DS name for the sealed manifest (default: imported-ds)
   --force            Overwrite an existing design.tokens.json
+  --reset-registry   Confirm --force may wipe a non-empty registry (required alongside
+                     --force when component-registry.json already has components —
+                     REGISTRY_NOT_EMPTY otherwise)
   Converts a flat { category: { name: value } } token file into DTCG, inferring
   $type per value (color/dimension/number/fontFamily/fontWeight/duration). Nested
   groups are hoisted to <cat>-<sub>. Un-typeable values (box-shadow strings,
@@ -179,6 +182,7 @@ Error codes:
   FILE_NOT_FOUND     'ds import' source file does not exist
   BAD_JSON           'ds import' source is not valid JSON / did not convert
   EXISTS             'ds import' target design.tokens.json exists (use --force)
+  REGISTRY_NOT_EMPTY 'ds import --force' would wipe a non-empty registry (pass --reset-registry)
   EMPTY_IMPORT       'ds import' found no typeable tokens
   WRITE_ERROR        'ds import' could not write the DS store
   DS_NOT_FOUND       'ds specimen' found no component-registry.json

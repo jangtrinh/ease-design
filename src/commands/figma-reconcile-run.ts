@@ -39,6 +39,8 @@ import { writeFigmaNode } from "../core/figma-node-reader.js";
 import { readCursor, syncStatePath, writeCursor } from "../core/figma-sync-state.js";
 import { renderApply, renderDryRun } from "./figma-reconcile-render.js";
 import { withOutcome } from "../core/memory-autorecord.js";
+import { pathsForDir } from "../core/design-system.js";
+import { reseal, loadDesignSystemForReseal } from "../core/ds-reseal.js";
 
 const CHANGE_LOG_RELPATH = ["design", "figma.changes.jsonl"] as const;
 const REGISTRY_RELPATH = ["design", "component-registry.json"] as const;
@@ -162,9 +164,35 @@ export function runReconcile(parsed: ParsedArgs): CommandResult {
   }
 
   const { registry: next, report, sidecarWrites, changed } = applyDelta(registry, delta, mirror);
+
+  // Snapshot the DS *before* any write this apply might make (spec 009 P1, Art IV) —
+  // reseal needs the pre-mutation manifest to bump generation from, and a DS_TAMPERED
+  // load must refuse before anything (sidecars included) is written — never heal on top
+  // of an already-tampered store (D4). No manifest present → nothing to reseal.
+  const dsPaths = pathsForDir(join(dir, DESIGN_DIR));
+  let ds;
+  if (changed) {
+    try {
+      ds = loadDesignSystemForReseal(dsPaths);
+    } catch (e) {
+      const code = e !== null && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "WRITE_ERROR";
+      const msg = e instanceof Error ? e.message : String(e);
+      return useJson ? errJson(SUB, code, msg) : errText(`ui: ${msg}\n`);
+    }
+  }
+
   try {
     writeSidecars(join(dir, DESIGN_DIR), sidecarWrites);
     if (changed) saveRegistry(registryPath, next);
+    if (changed && ds !== undefined) {
+      reseal({
+        ds, paths: dsPaths, registry: next, nowIso: new Date().toISOString(),
+        entry: {
+          kind: "register", by: "ui figma reconcile",
+          note: `added ${report.added.length}, updated ${report.updated.length}, deprecated ${report.deprecated.length}`,
+        },
+      });
+    }
     writeCursor(statePath, cursorTo);
   } catch (e) {
     if (e instanceof RegistryError) {

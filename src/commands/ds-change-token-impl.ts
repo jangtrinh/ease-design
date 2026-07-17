@@ -1,23 +1,14 @@
 /**
  * runChangeToken — implementation for `ui ds change-token`.
  *
- * Changes one token's $value (literal or alias), re-resolves the tree,
- * atomically writes the new tokens file and manifest, bumps generation,
- * and appends a changelog entry.
- *
- * Atomicity sequence (A-F):
- *   A. canonicalStringify(newTree)     → newTokensStr  (in memory)
- *   B. canonicalStringify(newManifest) → newManifestStr (in memory)
- *   C. writeFileSync(tokens.tmp, newTokensStr)
- *   D. writeFileSync(manifest.tmp, newManifestStr)
- *   E. renameSync(tokens.tmp, tokens)
- *   F. renameSync(manifest.tmp, manifest)
- * If C/D throws → no live files mutated.
- * If E succeeds but F fails → DS_TAMPERED on next load (document recovery).
+ * Changes one token's $value (literal or alias), re-resolves the tree, then hands the
+ * new tree to `reseal` (src/core/ds-reseal.ts, spec 009 P1) — the shared ceremony that
+ * atomically writes tokens + manifest, bumps generation, and appends a changelog entry.
+ * This command PROVED the extraction: it was the only writer that resealed correctly
+ * before the phase, so its behaviour is the byte-for-byte oracle for the shared helper.
  */
-import { renameSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { cwd } from "node:process";
+import { dirname, resolve } from "node:path";
 
 import { errJson, errText, okJson } from "../core/output.js";
 import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
@@ -27,11 +18,8 @@ import {
   pathsForDir,
   DSError,
 } from "../core/design-system.js";
-import {
-  canonicalStringify,
-  canonicalHash,
-  appendChangelog,
-} from "../core/ds-manifest.js";
+import { DSManifestError } from "../core/ds-manifest.js";
+import { reseal } from "../core/ds-reseal.js";
 import { resolveTokens } from "../core/token-resolve.js";
 import { parseTokenFile } from "../core/token-model.js";
 import type { TokenType } from "../core/token-model.js";
@@ -295,52 +283,28 @@ export function runChangeToken(parsed: ParsedArgs): CommandResult {
     return useJson ? errJson(CMD, rawCode, msg) : errText(`ui: ${msg}\n`);
   }
 
-  // ── Atomic write sequence (A → F) ───────────────────────────────────────────
+  // ── Reseal (spec 009 P1: the shared Art IV ceremony) ────────────────────────
 
-  const newTokensStr = canonicalStringify(newTokens);
-  const newHash = canonicalHash(newTokens);
-
-  const newManifestObj = appendChangelog(
-    { ...ds.manifest, generation: ds.manifest.generation + 1, compiledHash: newHash },
-    {
-      ts: new Date().toISOString(),
-      kind: "change-token",
-      by: "ui ds change-token",
-      path: tokenPath,
-      from: oldSerialized,
-      to: newSerialized,
-      ...(reason !== undefined && { reason }),
-    },
-  );
-  const newManifestStr = canonicalStringify(newManifestObj);
-
-  const tokensTmp = paths.tokens + ".tmp";
-  const manifestTmp = paths.manifest + ".tmp";
-
+  let resealResult;
   try {
-    writeFileSync(tokensTmp, newTokensStr, "utf8");     // C
-    writeFileSync(manifestTmp, newManifestStr, "utf8"); // D
+    resealResult = reseal({
+      ds,
+      paths,
+      tokens: newTokens,
+      entry: {
+        kind: "change-token",
+        by: "ui ds change-token",
+        path: tokenPath,
+        from: oldSerialized,
+        to: newSerialized,
+        ...(reason !== undefined && { reason }),
+      },
+      nowIso: new Date().toISOString(),
+    });
   } catch (e) {
-    const msg = `failed to write temporary files: ${e instanceof Error ? e.message : String(e)}`;
-    return useJson ? errJson(CMD, "WRITE_ERROR", msg) : errText(`ui: ${msg}\n`);
-  }
-
-  try {
-    renameSync(tokensTmp, paths.tokens);     // E
-  } catch (e) {
-    const msg = `failed to commit tokens file: ${e instanceof Error ? e.message : String(e)}`;
-    return useJson ? errJson(CMD, "WRITE_ERROR", msg) : errText(`ui: ${msg}\n`);
-  }
-
-  try {
-    renameSync(manifestTmp, paths.manifest); // F
-  } catch (e) {
-    // Tokens committed, manifest stale — DS_TAMPERED on next load.
-    const msg =
-      `tokens file updated but manifest commit failed: ${e instanceof Error ? e.message : String(e)}. ` +
-      "The design system is in a partially-updated state — hashes will not match on next load. " +
-      `Recover: restore from '${manifestTmp}' if present, or run 'ui ds init --force' to recompile from scratch.`;
-    return useJson ? errJson(CMD, "WRITE_ERROR", msg) : errText(`ui: ${msg}\n`);
+    const code = e instanceof DSManifestError ? e.code : "WRITE_ERROR";
+    const msg = e instanceof Error ? e.message : String(e);
+    return useJson ? errJson(CMD, code, msg) : errText(`ui: ${msg}\n`);
   }
 
   // ── Respond ─────────────────────────────────────────────────────────────────
@@ -350,13 +314,13 @@ export function runChangeToken(parsed: ParsedArgs): CommandResult {
     from: oldSerialized,
     to: newSerialized,
     changed: true,
-    generation: newManifestObj.generation,
-    compiledHash: newHash,
+    generation: resealResult.generation,
+    compiledHash: resealResult.compiledHash,
   });
   return withOutcome(out, parsed, {
     type: "token_change",
     actor: "ui ds change-token",
     projectDir: dirname(paths.dir),
-    data: { path: tokenPath, from: oldSerialized, to: newSerialized, ...(reason !== undefined && { reason }), generation: newManifestObj.generation },
+    data: { path: tokenPath, from: oldSerialized, to: newSerialized, ...(reason !== undefined && { reason }), generation: resealResult.generation },
   });
 }

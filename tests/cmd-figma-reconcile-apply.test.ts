@@ -16,6 +16,9 @@ import type { ChangeFrame, RegistryView } from "../src/core/figma-reconcile.js";
 import { applyDelta } from "../src/core/figma-apply.js";
 import { readCursor, syncStatePath } from "../src/core/figma-sync-state.js";
 import { createEmptyRegistry, type ComponentRecord, type Registry } from "../src/core/registry-store.js";
+import { pathsForDir, loadDesignSystem } from "../src/core/design-system.js";
+
+const PERSONA_DATA = new URL("../knowledge/personas/personas.json", import.meta.url).pathname;
 
 // ─── fixture builders ──────────────────────────────────────────────────────────
 
@@ -220,5 +223,48 @@ describe("ui figma reconcile --apply — command", () => {
     expect(env.data.cursor_to).toBe(2);
     expect(env.data.apply.deprecated).toEqual(["One/A"]);
     expect(readCursor(syncStatePath(dir))).toBe(2); // advanced to end after replay
+  });
+});
+
+// ─── sealed DS integration (spec 009 P1) — the second unsealed writer, fixed ────────────
+
+describe("ui figma reconcile --apply — sealed DS integration (spec 009 P1)", () => {
+  it("ds init → figma reconcile --apply → ds status exits 0", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-fig-apply-seal-"));
+    capture([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "test", // kit-populated (not --bare) — real names to touch
+      "--dir", tmp, "--persona-data", PERSONA_DATA,
+    ]);
+    writeFileSync(
+      join(tmp, "design", "figma.changes.jsonl"),
+      jsonl([frame({ op: "deleted", nodeName: "Control/Button", nodeId: "c1" })]),
+      "utf8",
+    );
+    const applyResult = capture(["figma", "reconcile", "--dir", tmp, "--apply", "--json"]);
+    expect(applyResult.code).toBe(0);
+    expect(JSON.parse(applyResult.out).data.apply.deprecated).toEqual(["Control/Button"]);
+
+    const status = capture(["ds", "status", "--dir", tmp, "--json"]);
+    expect(status.code).toBe(0);
+    expect(() => loadDesignSystem(pathsForDir(join(tmp, "design")))).not.toThrow();
+  });
+
+  it("a no-DS project (no ds init) still applies — unsealed write, unchanged behaviour", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-fig-apply-noseal-"));
+    mkdirSync(join(tmp, "design"), { recursive: true });
+    writeFileSync(
+      join(tmp, "design", "component-registry.json"),
+      JSON.stringify({ version: "0.1.0", components: [{ name: "Card/Basic", category: "card", markup: "<div></div>", tokensUsed: [], scope: "local" }] }, null, 2) + "\n",
+      "utf8",
+    );
+    writeFileSync(
+      join(tmp, "design", "figma.changes.jsonl"),
+      jsonl([frame({ op: "deleted", nodeName: "Card/Basic", nodeId: "c" })]),
+      "utf8",
+    );
+    const applyResult = capture(["figma", "reconcile", "--dir", tmp, "--apply", "--json"]);
+    expect(applyResult.code).toBe(0);
+    expect(JSON.parse(applyResult.out).data.apply.deprecated).toEqual(["Card/Basic"]);
   });
 });
