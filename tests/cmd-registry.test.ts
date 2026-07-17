@@ -2,11 +2,14 @@ import { describe, expect, it, afterEach } from "vitest";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
-import { unlinkSync, existsSync, readFileSync } from "node:fs";
+import { unlinkSync, existsSync, readFileSync, mkdtempSync } from "node:fs";
 import { run } from "../src/cli.js";
+import { loadManifest } from "../src/core/ds-manifest.js";
+import { pathsForDir, loadDesignSystem } from "../src/core/design-system.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const fix = (name: string) => join(HERE, "fixtures", name);
+const PERSONA_DATA = new URL("../knowledge/personas/personas.json", import.meta.url).pathname;
 
 function captureRun(args: string[]): { code: number; out: string; err: string } {
   let out = "";
@@ -179,6 +182,65 @@ describe("ui registry register", () => {
     expect(json.error.code).toBe("FILE_NOT_FOUND");
   });
 
+});
+
+// ─── register — sealed DS integration (spec 009 P1) ────────────────────────────
+
+describe("ui registry register — sealed DS integration (spec 009 P1)", () => {
+  function initDs(): string {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-registry-seal-"));
+    captureRun([
+      "ds", "init", "acme",
+      "--persona", "liquid-glass", "--intent", "test", "--bare",
+      "--dir", tmp, "--persona-data", PERSONA_DATA,
+    ]);
+    return tmp;
+  }
+
+  it("ds init → registry register → ds status exits 0", () => {
+    const tmp = initDs();
+    const registryPath = join(tmp, "design", "component-registry.json");
+    const reg = captureRun([
+      "registry", "register", "Button/Primary",
+      "--category", "action", "--markup", fix("registry-markup.html"),
+      "--file", registryPath,
+    ]);
+    expect(reg.code).toBe(0);
+    const status = captureRun(["ds", "status", "--dir", tmp, "--json"]);
+    expect(status.code).toBe(0);
+  });
+
+  it("appends a register changelog entry (kind register, by ui registry register)", () => {
+    const tmp = initDs();
+    const registryPath = join(tmp, "design", "component-registry.json");
+    captureRun([
+      "registry", "register", "Button/Primary",
+      "--category", "action", "--markup", fix("registry-markup.html"),
+      "--file", registryPath,
+    ]);
+    const manifest = loadManifest(join(tmp, "design", "ds.manifest.json"));
+    const last = manifest.changelog[manifest.changelog.length - 1];
+    expect(last?.kind).toBe("register");
+    expect(last?.by).toBe("ui registry register");
+    expect(manifest.generation).toBe(2); // init = 1, register bumps to 2
+  });
+
+  it("refusing a bad token leaves the seal intact — DS still loads, registry unchanged", () => {
+    const tmp = initDs();
+    const registryPath = join(tmp, "design", "component-registry.json");
+    const before = readFileSync(registryPath, "utf8");
+    const r = captureRun([
+      "registry", "register", "Button/Primary",
+      "--category", "action", "--markup", fix("registry-markup.html"),
+      "--tokens", "NOT A VALID TOKEN",
+      "--file", registryPath, "--json",
+    ]);
+    expect(r.code).toBe(1);
+    const json = JSON.parse(r.out) as { error: { code: string } };
+    expect(json.error.code).toBe("BAD_TOKEN");
+    expect(readFileSync(registryPath, "utf8")).toBe(before);
+    expect(() => loadDesignSystem(pathsForDir(join(tmp, "design")))).not.toThrow();
+  });
 });
 
 // ─── lookup ───────────────────────────────────────────────────────────────────

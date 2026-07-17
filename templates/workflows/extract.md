@@ -394,7 +394,7 @@ user with the suggested remediation and stop the workflow.
    Inspect the JSON envelope. The component count should be plausible
    for the source (no silent drops between step 8 and now). Every
    record must use a canonical `Category/Variant` name and declare at
-   least one entry under `tokens` — a registry record with zero linked
+   least one entry under `tokensUsed` — a registry record with zero linked
    tokens means the component was registered without proving it
    consumes the token store, which fragments the system.
 

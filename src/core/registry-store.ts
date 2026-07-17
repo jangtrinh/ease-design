@@ -13,6 +13,7 @@
  * so the file is stable regardless of insert order.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { canonicalStringify } from "./ds-manifest.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -333,7 +334,9 @@ export function saveRegistry(path: string, reg: Registry): void {
     version: reg.version,
     components: [...reg.components].sort((a, b) => a.name.localeCompare(b.name)),
   };
-  const content = JSON.stringify(sorted, null, 2) + "\n";
+  // D5 (spec 009 P1): canonicalStringify, never JSON.stringify — ds-manifest.ts's mandate.
+  // A reseal hashes these bytes, so the write and the hash must agree byte-for-byte.
+  const content = canonicalStringify(sorted);
   try {
     writeFileSync(path, content, "utf8");
   } catch (e) {

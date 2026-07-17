@@ -503,8 +503,9 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
           { name: "dir", type: "string", summary: "Project directory to write design/ into (default cwd)" },
           { name: "name", type: "string", summary: "DS name for the sealed manifest (default imported-ds)" },
           { name: "force", type: "boolean", summary: "Overwrite an existing design.tokens.json" },
+          { name: "reset-registry", type: "boolean", summary: "Confirm --force may wipe a non-empty registry (required alongside --force when the registry has components)" },
         ],
-        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "BAD_NAME", "FILE_NOT_FOUND", "BAD_JSON", "EXISTS", "EMPTY_IMPORT", "WRITE_ERROR"],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "BAD_NAME", "FILE_NOT_FOUND", "BAD_JSON", "EXISTS", "REGISTRY_NOT_EMPTY", "EMPTY_IMPORT", "WRITE_ERROR"],
       },
       context: {
         summary: "Emit the active design system as a context block for the host model",

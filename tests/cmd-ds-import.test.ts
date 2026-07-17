@@ -163,3 +163,53 @@ describe("ui ds import — error codes", () => {
     expect(errorCode(r)).toBe("BAD_NAME");
   });
 });
+
+describe("ui ds import — D2: --force refuses to wipe a non-empty registry (spec 009 P1)", () => {
+  function seedNonEmptyRegistry(tmp: string): void {
+    const src = writeFlat(tmp, "tokens.json", { colors: { primary: "#111111" } });
+    capture(["ds", "import", src, "--dir", tmp, "--json"]);
+    const markup = join(tmp, "markup.html");
+    writeFileSync(markup, "<button>Primary</button>", "utf8");
+    const registryPath = join(tmp, "design", "component-registry.json");
+    capture([
+      "registry", "register", "Button/Primary",
+      "--category", "action", "--markup", markup, "--file", registryPath,
+    ]);
+  }
+
+  it("--force over a non-empty registry fails REGISTRY_NOT_EMPTY", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-import-d2-"));
+    seedNonEmptyRegistry(tmp);
+    const src2 = writeFlat(tmp, "tokens2.json", { colors: { primary: "#222222" } });
+    const r = capture(["ds", "import", src2, "--dir", tmp, "--force", "--json"]);
+    expect(r.code).toBe(1);
+    expect(errorCode(r)).toBe("REGISTRY_NOT_EMPTY");
+    const reg = JSON.parse(readFileSync(join(tmp, "design", "component-registry.json"), "utf8"));
+    expect(reg.components).toHaveLength(1); // NOT wiped
+  });
+
+  it("--force --reset-registry wipes as before (the escape hatch still works)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-import-d2-reset-"));
+    seedNonEmptyRegistry(tmp);
+    const src2 = writeFlat(tmp, "tokens2.json", { colors: { primary: "#222222" } });
+    const r = capture(["ds", "import", src2, "--dir", tmp, "--force", "--reset-registry", "--json"]);
+    expect(r.code).toBe(0);
+    const reg = JSON.parse(readFileSync(join(tmp, "design", "component-registry.json"), "utf8"));
+    expect(reg.components).toHaveLength(0);
+    const tokens = JSON.parse(readFileSync(join(tmp, "design", "design.tokens.json"), "utf8"));
+    expect(tokens.colors.primary.$value).toBe("#222222");
+  });
+});
+
+describe("ui ds import — writes a single trailing newline (spec 009 P1 D5 fallout)", () => {
+  it("design.tokens.json / component-registry.json / ds.manifest.json each end with exactly one newline", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-import-newline-"));
+    const src = writeFlat(tmp, "tokens.json", { colors: { primary: "#111111" } });
+    capture(["ds", "import", src, "--dir", tmp, "--json"]);
+    for (const name of ["design.tokens.json", "component-registry.json", "ds.manifest.json"]) {
+      const raw = readFileSync(join(tmp, "design", name), "utf8");
+      expect(raw.endsWith("\n")).toBe(true);
+      expect(raw.endsWith("\n\n")).toBe(false);
+    }
+  });
+});
