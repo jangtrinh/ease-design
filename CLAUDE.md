@@ -50,6 +50,36 @@ The rules below summarize repo practice; the constitution wins on conflict.
   (L1→L4). Extract the helper; don't patch where it surfaced.
 - **Generated artifacts run the FULL linter set in their own tests.** The generated specimen page
   shipped an unguarded animation because its gate ran 3 of 4 linters (missed taste-lint).
+- **A field report is a symptom, not a diagnosis. Triage at the source before you spec.** Of the
+  dana dogfood's 11 findings, **two were misdiagnosed** — F5 said `--tokens` was discarded (it
+  persists as `tokensUsed`; the probe read the wrong key), F10 said the scan "can't see a UI below
+  root" (it can; it spends its 4000-entry budget depth-first and alphabetically, then gives up
+  silently). Worse: we re-ran F5's own probe script and reported "confirmed". A reporter without
+  the source guesses causes; that is not a flaw in the report, it is what a report *is*.
+- **If it looks like a hole, first assume it is a decision — then go find the sentence that made
+  it.** Nine times in one session a deliberate design read as an accident: the alphabetical walk
+  (`project-scan.ts:6` — it is Art I determinism), the mode compiler "dropping" `$extensions`
+  (`figma-ds-tokens.ts:14` — *"preserved and documented"*), the registry's two doors
+  (`figma-ds-registry.ts:13` — the strict name pattern *"exists for code-authored components, not
+  scanned Figma inventory"*), `slice(0,5)` (declared at `:24`), npm-link (README:132). **Every one
+  had a sentence next to the code saying why.** Grep-sized reads manufacture false findings.
+- **Count before you target. A headline number is a hypothesis.** In one session: a 20× coverage
+  gap measured 3.5×; "68 missing components" measured 25; ten plausible `SKIP_DIRS` additions
+  measured 0/9 while the one that mattered (`.venv`) was 8,187 files — 54% of a real repo's tree.
+  Counting the breakpoint scale did not just confirm Tailwind's values, it proved the corpus uses
+  `rem` — the accessible choice a guess would have missed. **The cheapest rule in the repo; it
+  paid three times before a line of code was written.**
+- **A report is not evidence. Re-run the gate yourself, where it actually runs.** An executor
+  reported "4 pre-existing failures"; `main` was clean — it had committed before stashing, so the
+  stash was a no-op. And a `git checkout` **refused by a worktree** silently gates the wrong tree:
+  our own "GATE PASS" was theatre until it ran inside the worktree (the tell was two branches
+  reporting the identical test count).
+- **A test can enshrine the bug, and a test can assert its own filesystem path.**
+  `ds-round-trip.test.ts` was named *"init → context → registry add → DS_TAMPERED"* and asserted
+  the tamper as correct — every green CI run certified that registering a component must break the
+  design system. Separately, an unanchored `/F\d+/i` over a wrapper that embeds an absolute path
+  passed for months and failed only from a worktree whose hash held `f826`. **When a gate result
+  surprises you, suspect the assertion before the code.**
 - **A mock must reproduce the STRICT API contract — what throws, what's required — not the happy path.**
   Two spec-005 bugs survived a green suite because the test mock was more lenient than Figma: the sync
   `.mainComponent` getter *throws* under `documentAccess: "dynamic-page"` (mock returned a value), and
