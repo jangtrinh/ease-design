@@ -6,8 +6,10 @@ description: "Extract a design system from existing HTML. Use when the user prov
 
 ## Title
 
-`/ui:extract <file.html>` — **extract a design system from existing HTML**. Read
-a single HTML artifact, infer its underlying design language (tokens + reusable
+`/ui:extract <file.html>` — **extract a design system from existing HTML or
+source code**. Read a single HTML artifact — or the 3–5 representative source
+files a code project supplies (component files + stylesheets, sampled per
+`learn.md` §3a) — infer its underlying design language (tokens + reusable
 components), and write that language back into the project's design-system
 store as a real, enforceable SSOT.
 
@@ -25,6 +27,9 @@ Use `/ui:extract` when:
 - The project has no DS yet — `/ui:extract` will compile a brand-new one.
 - The project has a DS but the user wants to *replace* it with one derived
   from the supplied HTML (explicit `--force` on `ui ds init` step 4).
+- The project is a **code repo** (React/Vue/Svelte/etc.) with no representative
+  HTML file — `/ui:learn`'s code route (`learn.md` step 3) samples 3–5 source
+  files and hands them here directly (spec 009 P4, D5).
 
 ---
 
@@ -32,7 +37,7 @@ Use `/ui:extract` when:
 
 | Input | Source | Required | Notes |
 |---|---|---|---|
-| `<file.html>` | path argument | yes | A single HTML artifact. Multi-file extraction is out of scope for v1; if the user has multiple HTML files, ask them to pick the most representative one. |
+| `<file.html>` **or** 3–5 source files | path argument(s) | yes | **Either** a single HTML artifact **or** the 3–5 representative source files `learn.md` §3a already samples for a code project (component files + their paired stylesheets). Everything from step 1 on reads the input as one or more files to walk together — there is no HTML-only restriction downstream (spec 009 P4, D5: this row was the sentence that closed the road to every code project). |
 | Project DS state | `design/ds.manifest.json` (via `ui ds status`) | yes | Determines whether step 4 calls `ui ds init` fresh or `ui ds init --force` to replace an existing system. |
 | Token taxonomy | `knowledge/token-taxonomy.md` | yes | Defines the DTCG primitive / semantic two-tier model the extracted tokens must conform to. |
 | Color science | `knowledge/color-science.md` | yes | Defines how to bucket observed hex values into the 11-stop OKLCH scale and how to map them to semantic roles. |
@@ -43,12 +48,21 @@ Use `/ui:extract` when:
 
 ## Steps
 
-### 1. Read the source HTML
+### 1. Read the source
 
-Load `<file.html>` from disk. Hold the full markup in working memory. If the
-file exceeds ~80k characters, strip runs of base64 image data before analysis
-(they tell you nothing about tokens or components). Do not strip CSS, classes,
-or inline style attributes — those are the extraction signal.
+**HTML input**: Load `<file.html>` from disk. Hold the full markup in working
+memory. If the file exceeds ~80k characters, strip runs of base64 image data
+before analysis (they tell you nothing about tokens or components). Do not
+strip CSS, classes, or inline style attributes — those are the extraction
+signal.
+
+**Code input** (3–5 sampled source files, per `learn.md` §3a and its code-route
+decisions D1/D2/D4): load every sampled file — component source
+(`.tsx`/`.jsx`/`.vue`/`.svelte`) and its paired stylesheet — and hold them all
+in working memory together. Steps 2–9 below treat "the document" as the union
+of every sampled file; a class string or component export repeated across
+files is the same repetition signal step 2 already looks for inside one HTML
+page.
 
 ### 2. Discover candidate components
 
@@ -175,7 +189,12 @@ config for `:hover`, `:focus`, `:focus-visible`, and `:active` rules, plus every
 `transition` and `animation` / `@keyframes` declaration. For each component you
 register (step 8), pass the subset you *actually observed* to
 `ui registry register … --states <observed>` — only states with evidence, never
-a fabricated one. Separately, distil the motion signature into a one-line
+a fabricated one. **The kernel folds each observed state into `variants` as
+`State=<PascalCase>` (e.g. `State=Hover`); the record's separate `states` field
+stays unset** (spec 009 D3 — measured 0/537 populated in platform-design-system
+and 0/27 in the `ds init` kit, so the doctrine here now describes where states
+actually live instead of a field no emitter ever wrote). Separately, distil the
+motion signature into a one-line
 **Motion identity** note in the summary (e.g. "150ms ease-out hovers, 2px lift
 on cards, no entrance animation") — it is the interaction fingerprint later
 generation must match. Where the source has no observable interaction states
@@ -333,7 +352,9 @@ Where:
   variation if any).
 - `--states` is the subset of `{default, hover, active, focus, disabled}`
   observed in the source. Static HTML usually only shows `default`; record
-  what you see, don't fabricate.
+  what you see, don't fabricate. The flag still validates against this enum,
+  but each value now lands in `variants` as `State=<PascalCase>` — not in the
+  record's `states` field, which the kernel leaves unset (spec 009 D3).
 
 The registry file is auto-created on the first `register` if it doesn't
 already exist (step 6 created an empty one via `ui ds init`).

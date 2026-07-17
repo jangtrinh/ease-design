@@ -121,8 +121,9 @@ Follow the flow for the chosen source; **do not** restate its steps here.
        and documented, exactly like the Figma C0 path above.
     4. Continue to step 3a for component sampling — the vocabulary is done;
        only components still need `extract.md`'s registration steps
-       (`templates/workflows/extract.md` step 8 onward), not its token steps
-       (4–7, which this C0 path replaces for the values it could extract).
+       (`templates/workflows/extract.md` step 8 onward, driven by **step 3d**'s
+       record-shape rules below), not its token steps (4–7, which this C0 path
+       replaces for the values it could extract).
     - **Record, don't fix:** if the same primitive family is duplicated
       per-theme as parallel hardcoded ramps instead of one semantic layer over
       shared primitives (`knowledge/token-taxonomy.md`'s named DON'T), note it
@@ -130,7 +131,9 @@ Follow the flow for the chosen source; **do not** restate its steps here.
   - **No CSS custom properties** (pure Tailwind utility classes, inline
     styles, CSS-in-JS with no `--*` declarations) → the C0 compiler has
     nothing to read. Follow `templates/workflows/extract.md` against the
-    representative files chosen in step 3a instead.
+    representative files chosen in step 3a instead — its Inputs accept this
+    sampled set directly (spec 009 D5) — and apply **step 3d**'s record-shape
+    rules when registering each component.
 - **URL** → follow `templates/workflows/from-url.md` with the user's URL.
 - **Figma** → branch on what the target IS:
   - **A design SYSTEM / library** (the user points at a file whose value is its
@@ -201,6 +204,12 @@ Harvest interaction states (`:hover` / `:focus` / `:active`) and motion
 Motion identity note — following the **"Interaction-state evidence"** section of
 `templates/workflows/extract.md` (canonical). Register only states you actually
 observed via `ui registry register … --states <observed>`; never invent one.
+**The `states` field on a registry record is dead** — measured 0/537 populated
+in platform-design-system and 0/27 in the `ds init` kit; the only place it was
+ever mandated was this doctrine. `--states` still takes the same comma list and
+still refuses an unobserved or invalid value, but the kernel now folds each one
+into `variants` as `State=<PascalCase>` (kit-identical to `Tone=`/`Size=`) and
+leaves `states` unset (spec 009 D3).
 
 #### Step 3c — Evidence grade (SOURCE-grade only)
 
@@ -208,6 +217,44 @@ Admit only values that trace to deterministic extraction; a value the model
 merely remembers or infers is GUESS-grade — exclude it and list it under
 "unverified". Apply the **"Evidence grade"** section of
 `templates/workflows/extract.md` (canonical); `/ui:learn` adds no separate rule.
+
+#### Step 3d — Component record shape for a code source (D1/D2/D4)
+
+A code source needs three decisions an HTML page never raises, and they are
+RESOLVED — do not re-derive them (spec 009 D1/D2/D4, from measuring dana +
+platform-design-system + the `ds init` kit):
+
+1. **One record per component, not per variant** (D1). A component's variant ×
+   size × radius matrix is **one** registry entry — dana's `Button` (8 tones ×
+   3 sizes × 3 radii = 72 combinations) is `Control/Button`, not 72 records.
+   The matrix lives inside that one record's `variants` array. Name it
+   `Category/Component` (`registry-store.ts:74`'s `NAME_PATTERN`,
+   PascalCase/PascalCase) — code-authored components are exactly what that
+   pattern exists for, per `figma-ds-registry.ts:9-14`'s own header (Figma
+   inventory is a *different* door, by design; never route a code component
+   through it).
+2. **Axis names are the source's own prop names, PascalCased** (D2). If the
+   component declares a prop literally named `variant`, the axis is
+   `Variant=` (`variant="primary"` → `Variant=Primary`); a `size` prop is
+   `Size=`. Do **not** re-interpret a prop name into a house term — dana's
+   `variant` stays `Variant`, it never becomes `Tone`. If a prop name collides
+   with `State` (step 3b), the source's own name wins; record the collision
+   in the summary.
+3. **`markup` is an HTML specimen sheet traced to real class strings** (D4).
+   HTML is the design (owner decree, 2026-07-17): `/ui:generate` emits
+   self-contained HTML and does not know frameworks exist — developers port
+   it. A specimen sheet (kit-style: a wrapper + rows showing the variant
+   matrix) is the honest equivalent for a code source, with one hard rule:
+   every cell must trace to a class string the source actually declares —
+   dana's `variantClasses.primary` in `Button.tsx` is right there, copy it
+   verbatim. A cell you cannot trace, you do not draw; list it under
+   "unverified" (step 3c). **Never render the component** to obtain markup —
+   no jsdom, no testing-library, no dev server, even though dana has the
+   toolchain to do exactly that — rendering a user's code is a No-Go
+   (`brainstorm.md` §7).
+
+With these three settled, `extract.md`'s steps 2–3 (discovery + canonical
+naming) and step 8 (register) run unchanged against the sampled files.
 
 ### Step 4 — Compile and verify
 
@@ -253,13 +300,15 @@ Emit a compact readiness report in exactly this shape:
 
 ```
 ✓ learned from <source> (<n> files sampled)
-✓ design system: <k> tokens · <m> components registered (<s> with states) · persona <slug>
+✓ design system: <k> tokens · <m> components registered (<s> with observed states) · persona <slug>
 → try: /ui:generate "<suggested intent from the product's domain>"
 ```
 
 Derive the counts from `ui ds context --format json` and `ui registry list
 --json`; draw the suggested intent from the product's own domain (inferred from
-the sampled content), not a generic example.
+the sampled content), not a generic example. `<s>` counts records whose
+`variants` array contains a `State=*` entry (spec 009 D3) — **not** the
+record's own `states` field, which stays unset.
 
 ## Outputs
 

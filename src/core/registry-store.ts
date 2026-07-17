@@ -75,6 +75,29 @@ const NAME_PATTERN = /^[A-Z][A-Za-z]+\/[A-Z][A-Za-z]+$/;
 const TOKEN_PATTERN = /^[a-z][a-z0-9.-]*$/;
 const VALID_STATES = new Set<string>(["default", "hover", "active", "focus", "disabled"]);
 
+/**
+ * `--states` → `State=X` variant entries (spec 009 D3).
+ *
+ * The record's `states` field is dead: 0/537 populated in platform-design-system, 0/27 in
+ * the `ds init` kit. The only place it was ever mandated was the workflow doctrine
+ * (`extract.md`, `learn.md` §3b) — no emitter ever wrote it. States travel as `State=X`
+ * inside `variants`, kit-identical to `Tone=`/`Size=`. `--states` keeps validating against
+ * the same enum (a scripted caller's contract does not change) but its values now land
+ * here instead of in `states`.
+ * @throws RegistryError("BAD_STATE") on a value outside the enum.
+ */
+export function statesToVariants(states: string[]): string[] {
+  return states.map((s) => {
+    if (!VALID_STATES.has(s)) {
+      throw new RegistryError(
+        "BAD_STATE",
+        `invalid state '${s}' — must be one of: default, hover, active, focus, disabled`,
+      );
+    }
+    return `State=${s.charAt(0).toUpperCase()}${s.slice(1)}`;
+  });
+}
+
 /** Keys permitted at the registry root object (mirrors schema additionalProperties:false). */
 const REGISTRY_ROOT_KEYS = new Set(["version", "components"]);
 

@@ -307,7 +307,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
           { name: "markup", type: "string", required: true, summary: "Markup source file, or '-' for stdin" },
           { name: "tokens", type: "string", summary: "Comma-separated token paths the component uses" },
           { name: "variants", type: "string", summary: "Comma-separated variant names" },
-          { name: "states", type: "string", values: ["default", "hover", "active", "focus", "disabled"], summary: "Comma-separated states (each from the enum)" },
+          { name: "states", type: "string", values: ["default", "hover", "active", "focus", "disabled"], summary: "Comma-separated states (each from the enum); folded into --variants as State=X, not into the record's own states field" },
           { name: "description", type: "string", summary: "Free-text component description" },
           { name: "force", type: "boolean", summary: "Overwrite an existing component" },
           { name: "file", type: "string", summary: "Registry file path (default ./design/component-registry.json)" },

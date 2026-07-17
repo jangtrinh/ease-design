@@ -10,6 +10,7 @@ import {
   registerComponent,
   lookupComponent,
   listComponents,
+  statesToVariants,
   RegistryError,
 } from "../src/core/registry-store.js";
 import type { ComponentRecord, Registry } from "../src/core/registry-store.js";
@@ -452,6 +453,34 @@ describe("listComponents", () => {
   it("does not mutate the original registry", () => {
     listComponents(reg, "action");
     expect(reg.components).toHaveLength(3);
+  });
+});
+
+// ─── statesToVariants (spec 009 D3) ────────────────────────────────────────────
+
+describe("statesToVariants", () => {
+  it("PascalCases each valid state into a State=X variant entry", () => {
+    expect(statesToVariants(["hover", "focus"])).toEqual(["State=Hover", "State=Focus"]);
+  });
+
+  it("returns an empty array for an empty input", () => {
+    expect(statesToVariants([])).toEqual([]);
+  });
+
+  it("covers the full enum", () => {
+    expect(statesToVariants(["default", "hover", "active", "focus", "disabled"])).toEqual([
+      "State=Default", "State=Hover", "State=Active", "State=Focus", "State=Disabled",
+    ]);
+  });
+
+  it("throws RegistryError('BAD_STATE') on a value outside the enum", () => {
+    expect(() => statesToVariants(["smashed"])).toThrow(RegistryError);
+    try {
+      statesToVariants(["smashed"]);
+    } catch (e) {
+      expect(e).toBeInstanceOf(RegistryError);
+      expect((e as RegistryError).code).toBe("BAD_STATE");
+    }
   });
 });
 
