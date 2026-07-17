@@ -104,14 +104,13 @@ describe("validateComponentRecord", () => {
     ).toThrow(expect.objectContaining({ code: "BAD_STATE" }));
   });
 
-  // Spec 009 P4 real-data finding (reports/p4-real-data-gate.md §3): BAD_TOKEN checks the
-  // path's FORMAT only, not that it resolves against a compiled token set — a well-formed
-  // but nonexistent path is accepted. This test documents today's actual behaviour so a
-  // future change (in either direction — tightening to an existence check, or a regression
-  // that further loosens the format check) shows up as a diff here rather than silently.
-  // Do not "fix" this test to expect a throw without also resolving the design questions in
-  // §3 of that report (which mode(s) count, how the checker gets the compiled tokens).
-  it("a syntactically valid but nonexistent token path is NOT refused (known gap, P4 finding)", () => {
+  // validateComponentRecord is a pure function with no DS access — it can only ever check
+  // --tokens FORMAT (spec 009 P4 real-data finding, reports/p4-real-data-gate.md §3, fixed
+  // by the owner in the same phase: registry.ts now ALSO calls
+  // registry-token-check.ts's assertTokensExist against the loaded DS before saving —
+  // see tests/cmd-registry.test.ts's "sealed DS integration" describe block for that half).
+  // This test pins that this function's job stops at format, by design — it is not the gap.
+  it("accepts a syntactically valid token path regardless of whether it resolves anywhere (format-only, by design — see registry-token-check.ts for the existence half)", () => {
     const rec = validateComponentRecord(
       validRecord({ tokensUsed: ["color.this-token-does-not-exist-anywhere"] }),
     );

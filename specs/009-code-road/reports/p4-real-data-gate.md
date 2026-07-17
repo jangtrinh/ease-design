@@ -29,10 +29,12 @@ end-to-end run on three real projects chosen for spread, plus a non-gating EaseU
    text). The CSS-custom-properties branch (P3's C0 path) and the plain-extract branch both now
    point at it instead of a bare "register the component" instruction.
 
-`registry.ts`: 324/330 lines (a dedupe helper for the repeated `RegistryError`→`CommandResult`
-catch pattern paid for the states/variants merge without growing the file). Four gates green,
-`npm test` 135 files / 2046 tests passed, `ui knowledge check` clean — all confirmed before this
-report was written.
+5. **BAD_TOKEN existence check** (owner-correction, added after the first pass of this report —
+   see §3's addendum) — `src/core/registry-token-check.ts` (new, small module) + one call site
+   in `registry.ts`'s Save step. `registry.ts`: **330/330 lines exactly** (a dedupe helper for
+   the repeated `RegistryError`→`CommandResult` catch pattern paid for the states/variants merge
+   *and* this addition without growing past budget). Four gates green, `npm test` 136 files /
+   2056 tests passed, `ui knowledge check` clean — all confirmed before this report was written.
 
 ---
 
@@ -52,7 +54,7 @@ UC-06's actual precondition ("clean checkout, no `design/`").
 | components registered | 1 — `Control/Button` | 1 — `Social/ShareButtons` | 1 — `Control/LocationSelector` |
 | `ds status --json` exit | **0** (generation 1 → 2 after register) | **0** (generation 1 → 2) | **0** (generation 1 → 2) |
 | `ds context --strict --with-theme` exit | **0** | **0** | **0** |
-| what the road got wrong (project-specific) | see §3 — the `BAD_TOKEN` finding, discovered here | most of the 27 components are one-off marketing sections (`hero-section.tsx`, `footer.tsx`, …), not variant-prop primitives — only one real D1/D2 candidate (`ShareButtons`'s `placement` prop) surfaced in the whole sampled set | `docs/product/hvs-design-system/` is a stale demo/preview tree with its own component CSS (`ButtonPrimary.css`, forced `.state-hover`/`.state-active` classes) sitting right next to the real `app/globals.css` — a less careful read could learn the demo instead of the product |
+| what the road got wrong (project-specific) | see §3 — the `BAD_TOKEN` finding, discovered here, since fixed (addendum) | most of the 27 components are one-off marketing sections (`hero-section.tsx`, `footer.tsx`, …), not variant-prop primitives — only one real D1/D2 candidate (`ShareButtons`'s `placement` prop) surfaced in the whole sampled set | `docs/product/hvs-design-system/` is a stale demo/preview tree with its own component CSS (`ButtonPrimary.css`, forced `.state-hover`/`.state-active` classes) sitting right next to the real `app/globals.css` — a less careful read could learn the demo instead of the product. **Not this phase's fix** — flagged for P2's `project-scan.ts` (see below) |
 
 **learn.md's own quality gate — the phase's success criterion — is satisfied on all three:**
 *"when the source was code, ≥1 component is registered"* (true, ×3) **and** *"`ds status` must
@@ -76,6 +78,20 @@ exit 0"* (true, ×3). Per Key Insight/UC-06 this pair of sentences could not bot
   named prop for it — D2 explicitly requires the axis name to come from the source's own prop,
   and there is no such prop here, so it was skipped in favor of `location-selector.tsx`, which
   declares a real `variant?: "default" | "compact"` prop.
+  - **Follow-up flagged, NOT fixed here** (owner's call): `docs/product/hvs-design-system/` — a
+    stale demo/preview tree, 7× bigger than the real `components/ui` — is real and valuable, but
+    the owner counted the corpus before this report proposed a general "detect stale/demo trees"
+    class and found no such class is warranted:
+    ```
+    docs      3/11 · 95 UI files → hvs(48) EaseUI(43) gravityhive(4)
+    examples  1/11 ·  3 files    → VSF-PCP(3)
+    demo · demos · preview · playground · sandbox · storybook · fixtures · .bak · -old · deprecated → 0
+    ```
+    Every plausible name pattern is zero except `docs/`. The honest, narrow rule is **"the
+    product's UI does not live under `docs/`"** — one more `SKIP_DIRS` entry, the same shape as
+    P2's `.venv` fix (`project-scan.ts:58-59`). `project-scan.ts` is P2's file and P2 is already
+    in review (#78) — **not this phase's file to touch.** Recorded here as the follow-up per the
+    owner's instruction, with the counts above; left undone.
 - Both `traicaybentre` and `hvs` have `.claude/worktrees/*` subdirectories containing duplicate
   copies of the whole tree (13 in traicaybentre, 3 in hvs). `ui scan`'s `SKIP_DIRS` already
   excludes `.claude` (`project-scan.ts:58`), so this did **not** distort the live scan results
@@ -126,16 +142,67 @@ That test is real and still passes; it was simply never asked the question this 
 safety claim depends on. This is exactly the shape of Key Insight 7's warning: a green test can
 certify the wrong property.
 
-**Disposition**: not fixed in this phase. The task's hard constraints explicitly say never to
-touch `validateComponentRecord`'s strictness, and an existence-check against the compiled token
-set is a real design decision (what counts as "the compiled set" — base mode only? every mode?
-does it need the tokens file path threaded through `registry.ts`, which currently never reads
-tokens at all?) that deserves its own resolved decision, not an improvisation inside this report.
-Reported per Art V / this spec's own "STOP AND REPORT" precedent (P1's line-budget lie, P2's
-Gherkin wish, P3's naming rule) rather than patched. **The road still worked in all three
-live runs above** because the host model (this session) traced every `tokensUsed` entry to a
-real compiled path by hand, as D4 requires — the gap is that the kernel does not yet enforce
-what the doctrine assumes it enforces.
+**Disposition (original)**: not fixed at first pass. The task's hard constraints as given said
+never to touch `validateComponentRecord`'s strictness, so this was reported per Art V / this
+spec's own "STOP AND REPORT" precedent (P1's line-budget lie, P2's Gherkin wish, P3's naming
+rule) rather than patched.
+
+### Addendum — owner-corrected and fixed in this phase
+
+The owner re-verified the finding live, confirmed the misread was in the ORIGINAL phase
+briefing (Key Insight 6 / the "never weaken it" constraint were both written believing
+`BAD_TOKEN` already checked existence), and made the call: **P4 closes it**, reusing P1's
+existing shape rather than inventing one (Art IV).
+
+- **New module `src/core/registry-token-check.ts`** (kept out of `registry.ts` — the file was
+  already at budget): `tokenExistsInTree(tokens, path)` — two-level `category.name` lookup,
+  the same convention `ds-change-token-impl.ts` already enforces; `assertTokensExist(tokensUsed,
+  tokens)` — no-op when `tokens` is `undefined` (the standalone-registry case, e.g.
+  `ingest-figma-ds`'s `--file` target — format-only, unchanged), else throws `RegistryError`
+  `BAD_TOKEN` on the first path that does not resolve, with a message that says **"does not
+  exist"**, never "must match" — the two failures now read differently. Modes are `$extensions`
+  ON a token, not tokens of their own, so resolving in the base tree is the whole test — the
+  "which modes count?" question in the original disposition dissolves.
+- **`registry.ts`** — `runRegister`'s existing Save step already calls
+  `loadDesignSystemForReseal(dsPaths)` once (P1); it now also calls `assertTokensExist(record.
+  tokensUsed, ds?.tokens)` there, before deciding reseal vs. plain save, so a refusal happens
+  before any write. No second DS load, no growth beyond budget: **330/330 lines exactly.**
+- **Verified live** (isolated probe, not touching a gate project): with a sealed DS present,
+  `--tokens color.color-accent-strong,color.totally-invented-xyz` now refuses —
+
+  ```
+  {"ok": false, "error": {"code": "BAD_TOKEN",
+    "message": "token 'color.totally-invented-xyz' does not exist in the compiled design
+      system — the path is well-formed but unknown, not malformed. Check 'ui ds context
+      --format json' for a real path."}}
+  ```
+
+  registry file byte-unchanged after the refusal. The original standalone-registry probe
+  (`--file` with no manifest) still accepts the same invented path, unchanged — confirmed with
+  a dedicated test (`tests/cmd-registry.test.ts`).
+- **Re-ran the three-project gate against the fix** (owner's instruction: if a real component
+  now fails, that is a finding to report, not a reason to relax the check). Re-registered all
+  three components verbatim (`--force`) under the corrected binary:
+
+  | | dana-desktop `Control/Button` | traicaybentre `Social/ShareButtons` | hvs `Control/LocationSelector` |
+  |---|---|---|---|
+  | register exit under the fix | **0** | **0** | **0** |
+  | `ds status` exit after | **0** (generation 3) | **0** (generation 3) | **0** (generation 3) |
+  | `ds context --strict --with-theme` exit | **0** | **0** | **0** |
+
+  **All three real components still pass.** No relaxation was needed — every `tokensUsed` entry
+  traced in §2/§4 was a genuinely real compiled path, so the stricter check changes nothing
+  about the three gate results; it only closes the hole a fabricated path could have used.
+- **Tests**: `tests/registry-token-check.test.ts` (new, pure unit tests over an in-memory
+  `TokenTree`) pins `tokenExistsInTree`/`assertTokensExist`. `tests/cmd-registry.test.ts` gained
+  three CLI-level cases in the "sealed DS integration" block: the invented-token refusal with
+  the distinct message, a genuinely-resolving token being accepted, and the standalone-registry
+  path still being format-only. `tests/registry-store.test.ts`'s test was reworded from
+  "documents a known gap" to "pins that `validateComponentRecord` is format-only **by design**"
+  — it was never the gap; `registry.ts` calling it plus the new module together are the fix.
+
+**Current status**: closed. `registry register`'s existence check (DS present) + format check
+(always) together are what P4's Key Insight 6 originally described.
 
 ---
 
@@ -222,15 +289,16 @@ truncated: true   visited: 4000
 
 **Status:** DONE
 **Summary:** D5 (dual-input `extract.md`), D3 (`--states` → `variants` via `statesToVariants`),
-and D1/D2/D4 (learn.md's real code route) implemented; four gates + 2046 tests + `ui knowledge
-check` green. Gate ran end-to-end on dana-desktop, traicaybentre, hvs (copies) — all three:
-≥1 component registered, `ds status` exit 0, `ds context --strict --with-theme` exit 0.
-`learn.md`'s own quality gate is satisfiable on real code for the first time. EaseUI run reported
-as evidence (not gating). One real finding: `registry register`'s `BAD_TOKEN` is a path-format
-check, not an existence check against the compiled token set — reported, not patched (see §3).
-**Concerns/Blockers:** The BAD_TOKEN gap (§3) is a real safety-story shortfall this phase
-discovered but was constrained from fixing (touching `validateComponentRecord`'s strictness was
-explicitly out of scope). Recommend a follow-up decision: should `registry register` read the
-project's compiled tokens and refuse a path that doesn't resolve? That needs its own resolved
-design (which mode(s) count, how `registry.ts` gets the tokens file without growing past its
-line budget) rather than being improvised inside this phase.
+D1/D2/D4 (learn.md's real code route), **and the BAD_TOKEN existence check** (owner-corrected
+follow-up, `registry-token-check.ts`) all implemented; four gates + 2056 tests + `ui knowledge
+check` green; `registry.ts` at 330/330 lines exactly. Gate ran end-to-end on dana-desktop,
+traicaybentre, hvs (copies), **then re-ran after the BAD_TOKEN fix** — all three, both times:
+≥1 component registered, `ds status` exit 0, `ds context --strict --with-theme` exit 0, and no
+real component was relaxed-for by the stricter check. `learn.md`'s own quality gate is
+satisfiable on real code for the first time. EaseUI run reported as evidence (not gating). The
+`docs/`-as-demo-tree observation is recorded as a follow-up for P2's `project-scan.ts` (§2, with
+the owner's corpus counts) and deliberately left undone — not this phase's file.
+**Concerns/Blockers:** none outstanding for this phase. The BAD_TOKEN gap is closed (see §3
+addendum) and re-verified live against all three gate projects with no regression. The
+`docs/` `SKIP_DIRS` follow-up is explicitly deferred to P2 (#78), per the owner's instruction —
+not a blocker on this phase, just an open item for whoever picks up P2 next.

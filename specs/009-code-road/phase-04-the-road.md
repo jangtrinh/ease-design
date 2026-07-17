@@ -158,17 +158,23 @@ Per project, in `reports/p4-real-data-gate.md`:
 | components registered | 1 (`Control/Button`) | 1 (`Social/ShareButtons`) | 1 (`Control/LocationSelector`) |
 | `ds status` exit | 0 (generation 1→2) | 0 (generation 1→2) | 0 (generation 1→2) |
 | `ds context --strict --with-theme` exit | 0 | 0 | 0 |
-| **what the road got wrong** | see below — the `BAD_TOKEN` finding (applies to all three) | most components are one-off marketing sections, not variant-prop primitives — D1/D2 only had one real candidate (`ShareButtons`'s `placement` prop) in 27 files | `docs/product/hvs-design-system/` is a stale demo/preview tree with its own `ButtonPrimary.css` etc. — a less careful read could mistake it for the real DS instead of `app/globals.css` |
+| **what the road got wrong** | see below — the `BAD_TOKEN` finding, **since fixed** (applies to all three) | most components are one-off marketing sections, not variant-prop primitives — D1/D2 only had one real candidate (`ShareButtons`'s `placement` prop) in 27 files | `docs/product/hvs-design-system/` is a stale demo/preview tree with its own `ButtonPrimary.css` etc. — flagged as a P2 `project-scan.ts` follow-up, not fixed here |
 
-**The one thing the road got wrong (all three projects, same root cause):** `ui registry
-register`'s `BAD_TOKEN` (`registry-store.ts`, `TOKEN_PATTERN`) validates only that a `--tokens`
-value matches `^[a-z][a-z0-9.-]*$` — it does **not** check the value against the project's
-compiled token set. `color.this-token-does-not-exist-anywhere` registers successfully (verified
-live, isolated from all three project runs). This phase's own Key Insight 6 and hard constraints
-describe `BAD_TOKEN` as refusing "any invented token" — that is not what the code does today; it
-refuses malformed *syntax*, not an *invented path*. Per the "never touch `validateComponentRecord`'s
-strictness" constraint this was not changed here — reported per Art V/Insight 7, not patched.
-See `reports/p4-real-data-gate.md` for the full reproduction and discussion.
+**The one thing the road got wrong (all three projects, same root cause) — FIXED in this phase:**
+`ui registry register`'s `BAD_TOKEN` (`registry-store.ts`, `TOKEN_PATTERN`) validated only that a
+`--tokens` value matched `^[a-z][a-z0-9.-]*$` — it did **not** check the value against the
+project's compiled token set. `color.this-token-does-not-exist-anywhere` registered successfully
+(verified live, isolated from all three project runs). The original phase briefing's Key Insight
+6 and hard constraints described `BAD_TOKEN` as refusing "any invented token" — that was a
+misread of the code (owner-confirmed), not what the code did. **Owner decision: fix it, reusing
+P1's `loadDesignSystemForReseal` (Art IV)** — new small module `src/core/registry-token-check.ts`
+(`assertTokensExist`) called once from `registry.ts`'s existing Save step: DS present → every
+`tokensUsed` path must resolve in the compiled tree (two-level `category.name`, base-mode
+resolution only — modes are `$extensions` on a token, not separate tokens); no DS (standalone
+`--file` registry) → format-only, unchanged. `registry.ts` stays at 330/330. Re-ran the
+three-project gate after the fix — **all three real components still pass**; the stricter check
+changed nothing about them because every `tokensUsed` entry was genuinely traced, not invented.
+See `reports/p4-real-data-gate.md` §3 addendum for the full reproduction, fix, and re-verification.
 
 Plus, verbatim: **one component record the road produced**, and **one thing it got wrong** —
 or "none", but look. Also run **EaseUI** (no root `package.json`, 2 UI roots, 4220 entries vs a

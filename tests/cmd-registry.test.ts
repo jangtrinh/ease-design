@@ -312,6 +312,57 @@ describe("ui registry register — sealed DS integration (spec 009 P1)", () => {
     expect(readFileSync(registryPath, "utf8")).toBe(before);
     expect(() => loadDesignSystem(pathsForDir(join(tmp, "design")))).not.toThrow();
   });
+
+  // spec 009 P4 owner-correction: BAD_TOKEN was format-only (reports/p4-real-data-gate.md
+  // §3) — a well-formed but INVENTED path registered cleanly. registry.ts now also checks
+  // existence against the loaded DS's compiled tree (registry-token-check.ts) before saving.
+  it("a well-formed but nonexistent token is refused when a DS is present — existence, not format", () => {
+    const tmp = initDs();
+    const registryPath = join(tmp, "design", "component-registry.json");
+    const before = readFileSync(registryPath, "utf8");
+    const r = captureRun([
+      "registry", "register", "Button/Primary",
+      "--category", "action", "--markup", fix("registry-markup.html"),
+      "--tokens", "color.this-token-does-not-exist-anywhere",
+      "--file", registryPath, "--json",
+    ]);
+    expect(r.code).toBe(1);
+    const json = JSON.parse(r.out) as { error: { code: string; message: string } };
+    expect(json.error.code).toBe("BAD_TOKEN");
+    // Distinct message from the format failure above — "does not exist", never "must match".
+    expect(json.error.message).toMatch(/does not exist/);
+    expect(json.error.message).not.toMatch(/must match/);
+    expect(readFileSync(registryPath, "utf8")).toBe(before);
+  });
+
+  it("a token that genuinely resolves in the compiled DS is accepted", () => {
+    const tmp = initDs();
+    const registryPath = join(tmp, "design", "component-registry.json");
+    const ds = loadDesignSystem(pathsForDir(join(tmp, "design")));
+    const category = Object.keys(ds.tokens)[0]!;
+    const name = Object.keys(ds.tokens[category]!)[0]!;
+    const realPath = `${category}.${name}`;
+    const r = captureRun([
+      "registry", "register", "Button/Primary",
+      "--category", "action", "--markup", fix("registry-markup.html"),
+      "--tokens", realPath,
+      "--file", registryPath, "--json",
+    ]);
+    expect(r.code).toBe(0);
+    const json = JSON.parse(r.out) as { data: { component: { tokensUsed: string[] } } };
+    expect(json.data.component.tokensUsed).toEqual([realPath]);
+  });
+
+  it("a standalone registry (no DS next to --file) still accepts a nonexistent-but-well-formed token — format-only, unchanged", () => {
+    const p = tmpPath();
+    const r = captureRun([
+      "registry", "register", "Button/Primary",
+      "--category", "action", "--markup", fix("registry-markup.html"),
+      "--tokens", "color.this-token-does-not-exist-anywhere",
+      "--file", p, "--json",
+    ]);
+    expect(r.code).toBe(0);
+  });
 });
 
 // ─── lookup ───────────────────────────────────────────────────────────────────

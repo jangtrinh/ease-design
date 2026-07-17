@@ -26,6 +26,7 @@ import {
 } from "../core/registry-store.js";
 import { pathsForDir } from "../core/design-system.js";
 import { reseal, loadDesignSystemForReseal } from "../core/ds-reseal.js";
+import { assertTokensExist } from "../core/registry-token-check.js";
 
 const CMD = "registry";
 const DEFAULT_REGISTRY_PATH = "./design/component-registry.json";
@@ -65,7 +66,7 @@ Error codes:
   BAD_ARG            Missing subcommand, positional, or required flag
   BAD_NAME           Name does not match Category/Variant pattern
   BAD_STATE          A --states value not in the enum
-  BAD_TOKEN          A --tokens value fails the token-path pattern
+  BAD_TOKEN          Bad --tokens format, OR (DS present) unresolvable path — distinct msgs
   NAME_EXISTS        register of existing name without --force
   NOT_FOUND          lookup of absent name
   FILE_NOT_FOUND     --markup file does not exist
@@ -189,10 +190,13 @@ function runRegister(parsed: ParsedArgs): CommandResult {
     return asResult(useJson, sub, e);
   }
 
-  // Save — reseal on a sealed DS, else the plain unsealed write (spec 009 P1).
+  // Save — reseal on a sealed DS, else the plain unsealed write (spec 009 P1). DS present ->
+  // tokensUsed must also resolve in its compiled tree, not just match the format regex
+  // (spec 009 P4 owner-correction — BAD_TOKEN was format-only; see registry-token-check.ts).
   const dsPaths = pathsForDir(dirname(registryPath));
   try {
     const ds = loadDesignSystemForReseal(dsPaths);
+    assertTokensExist(record.tokensUsed, ds?.tokens);
     if (ds !== undefined) {
       reseal({
         ds, paths: dsPaths, registry: result.registry, nowIso: new Date().toISOString(),
