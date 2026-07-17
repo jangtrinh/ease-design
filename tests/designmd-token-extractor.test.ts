@@ -110,6 +110,43 @@ describe("extractTokens — custom properties", () => {
   });
 });
 
+describe("extractTokens — D1 selector provenance (spec 009 P3)", () => {
+  it("records the enclosing selector for :root, @theme, and a data-theme block", () => {
+    const out = extractTokens([
+      src("a.css", `
+        :root { --color-bg: #ffffff; }
+        @theme { --color-gray-900: var(--gray-900); }
+        [data-theme="dark"] { --color-bg: #111111; }
+      `),
+    ]);
+    const bgRoot = out.customProperties.find(p => p.name === "--color-bg" && p.value === "#ffffff");
+    expect(bgRoot?.selectors[0]).toBe(":root");
+    const gray = out.customProperties.find(p => p.name === "--color-gray-900");
+    expect(gray?.selectors[0]).toBe("@theme");
+    const bgDark = out.customProperties.find(p => p.name === "--color-bg" && p.value === "#111111");
+    expect(bgDark?.selectors[0]).toBe('[data-theme="dark"]');
+  });
+
+  it("records a compound comma-separated selector list verbatim (dana's 3-mode block)", () => {
+    const out = extractTokens([
+      src("a.css", `[data-theme="dark"],\n[data-theme="classic"],\n.dark {\n  --surface-content: var(--gray-900);\n}`),
+    ]);
+    const surface = out.customProperties.find(p => p.name === "--surface-content");
+    expect(surface?.selectors[0]).toContain('[data-theme="dark"]');
+    expect(surface?.selectors[0]).toContain(".dark");
+  });
+
+  it("selectors[] stays index-aligned with sources[] across multiple files", () => {
+    const out = extractTokens([
+      src("a.css", ":root { --x: 1px; }"),
+      src("b.css", ".weird { --x: 1px; }"),
+    ]);
+    const x = out.customProperties.find(p => p.name === "--x");
+    expect(x?.sources.length).toBe(x?.selectors.length);
+    expect(x?.selectors).toEqual([":root", ".weird"]);
+  });
+});
+
 describe("extractTokens — real traicaybentre fixture", () => {
   const htmlPath = join(REPO_ROOT, "plans/260527-from-url-designmd/artifacts/traicaybentre.html");
   const css1Path = join(REPO_ROOT, "plans/260527-from-url-designmd/artifacts/traicaybentre.css");

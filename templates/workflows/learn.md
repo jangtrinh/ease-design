@@ -82,8 +82,55 @@ routed flow derives all of that from evidence.
 
 Follow the flow for the chosen source; **do not** restate its steps here.
 
-- **Code** → follow `templates/workflows/extract.md` against the representative
-  files chosen in step 3a.
+- **Code** → branch on whether the scan's `cssFiles` declare `--*` custom
+  properties (a Tailwind v4 `@theme` block or a token-authored `:root`/theme
+  selector — check with a quick `grep -c -- '--' <file>` or read the file):
+  - **CSS custom properties present** → this is the code road's own C0
+    (spec 009 P3): compile the vocabulary deterministically instead of having
+    the host model eyeball values and issue one `change-token` per token (the
+    old path — real cost measured at 102 calls on one project). Zero-network,
+    zero-LLM:
+    1. Harvest every declared custom property across **all** reported
+       `cssFiles`, with per-line + per-selector provenance:
+       ```sh
+       ui designmd extract-tokens <any-sampled-html-or-empty.html> \
+         --css "<cssFile1>,<cssFile2>,..." --out t.json
+       ```
+       `--css` takes a **single comma-joined flag** for multiple files — passing
+       `--css` more than once is a `REPEATED_FLAG` error, not a silent
+       last-file-wins. `<html-path>` is still required even for a CSS-only
+       project (a known wart — pass a tiny placeholder `<html></html>` file).
+    2. Compile it into a portable, unsealed `tokens.json` — literal values
+       become primitives, `var(--x)` aliases become semantics, and each theme
+       selector (`[data-theme="X"]`, `.dark`, `@media (prefers-color-scheme:
+       dark)`) becomes a mode:
+       ```sh
+       ui ingest-css-ds t.json --out . --name "<ds-name>"
+       ```
+       A `LEAF_COLLISION` here (two source custom properties strip to the same
+       token path, e.g. `--gray-900` and `--color-gray-900` both →
+       `color.gray-900`) means the project really does declare both — rename
+       one at the source or accept the message and move on; do not work
+       around it by re-running with different input.
+    3. Seal it into the store:
+       ```sh
+       ui ds import tokens.json --dir . --name "<ds-name>"
+       ```
+       `ui tokens compile design/design.tokens.json --target css` then emits
+       the **base** mode only — other modes stay preserved in the token file
+       and documented, exactly like the Figma C0 path above.
+    4. Continue to step 3a for component sampling — the vocabulary is done;
+       only components still need `extract.md`'s registration steps
+       (`templates/workflows/extract.md` step 8 onward), not its token steps
+       (4–7, which this C0 path replaces for the values it could extract).
+    - **Record, don't fix:** if the same primitive family is duplicated
+      per-theme as parallel hardcoded ramps instead of one semantic layer over
+      shared primitives (`knowledge/token-taxonomy.md`'s named DON'T), note it
+      as a finding — there is no automatic normalisation for this yet.
+  - **No CSS custom properties** (pure Tailwind utility classes, inline
+    styles, CSS-in-JS with no `--*` declarations) → the C0 compiler has
+    nothing to read. Follow `templates/workflows/extract.md` against the
+    representative files chosen in step 3a instead.
 - **URL** → follow `templates/workflows/from-url.md` with the user's URL.
 - **Figma** → branch on what the target IS:
   - **A design SYSTEM / library** (the user points at a file whose value is its

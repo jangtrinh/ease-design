@@ -23,6 +23,7 @@
  *   - Font sizes / weights — these come from the workflow's
  *     `extract.md` recipe still.
  */
+import { computeSelectorBlocks, selectorAt } from "./css-selector-blocks.js";
 
 export interface HexObservation {
   /** Lowercase #RRGGBB. */
@@ -51,6 +52,10 @@ export interface CustomPropertyObservation {
   hex?: string;
   /** Source label + line number for the first N observations. */
   sources: string[];
+  /** Enclosing selector per observation, index-aligned with `sources` (D1, spec 009 P3).
+   * E.g. ":root", "@theme", '[data-theme="dark"]'; "" when none. Parallel field —
+   * `sources` keeps its "file:Lnn" shape (load-bearing elsewhere). */
+  selectors: string[];
 }
 
 export interface ExtractedTokens {
@@ -87,6 +92,7 @@ function lineOf(body: string, idx: number): number {
   return line;
 }
 
+
 /**
  * Extract canonical tokens from one or more raw source files.
  *
@@ -97,7 +103,7 @@ function lineOf(body: string, idx: number): number {
 export function extractTokens(sources: SourceFile[]): ExtractedTokens {
   const hexMap = new Map<string, { count: number; sources: string[] }>();
   const fontMap = new Map<string, { context: FontObservation["context"]; sources: string[] }>();
-  const cpMap = new Map<string, { value: string; hex?: string; sources: string[] }>();
+  const cpMap = new Map<string, { value: string; hex?: string; sources: string[]; selectors: string[] }>();
 
   function track<T extends { sources: string[] }>(rec: T, src: string): void {
     if (rec.sources.length < MAX_PROVENANCE_PER_TOKEN) {
@@ -160,6 +166,7 @@ export function extractTokens(sources: SourceFile[]): ExtractedTokens {
     }
 
     // ── CSS custom properties ──────────────────────────────────────────────────
+    const blocks = computeSelectorBlocks(source.body, source.name.endsWith(".html"));
     CUSTOM_PROP_RE.lastIndex = 0;
     while ((m = CUSTOM_PROP_RE.exec(source.body)) !== null) {
       const name = m[1]!;
@@ -174,8 +181,11 @@ export function extractTokens(sources: SourceFile[]): ExtractedTokens {
       const key = `${name}=${value}`;
       let rec = cpMap.get(key);
       if (!rec) {
-        rec = { value, hex, sources: [] };
+        rec = { value, hex, sources: [], selectors: [] };
         cpMap.set(key, rec);
+      }
+      if (rec.sources.length < MAX_PROVENANCE_PER_TOKEN) {
+        rec.selectors.push(selectorAt(m.index, blocks));
       }
       track(rec, `${source.name}:L${lineOf(source.body, m.index)}`);
     }
@@ -196,7 +206,7 @@ export function extractTokens(sources: SourceFile[]): ExtractedTokens {
   const customProperties: CustomPropertyObservation[] = [...cpMap.entries()]
     .map(([key, rec]) => {
       const name = key.split("=")[0]!;
-      const out: CustomPropertyObservation = { name, value: rec.value, sources: rec.sources };
+      const out: CustomPropertyObservation = { name, value: rec.value, sources: rec.sources, selectors: rec.selectors };
       if (rec.hex !== undefined) out.hex = rec.hex;
       return out;
     })

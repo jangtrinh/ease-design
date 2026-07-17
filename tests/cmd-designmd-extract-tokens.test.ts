@@ -156,3 +156,45 @@ describe("ui designmd extract-tokens — error handling", () => {
     expect(env.error.code).toBe("FILE_NOT_FOUND");
   });
 });
+
+describe("ui designmd extract-tokens — D1: selector provenance (spec 009 P3)", () => {
+  it("each custom-property source carries its enclosing selector", () => {
+    const { code, out } = captureRun([
+      "designmd", "extract-tokens",
+      fix("sample.html"),
+      "--css", fix("sample.css"),
+      "--json",
+    ]);
+    expect(code).toBe(0);
+    const env = JSON.parse(out) as { data: { customProperties: { name: string; selectors: string[] }[] } };
+    const brand = env.data.customProperties.find((p) => p.name === "--color-brand");
+    expect(brand?.selectors[0]).toBe(":root");
+  });
+});
+
+describe("ui designmd extract-tokens — F4: repeated --css is a hard error (spec 009 P3)", () => {
+  it("a comma-joined --css scans every file (the working multi-file form)", () => {
+    const { code, out } = captureRun([
+      "designmd", "extract-tokens",
+      fix("sample.html"),
+      "--css", `${fix("sample.css")},${fix("sample.css")}`,
+      "--json",
+    ]);
+    expect(code).toBe(0);
+    const env = JSON.parse(out) as { data: { customProperties: { name: string }[] } };
+    expect(env.data.customProperties.some((p) => p.name === "--color-brand")).toBe(true);
+  });
+
+  it("--css passed twice → REPEATED_FLAG, not a silent last-wins drop", () => {
+    const { code, out } = captureRun([
+      "designmd", "extract-tokens",
+      fix("sample.html"),
+      "--css", fix("sample.css"),
+      "--css", fix("sample.css"),
+      "--json",
+    ]);
+    expect(code).toBe(1);
+    const env = JSON.parse(out) as { ok: boolean; error: { code: string } };
+    expect(env.error.code).toBe("REPEATED_FLAG");
+  });
+});

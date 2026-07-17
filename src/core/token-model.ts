@@ -57,6 +57,32 @@ export class TokenError extends Error {
   }
 }
 
+// ─── Mode convention — the shared home (D3, spec 009 P3) ──────────────────────
+//
+// figma-ds-tokens.ts encodes `$extensions["mode.<name>"] = { $value }` locally
+// ("kept local to avoid a cycle" — figma-ds-tokens.ts:29) because it predates
+// this shared home. css-token-ingest.ts is the convention's SECOND emitter
+// (Art II: a convention with two emitters needs one shared definition and a
+// check — tests/mode-convention.test.ts is that check, driving both emitters
+// to equivalent input and asserting byte-identical `$extensions` shape).
+
+/** Lowercase, collapse to the alias-safe [a-z0-9-] alphabet. Never empty.
+ * Mirrors figma-ds-tokens.ts's sanitizeSeg exactly (mode-convention.test.ts pins this). */
+export function sanitizeModeName(s: string): string {
+  const out = s
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return out.length > 0 ? out : "x";
+}
+
+/** The `$extensions` key for a non-base mode, e.g. "dark" → "mode.dark". */
+export function modeExtensionKey(modeName: string): string {
+  return `mode.${sanitizeModeName(modeName)}`;
+}
+
 // ─── Predicates ───────────────────────────────────────────────────────────────
 
 const ALIAS_RE = /^\{[a-z0-9.-]+\}$/;

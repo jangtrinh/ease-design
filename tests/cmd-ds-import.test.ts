@@ -201,6 +201,40 @@ describe("ui ds import — D2: --force refuses to wipe a non-empty registry (spe
   });
 });
 
+describe("ui ds import — F2: alias-valued tokens survive import (spec 009 P3 D5)", () => {
+  it("test_an_alias_valued_token_imports_and_resolves", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-import-alias-"));
+    const src = writeFlat(tmp, "tokens.json", {
+      color: { "gray-900": "#181818", "text-primary": "{color.gray-900}" },
+    });
+    const r = capture(["ds", "import", src, "--dir", tmp, "--json"]);
+    expect(r.code).toBe(0);
+    const data = JSON.parse(r.out).data as { imported: number; skipped: number };
+    expect(data.skipped).toBe(0);
+    expect(data.imported).toBe(2);
+
+    const written = JSON.parse(readFileSync(join(tmp, "design", "design.tokens.json"), "utf8"));
+    expect(written.color["text-primary"]).toEqual({ $value: "{color.gray-900}", $type: "color" });
+
+    const compiled = capture(["tokens", "compile", join(tmp, "design", "design.tokens.json"), "--target", "css"]);
+    expect(compiled.code).toBe(0);
+    expect(compiled.out).toContain("--color-text-primary: #181818");
+  });
+
+  it("test_an_alias_only_token_file_is_not_empty_import", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-import-alias-only-"));
+    // Every token in the file is alias-valued — none of them are literals, so this
+    // exercises ds-import-impl.ts:64's EMPTY_IMPORT guard on a purely-semantic file.
+    const src = writeFlat(tmp, "tokens.json", {
+      color: { "text-primary": "{color.gray-900}", "text-secondary": "{color.gray-700}" },
+    });
+    const r = capture(["ds", "import", src, "--dir", tmp, "--json"]);
+    expect(r.code).toBe(0);
+    const data = JSON.parse(r.out).data as { imported: number };
+    expect(data.imported).toBe(2);
+  });
+});
+
 describe("ui ds import — writes a single trailing newline (spec 009 P1 D5 fallout)", () => {
   it("design.tokens.json / component-registry.json / ds.manifest.json each end with exactly one newline", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ease-import-newline-"));

@@ -89,8 +89,18 @@ describe("importFlatTokens — nested groups + fontFamily", () => {
 describe("importFlatTokens — plain number, neutral category", () => {
   it("a bare number in a category with no dimension/weight/duration signal → number", () => {
     const { dtcg, stats } = importFlatTokens({ misc: { opacityScale: 3 } });
-    expect(dtcg.misc?.opacityScale).toEqual({ $value: 3, $type: "number" });
+    expect(dtcg.misc?.opacityscale).toEqual({ $value: 3, $type: "number" });
     expect(stats.byType.number).toBe(1);
+  });
+
+  it("F6 (spec 009 P3): a camelCase source name is sanitized to a TOKEN_PATTERN-legal key", () => {
+    // registry-store.ts's TOKEN_PATTERN (^[a-z][a-z0-9.-]*$) forbids uppercase — a
+    // camelCase group/token name used to pass through verbatim and become
+    // unreferencable from any component (dana: 28/286 tokens this way).
+    const { dtcg } = importFlatTokens({ fontSize: { captionText: "12px" } });
+    expect(dtcg.fontsize?.captiontext).toEqual({ $value: "12px", $type: "dimension" });
+    expect(/^[a-z][a-z0-9.-]*$/.test("fontsize")).toBe(true);
+    expect(/^[a-z][a-z0-9.-]*$/.test("captiontext")).toBe(true);
   });
 });
 

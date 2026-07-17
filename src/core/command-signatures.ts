@@ -599,10 +599,10 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         summary: "Emit frequency-ranked source tokens (colours, fonts, custom-props)",
         positionals: [{ name: "<html-path>", required: true, summary: "Source HTML file" }],
         flags: [
-          { name: "css", type: "string", summary: "Additional CSS file to scan" },
+          { name: "css", type: "string", summary: "Additional CSS file(s) to scan — comma-separate for multiple (e.g. --css a.css,b.css); passing --css twice is a REPEATED_FLAG error, not a silent overwrite" },
           { name: "out", type: "string", summary: "Write the token report to a file" },
         ],
-        errorCodes: [...IO_CODES, "WRITE_ERROR"],
+        errorCodes: [...IO_CODES, "WRITE_ERROR", "REPEATED_FLAG"],
       },
       snapshot: {
         summary: "Produce a self-contained preview HTML (CSS inlined, scripts stripped)",
@@ -635,6 +635,19 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         { name: "now", type: "string", summary: "Deterministic clock for the seeded memory graph (ISO-8601)" },
       ],
       errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "FILE_NOT_FOUND", "READ_ERROR", "BAD_JSON", "BAD_DS", "WRITE_ERROR"],
+    },
+  },
+
+  "ingest-css-ds": {
+    summary: "Compile CSS custom properties (extract-tokens JSON) into a portable, unsealed tokens.json",
+    signature: {
+      summary: "Compile a 'designmd extract-tokens' output into DTCG tokens + modes",
+      positionals: [{ name: "<extract-tokens.json>", required: true, summary: "ui designmd extract-tokens --css ... --out output" }],
+      flags: [
+        { name: "out", type: "string", summary: "Output directory (default: current working directory)" },
+        { name: "name", type: "string", summary: "Recorded in the JSON summary only (no manifest is written here)" },
+      ],
+      errorCodes: ["UNKNOWN_FLAG", "BAD_ARG", "FILE_NOT_FOUND", "READ_ERROR", "BAD_JSON", "LEAF_COLLISION", "WRITE_ERROR"],
     },
   },
 

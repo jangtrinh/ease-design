@@ -27,6 +27,10 @@ Subcommands:
   snapshot         Produce a self-contained preview HTML (CSS inlined, scripts stripped)
   audit            Run the 5 audit families on a per-project folder; gates the workflow
 
+--css accepts multiple files as one comma-separated flag: --css a.css,b.css
+Passing --css more than once is rejected (REPEATED_FLAG) rather than silently
+dropping every value but the last.
+
 Options:
   --json           Emit a JSON envelope
   -h, --help       Show this help
@@ -42,6 +46,7 @@ Error codes (subcommand-specific):
   READ_ERROR       File exists but cannot be read
   WRITE_ERROR      Cannot write to the target path
   FOLDER_MISSING   Audit folder is missing a required file
+  REPEATED_FLAG    --css was passed more than once (extract-tokens) — combine with a comma instead
 `;
 
 export const designmdCommand = {

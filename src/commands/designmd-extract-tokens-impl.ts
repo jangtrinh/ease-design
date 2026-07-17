@@ -27,6 +27,17 @@ export function runExtractTokens(parsed: ParsedArgs): CommandResult {
     return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
   }
 
+  // F4 (spec 009 P3): --css is a scalar flag (cli-args.ts) — a repeated
+  // `--css a --css b` silently drops `a`. Hard-error rather than emit a
+  // partial vocabulary; the working multi-file form is a single comma-joined
+  // flag (`--css a,b`), documented in --help.
+  if (parsed.repeatedFlags.has("css")) {
+    const msg =
+      "'--css' was passed more than once — only the last value would be used, silently dropping the others. " +
+      "Combine multiple files into one flag instead: --css a.css,b.css";
+    return useJson ? errJson(CMD, "REPEATED_FLAG", msg) : errText(`ui: ${msg}\n`);
+  }
+
   const cssArg = parsed.flags["css"];
   const cssPaths: string[] = [];
   if (typeof cssArg === "string" && cssArg.length > 0) {

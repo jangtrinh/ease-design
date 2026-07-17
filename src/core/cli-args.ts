@@ -12,6 +12,15 @@ export interface ParsedArgs {
   help: boolean;
   version: boolean;
   json: boolean;
+  /**
+   * Flag keys supplied more than once on the command line (F4, spec 009 P3).
+   * `flags` stores only the last value — scalar map, `cli-args.ts:11` — so a
+   * repeated `--css a --css b` silently drops `a` there. A command that needs
+   * every value (e.g. `designmd extract-tokens --css`) can check this set and
+   * hard-error rather than silently losing data; commands that don't care can
+   * ignore it. Additive — no existing consumer of `flags` is affected.
+   */
+  repeatedFlags: Set<string>;
 }
 
 /**
@@ -59,6 +68,11 @@ function isValueToken(token: string): boolean {
 
 export function parseArgs(args: string[]): ParsedArgs {
   const flags: Record<string, string | boolean> = {};
+  const repeatedFlags = new Set<string>();
+  const setFlag = (key: string, value: string | boolean): void => {
+    if (key in flags) repeatedFlags.add(key);
+    flags[key] = value;
+  };
   const positionals: string[] = [];
   let doubleDashSeen = false;
   let i = 0;
@@ -80,13 +94,13 @@ export function parseArgs(args: string[]): ParsedArgs {
     }
 
     if (token === "-h") {
-      flags["help"] = true;
+      setFlag("help", true);
       i++;
       continue;
     }
 
     if (token === "-v") {
-      flags["version"] = true;
+      setFlag("version", true);
       i++;
       continue;
     }
@@ -98,18 +112,18 @@ export function parseArgs(args: string[]): ParsedArgs {
         // --key=value
         const key = withoutDashes.slice(0, eqIdx);
         const val = withoutDashes.slice(eqIdx + 1);
-        flags[key] = val;
+        setFlag(key, val);
       } else {
         // Peek ahead to decide: value or boolean flag?
         const next = args[i + 1];
         if (next !== undefined && isValueToken(next)) {
           // --key value
-          flags[withoutDashes] = next;
+          setFlag(withoutDashes, next);
           i += 2;
           continue;
         } else {
           // bare boolean flag — next token is absent or is itself a flag
-          flags[withoutDashes] = true;
+          setFlag(withoutDashes, true);
         }
       }
       i++;
@@ -126,7 +140,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     if (token.startsWith("-")) {
       // Unknown short flag — treat as error-signal by storing it but continue
       // (caller can inspect and reject if needed)
-      flags[token.slice(1)] = true;
+      setFlag(token.slice(1), true);
       i++;
       continue;
     }
@@ -151,5 +165,5 @@ export function parseArgs(args: string[]): ParsedArgs {
   const version = flags["version"] === true;
   const json = flags["json"] === true;
 
-  return { command, subcommand, positionals, flags, help, version, json };
+  return { command, subcommand, positionals, flags, help, version, json, repeatedFlags };
 }

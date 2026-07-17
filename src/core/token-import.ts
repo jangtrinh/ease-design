@@ -8,6 +8,9 @@
  * since DTCG is two levels deep.
  */
 
+import { isAlias, isTokenLeaf } from "./token-model.js";
+import { sanitizeSeg } from "./figma-ds-tokens.js";
+
 export type ImportedType = "color" | "dimension" | "number" | "fontFamily" | "fontWeight" | "duration";
 
 export interface ImportStats {
@@ -18,8 +21,9 @@ export interface ImportStats {
   skippedKeys: { key: string; reason: string }[];
 }
 export interface ImportResult {
-  /** DTCG token tree ready for parseTokenFile. */
-  dtcg: Record<string, Record<string, { $value: string | number; $type: ImportedType }>>;
+  /** DTCG token tree ready for parseTokenFile. `$extensions` survives an already-DTCG
+   * leaf pass-through (F2/D5) — e.g. a mode carried by ingest-css-ds/ingest-figma-ds. */
+  dtcg: Record<string, Record<string, { $value: string | number; $type: ImportedType; $extensions?: Record<string, unknown> }>>;
   stats: ImportStats;
 }
 
@@ -42,10 +46,24 @@ export function inferToken(category: string, name: string, value: unknown): { $v
     if (DURATION_CAT_RE.test(ctx) && /^\d+m?s$/i.test(v)) return { $value: v, $type: "duration" };
     // numeric-looking string
     if (/^-?\d*\.?\d+$/.test(v)) return numeric(category, name, Number(v));
-    return { skip: `unmappable string value "${v.slice(0, 24)}"` };
+    // F2 (spec 009 P3): an alias front-door refusal drops the entire semantic tier
+    // (token-taxonomy.md:110) — ALIAS_RE already exists (token-model.ts), change-token
+    // already accepts aliases; only this front door refused. No literal to type from, so
+    // fall back to a category/name hint (color dominates the real alias layer).
+    if (isAlias(v)) return { $value: v, $type: aliasTypeHint(ctx) };
+    return { skip: `unmappable string value "${String(value).slice(0, 24)}"` };
   }
   if (typeof value === "number") return numeric(category, name, value);
   return { skip: `unsupported value type ${typeof value}` };
+}
+
+/** No literal value to test (the leaf is alias-only) — infer $type from category+name hints. */
+function aliasTypeHint(ctx: string): ImportedType {
+  if (FAMILY_RE.test(ctx)) return "fontFamily";
+  if (WEIGHT_RE.test(ctx)) return "fontWeight";
+  if (DURATION_CAT_RE.test(ctx)) return "duration";
+  if (DIM_CAT_RE.test(ctx)) return "dimension";
+  return "color";
 }
 
 /** A bare number becomes a px dimension in a dimension-ish category, a fontWeight under weight, else a number. */
@@ -67,6 +85,22 @@ export function importFlatTokens(flat: unknown): ImportResult {
 
   const putCategory = (cat: string, entries: [string, unknown][]): void => {
     for (const [name, value] of entries) {
+      // F2/D5: an already-DTCG leaf (e.g. from ingest-css-ds/ingest-figma-ds, which both
+      // seal via 'ds import') is passed through as-is, $extensions included — recursing
+      // into its $value/$type as if they were child token names (the old behaviour)
+      // silently corrupted every such import into bogus "<cat>.$value" tokens.
+      if (isTokenLeaf(value) && (typeof value.$value === "string" || typeof value.$value === "number")) {
+        const catSan = sanitizeSeg(cat);
+        const nameSan = sanitizeSeg(name);
+        (dtcg[catSan] ??= {})[nameSan] = {
+          $value: value.$value,
+          $type: value.$type as ImportedType,
+          ...(value.$extensions !== undefined ? { $extensions: value.$extensions } : {}),
+        };
+        stats.imported++;
+        stats.byType[value.$type] = (stats.byType[value.$type] ?? 0) + 1;
+        continue;
+      }
       if (typeof value === "object" && value !== null && !Array.isArray(value)) {
         // nested group → hoist into its own category `<cat>-<name>`
         putCategory(`${cat}-${name}`, Object.entries(value as Record<string, unknown>));
@@ -78,7 +112,12 @@ export function importFlatTokens(flat: unknown): ImportResult {
         stats.skippedKeys.push({ key: `${cat}.${name}`, reason: r.skip });
         continue;
       }
-      (dtcg[cat] ??= {})[name] = r;
+      // F6 (spec 009 P3): 'ds init' writes kebab-case; TOKEN_PATTERN (registry-store.ts)
+      // forbids uppercase — a camelCase source group ("fontSize") used to pass through
+      // verbatim and become unreferencable from any component. Sanitize on the way in.
+      const catSan = sanitizeSeg(cat);
+      const nameSan = sanitizeSeg(name);
+      (dtcg[catSan] ??= {})[nameSan] = r;
       stats.imported++;
       stats.byType[r.$type] = (stats.byType[r.$type] ?? 0) + 1;
     }
