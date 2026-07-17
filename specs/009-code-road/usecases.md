@@ -89,6 +89,11 @@ properties under `:root` and/or Tailwind 4 `@theme`
   *"unmappable string value"*), which drops exactly the semantic tier the doctrine mandates
   (`token-taxonomy.md:110`). dana lost 87/263 this way.
 - **Alias-only file** → `EMPTY_IMPORT` (`ds-import-impl.ts:64`) despite every token being valid.
+- **Two tiers, two names, one token path** — `--gray-900` (primitive) and `--color-gray-900`
+  (Tailwind's `@theme` re-export of it) are DIFFERENT declared properties. Any rule that
+  normalises one onto the other collapses the two-tier structure. Verified live: a
+  "strip the redundant prefix" rule collided ≥120 times on dana. **The leaf is the declared name,
+  verbatim.** See phase-03 D6.
 - **camelCase group names** — `ds import` passes source names through verbatim
   (`token-import.ts:81`), producing `fontSize`/`zIndex` that `TOKEN_PATTERN`
   (`registry-store.ts:74`) forbids. 28/286 dana tokens became unreferencable from any

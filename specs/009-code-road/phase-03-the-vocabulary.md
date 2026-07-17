@@ -121,16 +121,37 @@ it; do not scope-creep.**
   `TOKEN_PATTERN` (`registry-store.ts:74`) forbids uppercase. **The ingest emits kebab-case.**
   A token no component can reference is not a token.
 
-### D6 — leaf naming: strip a redundant category prefix, once
+### D6 — leaf naming: the name, verbatim. NO prefix strip.
 
-`inferToken` gives the category from the value. The leaf is the custom-property name minus `--`.
-If the name already starts with the inferred category + `-`, strip it once:
-`--color-gray-900` → `color.gray-900` (not `color.color-gray-900`); `--gray-900` → `color.gray-900`;
-`--badge-danger-bg` → `color.badge-danger-bg`.
+**CORRECTED 2026-07-17 after the live run — the first draft of this rule was wrong, and the
+guard it shipped with is what caught it.**
 
-**Collision is possible** (`--gray-900` and `--color-gray-900` both → `color.gray-900`). On a
-collision: **fail loudly** with both source lines. Do not merge, do not suffix. dana has both —
-so this fires on the first real run, by design.
+The leaf is the custom-property name minus `--`, **unchanged**. `inferToken` gives the category
+from the value:
+- `--gray-900: #181818` → `color.gray-900` (primitive)
+- `--color-gray-900: var(--gray-900)` → **`color.color-gray-900`, `$value: "{color.gray-900}"`** —
+  an alias, recorded exactly as declared
+- `--badge-danger-bg: var(--error-700)` → `color.badge-danger-bg`, aliasing `{color.error-700}`
+
+**Why the original "strip a redundant prefix" rule was wrong.** It merged `--gray-900` and
+`--color-gray-900` into one path — **but they are two different declared properties on two
+different tiers.** dana's own comment names the second one's job:
+`@theme { /* --- Base palette registered as Tailwind colors --- */ --color-gray-900: var(--gray-900); }`
+— it re-exports the primitive so Tailwind can emit `bg-gray-900`. The prefix is not redundant; it
+is what makes it a different token. Stripping it collapses the two-tier structure
+`token-taxonomy.md:110` mandates and dana's whole DS rests on. On the live run it collided **≥120
+times** — the rule being wrong 120 times, not an edge case.
+
+**Measured, so the fix is not dana-shaped either**: the `@theme { --color-X: var(--Y) }`
+re-export is **2/3** of the surveyed corpus — dana (12+), hvs (7); traicaybentre puts literals
+straight in `@theme` (0). hvs never collided only because its primitives are prefixed
+(`--hvs-brand`). The pattern is real; the strip rule is what broke on it.
+
+`color.color-gray-900` is ugly. It is also **dana's name**. Recording a user's declared
+vocabulary verbatim is SOURCE-grade (`learn.md` §3c); rewriting it to look nicer is the silent
+interpretation this spec exists to stop.
+
+**Keep the collision guard.** It should now never fire on dana. If it fires anywhere, it is real.
 
 ### D7 — record the disease, do not cure it
 
