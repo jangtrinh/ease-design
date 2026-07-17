@@ -16,6 +16,7 @@ import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJsonWithExit } from "../core/output.js";
 import { buildAuditSpec } from "../core/audit-spec.js";
 import { detectViolations, type AuditNode } from "../core/audit-detect.js";
+import { withOutcome, lintOutcomeData } from "../core/memory-autorecord.js";
 
 const CMD = "audit";
 
@@ -172,9 +173,18 @@ export const auditCommand = {
     const result = detectViolations(nodesJson as AuditNode | AuditNode[], spec);
 
     const exitCode = result.total > 0 ? 1 : 0;
-    if (useJson) {
-      return okJsonWithExit(CMD, { file: nodesPath, ...result }, exitCode);
-    }
-    return { exitCode, stdout: formatReport(nodesPath, result) };
+    const out = useJson
+      ? okJsonWithExit(CMD, { file: nodesPath, ...result }, exitCode)
+      : { exitCode, stdout: formatReport(nodesPath, result) };
+    return withOutcome(out, parsed, {
+      type: "lint_run",
+      actor: "ui audit",
+      projectDir: nodesPath,
+      data: lintOutcomeData("audit", nodesPath, {
+        errorCount: result.total,
+        warningCount: 0,
+        findings: result.violations.map((v) => ({ checkId: v.rule })),
+      }),
+    });
   },
 };

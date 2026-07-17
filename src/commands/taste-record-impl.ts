@@ -9,6 +9,7 @@ import {
   isPairWinner, isVerdict, WINNERS, VERDICTS,
 } from "../core/taste-store.js";
 import type { PairVote, StudyRecord } from "../core/taste-store.js";
+import { withOutcome } from "../core/memory-autorecord.js";
 
 const CMD = "taste record";
 
@@ -61,7 +62,10 @@ export function runTasteRecord(parsed: ParsedArgs): CommandResult {
     if (ms !== undefined) vote.ms = ms;
 
     appendVote(root, vote);
-    return useJson ? okJson(CMD, { recorded: vote }) : ok(`recorded pair vote: ${a} vs ${b} -> ${winner}\n`);
+    const out = useJson ? okJson(CMD, { recorded: vote }) : ok(`recorded pair vote: ${a} vs ${b} -> ${winner}\n`);
+    // No projectDir: the taste root is a separate tree from design/, so there is no
+    // artifact to point at — cwd fallback stays (see memory-autorecord.ts header).
+    return withOutcome(out, parsed, { type: "taste_vote", actor: "ui taste record", data: { a, b, winner } });
   }
 
   // mode === "study"

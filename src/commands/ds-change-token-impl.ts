@@ -16,7 +16,7 @@
  * If E succeeds but F fails → DS_TAMPERED on next load (document recovery).
  */
 import { renameSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { cwd } from "node:process";
 
 import { errJson, errText, okJson } from "../core/output.js";
@@ -37,6 +37,7 @@ import { parseTokenFile } from "../core/token-model.js";
 import type { TokenType } from "../core/token-model.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
+import { withOutcome } from "../core/memory-autorecord.js";
 
 const CMD = "ds change-token";
 
@@ -344,12 +345,18 @@ export function runChangeToken(parsed: ParsedArgs): CommandResult {
 
   // ── Respond ─────────────────────────────────────────────────────────────────
 
-  return okJson(CMD, {
+  const out = okJson(CMD, {
     path: tokenPath,
     from: oldSerialized,
     to: newSerialized,
     changed: true,
     generation: newManifestObj.generation,
     compiledHash: newHash,
+  });
+  return withOutcome(out, parsed, {
+    type: "token_change",
+    actor: "ui ds change-token",
+    projectDir: dirname(paths.dir),
+    data: { path: tokenPath, from: oldSerialized, to: newSerialized, ...(reason !== undefined && { reason }), generation: newManifestObj.generation },
   });
 }

@@ -9,6 +9,7 @@ import type { CommandResult } from "../core/output.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import { allContentChecks } from "../core/content-checks.js";
 import type { ContentFinding } from "../core/content-checks.js";
+import { withOutcome, lintOutcomeData } from "../core/memory-autorecord.js";
 
 const CMD = "content-lint";
 
@@ -71,11 +72,11 @@ export const contentLintCommand = {
     const result = { file, findings: all, errorCount, warningCount: all.length - errorCount };
     const exitCode = errorCount > 0 ? 1 : 0;
 
-    if (useJson) return okJsonWithExit(CMD, result, exitCode);
     const lines = all.length === 0
       ? [`content-lint: ${file} — 0 findings.`]
       : [`content-lint: ${file} — ${errorCount} error(s), ${result.warningCount} warning(s)`,
          ...all.map((f) => `  ${f.severity === "error" ? "✗" : "!"} [${f.checkId}]${f.line !== undefined ? ` line ${f.line}` : ""}: ${f.message}`)];
-    return { exitCode, stdout: lines.join("\n") + "\n" };
+    const out = useJson ? okJsonWithExit(CMD, result, exitCode) : { exitCode, stdout: lines.join("\n") + "\n" };
+    return withOutcome(out, parsed, { type: "lint_run", actor: "ui content-lint", projectDir: file, data: lintOutcomeData("content-lint", file, result) });
   },
 };

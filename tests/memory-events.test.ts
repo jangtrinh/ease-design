@@ -34,6 +34,10 @@ describe("memory-events — validateEvent", () => {
       harvested: { source: "https://example.com" },
       duel_result: { benchmark: "linear", traits: [] },
       gap: { text: "motion axis has no bounce guidance", target: "taste-rubric.md#motion" },
+      lint_run: { check: "a11y-lint", file: "index.html", errorCount: 0, warningCount: 0, checkIds: [] },
+      autofix_applied: { file: "index.html", fixCount: 1, ruleIds: ["viewport-meta"] },
+      reconcile_applied: { added: [], updated: [], deprecated: [] },
+      taste_vote: { a: "item-1", b: "item-2", winner: "a" },
     };
     for (const [type, data] of Object.entries(happy)) {
       expect(codeOf(() => validateEvent(type, data, undefined)), type).toBeNull();
@@ -69,10 +73,14 @@ describe("memory-events — validateEvent", () => {
     expect(codeOf(() => validateEvent("insight", { text: "x" }, ["e1"]))).toBeNull();
   });
 
-  it("EVENT_TYPES has 12 members; isEventType/isMedium guard", () => {
-    expect(EVENT_TYPES.length).toBe(12);
+  it("EVENT_TYPES has 16 members; isEventType/isMedium guard", () => {
+    expect(EVENT_TYPES.length).toBe(16);
     expect(isEventType("gap")).toBe(true);
     expect(isEventType("user_pick")).toBe(true);
+    expect(isEventType("lint_run")).toBe(true);
+    expect(isEventType("autofix_applied")).toBe(true);
+    expect(isEventType("reconcile_applied")).toBe(true);
+    expect(isEventType("taste_vote")).toBe(true);
     expect(isEventType("nope")).toBe(false);
     expect(isMedium("html")).toBe(true);
     expect(isMedium("figma")).toBe(true);

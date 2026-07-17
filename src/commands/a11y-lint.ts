@@ -7,6 +7,7 @@ import { errJson, errText, okJsonWithExit } from "../core/output.js";
 import type { CommandResult } from "../core/output.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import { lintA11y } from "../core/a11y-lint.js";
+import { withOutcome, lintOutcomeData } from "../core/memory-autorecord.js";
 
 const CMD = "a11y-lint";
 
@@ -76,7 +77,7 @@ export const a11yLintCommand = {
     }
     const result = lintA11y(html);
     const exitCode = result.errorCount > 0 ? 1 : 0;
-    if (useJson) return okJsonWithExit(CMD, { file, ...result }, exitCode);
-    return { exitCode, stdout: formatReport(result, file) };
+    const out = useJson ? okJsonWithExit(CMD, { file, ...result }, exitCode) : { exitCode, stdout: formatReport(result, file) };
+    return withOutcome(out, parsed, { type: "lint_run", actor: "ui a11y-lint", projectDir: file, data: lintOutcomeData("a11y-lint", file, result) });
   },
 };

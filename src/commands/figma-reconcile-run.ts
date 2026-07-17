@@ -38,6 +38,7 @@ import { indexCaptures, parseMirrorCapture, type MirrorIndex } from "../core/fig
 import { writeFigmaNode } from "../core/figma-node-reader.js";
 import { readCursor, syncStatePath, writeCursor } from "../core/figma-sync-state.js";
 import { renderApply, renderDryRun } from "./figma-reconcile-render.js";
+import { withOutcome } from "../core/memory-autorecord.js";
 
 const CHANGE_LOG_RELPATH = ["design", "figma.changes.jsonl"] as const;
 const REGISTRY_RELPATH = ["design", "component-registry.json"] as const;
@@ -174,7 +175,18 @@ export function runReconcile(parsed: ParsedArgs): CommandResult {
   }
 
   const data = { ...base, dry_run: false as const, applied: true as const, apply: report };
-  return useJson ? okJson(SUB, data) : { exitCode: 0, stdout: renderApply(data, report) };
+  const out = useJson ? okJson(SUB, data) : { exitCode: 0, stdout: renderApply(data, report) };
+  const recordable = changed || sidecarWrites.length > 0;
+  if (!recordable) return out;
+  return withOutcome(out, parsed, {
+    type: "reconcile_applied",
+    actor: "ui figma reconcile",
+    projectDir: dir,
+    data: {
+      added: report.added, updated: report.updated, deprecated: report.deprecated,
+      mirrored: report.mirrored.length, cursorFrom, cursorTo,
+    },
+  });
 }
 
 /** Write every captured sidecar (content-guarded by writeFigmaNode). Throws RegistryError. */

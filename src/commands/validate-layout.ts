@@ -12,6 +12,7 @@ import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJsonWithExit } from "../core/output.js";
 import { lintLayout } from "../core/layout-lint.js";
+import { withOutcome, lintOutcomeData } from "../core/memory-autorecord.js";
 
 const CMD = "validate-layout";
 
@@ -123,13 +124,14 @@ export const validateLayoutCommand = {
     const exitCode = errorCount > 0 ? 1 : 0;
 
     // 5. Shape output
-    if (useJson) {
-      return okJsonWithExit(CMD, { file: filePath, errorCount, warningCount, findings }, exitCode);
-    }
-
-    return {
-      exitCode,
-      stdout: formatReport(filePath, errorCount, warningCount, findings),
-    };
+    const out = useJson
+      ? okJsonWithExit(CMD, { file: filePath, errorCount, warningCount, findings }, exitCode)
+      : { exitCode, stdout: formatReport(filePath, errorCount, warningCount, findings) };
+    return withOutcome(out, parsed, {
+      type: "lint_run",
+      actor: "ui validate-layout",
+      projectDir: filePath,
+      data: lintOutcomeData("validate-layout", filePath, { errorCount, warningCount, findings }),
+    });
   },
 };

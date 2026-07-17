@@ -29,6 +29,10 @@ export const EVENT_TYPES = [
   "duel_result",
   "insight",
   "gap",
+  "lint_run",
+  "autofix_applied",
+  "reconcile_applied",
+  "taste_vote",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -50,6 +54,18 @@ const REQUIRED_DATA: Readonly<Record<EventType, readonly string[]>> = {
   // `data.kind` is optional and unenforced (rubric-gap | persona-gap | recipe-gap |
   // benchmark-stale | guardrail-lesson). Unlike `insight`, `gap` needs no refs.
   gap: ["text", "target"],
+  // ─── Auto-recorded outcomes (spec 006 P1) — appended by `recordOutcome`, never by hand.
+  // A checker run: `check` names the tool (a11y-lint | content-lint | taste-lint |
+  // validate-layout | audit), `checkIds` is the sorted unique set of rules that tripped.
+  // `audit` maps total→errorCount, warningCount: 0 (it has no severity split).
+  lint_run: ["check", "file", "errorCount", "warningCount", "checkIds"],
+  // A `ui autofix --write` that CHANGED the file. A no-op autofix records nothing.
+  autofix_applied: ["file", "fixCount", "ruleIds"],
+  // A `ui figma reconcile --apply` that changed the registry and/or wrote sidecars.
+  reconcile_applied: ["added", "updated", "deprecated"],
+  // One `ui taste record --mode pair` vote. NOT `user_pick`: a corpus item id is not a
+  // designId, and compileGraph would file it under `designs` (memory-graph.ts:93).
+  taste_vote: ["a", "b", "winner"],
 };
 
 export interface MemoryArtifact {

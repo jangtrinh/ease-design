@@ -17,6 +17,7 @@ import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJsonWithExit } from "../core/output.js";
 import { lintTaste } from "../core/taste-lint.js";
 import { isTokenLeaf } from "../core/token-model.js";
+import { withOutcome, lintOutcomeData } from "../core/memory-autorecord.js";
 
 const CMD = "taste-lint";
 
@@ -185,16 +186,14 @@ export const tasteLintCommand = {
     const exitCode = errorCount > 0 ? 1 : 0;
 
     // 6. Shape output.
-    if (useJson) {
-      return okJsonWithExit(
-        CMD,
-        { file: filePath, errorCount, warningCount, axesAffected, findings },
-        exitCode,
-      );
-    }
-    return {
-      exitCode,
-      stdout: formatReport(filePath, errorCount, warningCount, axesAffected, findings),
-    };
+    const out = useJson
+      ? okJsonWithExit(CMD, { file: filePath, errorCount, warningCount, axesAffected, findings }, exitCode)
+      : { exitCode, stdout: formatReport(filePath, errorCount, warningCount, axesAffected, findings) };
+    return withOutcome(out, parsed, {
+      type: "lint_run",
+      actor: "ui taste-lint",
+      projectDir: filePath,
+      data: { ...lintOutcomeData("taste-lint", filePath, { errorCount, warningCount, findings }), axes: axesAffected },
+    });
   },
 };

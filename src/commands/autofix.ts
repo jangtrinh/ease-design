@@ -12,6 +12,7 @@ import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJson } from "../core/output.js";
 import { runAutofix } from "../core/html-autofix.js";
+import { withOutcome } from "../core/memory-autorecord.js";
 
 const CMD = "autofix";
 
@@ -102,27 +103,35 @@ export const autofixCommand = {
     }
 
     // 5. Shape output
+    let out: CommandResult;
     if (useJson) {
-      return okJson(CMD, {
+      out = okJson(CMD, {
         file: filePath,
         fixesApplied: findings.length,
         findings,
         written,
         html: fixedHtml,
       });
+    } else {
+      // Text mode: fixed HTML → stdout, summary → stderr
+      const ruleNames = findings.map((f) => f.ruleId).join(", ");
+      const summary =
+        findings.length === 0
+          ? "applied 0 fixes\n"
+          : `applied ${findings.length} fix${findings.length === 1 ? "" : "es"}: ${ruleNames}\n`;
+
+      out = doWrite
+        ? { exitCode: 0, stderr: summary } // File already written; just emit the summary
+        : { exitCode: 0, stdout: fixedHtml, stderr: summary };
     }
 
-    // Text mode: fixed HTML → stdout, summary → stderr
-    const ruleNames = findings.map((f) => f.ruleId).join(", ");
-    const summary =
-      findings.length === 0
-        ? "applied 0 fixes\n"
-        : `applied ${findings.length} fix${findings.length === 1 ? "" : "es"}: ${ruleNames}\n`;
-
-    if (doWrite) {
-      // File already written; just emit the summary
-      return { exitCode: 0, stderr: summary };
-    }
-    return { exitCode: 0, stdout: fixedHtml, stderr: summary };
+    const recordable = doWrite && written && findings.length > 0;
+    if (!recordable) return out;
+    return withOutcome(out, parsed, {
+      type: "autofix_applied",
+      actor: "ui autofix",
+      projectDir: filePath,
+      data: { file: filePath, fixCount: findings.length, ruleIds: [...new Set(findings.map((f) => f.ruleId))].sort() },
+    });
   },
 };
