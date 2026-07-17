@@ -4,6 +4,12 @@ A fresh process per harvest run, fed nothing but the versioned prompt + report t
 stdin: no session reuse, no conversation history, no repo context. `DESIGN_OS_MODEL_CMD`
 is parsed with `shlex.split` and run as an argv list (never `shell=True`) — the value is
 the operator's own config, not user input, but the packet still goes on stdin, never argv.
+
+The packet embeds report text from `plans/**/reports/*.md`, which is agent-written =
+UNTRUSTED input — a report can carry a prompt injection aimed at whatever model `cmd`
+invokes here. `harvest_core.strip_untrusted` is cheap defense-in-depth on the packet
+before it reaches this module; the real containment boundary is downstream, at the
+librarian veto-chain + human merge into `knowledge/`, not this adapter or the gate.
 """
 
 from __future__ import annotations

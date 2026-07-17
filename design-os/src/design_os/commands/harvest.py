@@ -3,8 +3,14 @@
 a FRESH host-model process via `DESIGN_OS_MODEL_CMD`, runs the deterministic anti-
 hallucination gate (harvest_core.gate), and records survivors through `ui memory record`.
 Never touches `knowledge/` — only `gap`/`insight` events, which the unchanged librarian
-veto-chain graduates. No model configured degrades to `skipped`, exit 0 — the heartbeat
-never breaks.
+veto-chain graduates. No model configured, a model process error, OR a model output that
+fails to parse as the candidate envelope all degrade to `skipped`, exit 0 — the heartbeat
+never breaks on a bad model turn.
+
+Every recorded `insight`/`gap` event carries a content-addressed `harvestKey` (see
+`harvest_core.candidate_key`); before recording, the ledger is checked for that key so a
+retry after a partial write (Decision 4: cursor never advances on a mid-batch failure)
+does not re-append the same candidate and manufacture a fake recurrence signal.
 """
 
 from __future__ import annotations
@@ -124,7 +130,11 @@ def harvest(
     try:
         candidates = harvest_core.parse_candidates(raw)
     except harvest_core.HarvestError as e:
-        emit(err_env(_COMMAND, e.code, str(e)), json_mode=json_, text=f"harvest: {e}\n", exit_code=1)
+        # A non-JSON / malformed model turn is a bad TURN, not a bad RUN — degrade like
+        # ModelUnavailable (skipped, packet saved, cursor untouched, exit 0) rather than
+        # breaking the heartbeat with exit 1.
+        path = _write_inbox(dir_, packet, to_harvest)
+        _skip(dir_, json_, reason="bad-candidates", deferred=deferred, reports_read=len(to_harvest), packet=path, detail=str(e))
         return
 
     survivors, dropped = harvest_core.gate(candidates, to_harvest)
@@ -143,6 +153,10 @@ def harvest(
     for c in survivors:
         by_source.setdefault(c.source, []).append(c)
 
+    # Read once: within this run, a key only recurs if the SAME (kind, text, source)
+    # was already appended by an earlier — partial — attempt at this same batch.
+    already_recorded = harvest_core.ledger_candidate_keys(dir_)
+
     event_ids: list[str] = []
     recorded = {"insight": 0, "gap": 0}
     for report in to_harvest:
@@ -154,13 +168,17 @@ def harvest(
             })
             event_ids.append(hid)
             for c in report_cands:
-                payload: dict[str, Any] = {"text": c.text, "evidence": c.evidence}
+                key = harvest_core.candidate_key(c.kind, c.text, c.source)
+                if key in already_recorded:
+                    continue  # a prior partial write already recorded this exact candidate
+                payload: dict[str, Any] = {"text": c.text, "evidence": c.evidence, "harvestKey": key}
                 if c.kind == "gap":
                     payload["target"] = c.target
                     payload["kind"] = c.gap_kind
                 eid = _run_record(dir_, c.kind, payload, refs=[hid])
                 event_ids.append(eid)
                 recorded[c.kind] += 1
+                already_recorded.add(key)
         except KernelNotFound as e:
             emit(err_env(_COMMAND, "KERNEL_MISSING", str(e)), json_mode=json_, text=f"harvest: {e}\n", exit_code=1)
             return

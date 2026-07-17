@@ -2,6 +2,13 @@
 content-hash cursor, packet assembly, candidate JSON parsing, and the deterministic
 selection gate (Decision 3 — the anti-hallucination line). No subprocess, no model call,
 no wall-clock read beyond what the caller passes in. The model proposes; this disposes.
+
+`plans/**/reports/*.md` is agent-written = UNTRUSTED input (a report can carry an
+injected instruction aimed at the harvesting model). Containment is the librarian
+veto-chain + human merge downstream of `knowledge/` — NOT this module's verbatim-
+evidence gate, which only proves a candidate quotes something that is literally in the
+report, not that the report itself is trustworthy. `strip_untrusted` below is cheap
+defense-in-depth on top of that, not the boundary.
 """
 
 from __future__ import annotations
@@ -14,9 +21,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+# Re-exported for callers — implementations live in sibling modules to keep this one
+# under the 200-line budget: parsing in harvest_parse, untrusted-input + idempotency
+# helpers in harvest_ledger.
+from design_os.harvest_ledger import candidate_key, ledger_candidate_keys, strip_untrusted
+from design_os.harvest_parse import Candidate, HarvestError, parse_candidates
+
+__all__ = [
+    "PROMPT_VERSION", "MIN_CONFIDENCE", "MIN_TEXT", "MAX_TEXT", "MIN_EVIDENCE",
+    "MAX_PER_REPORT", "MAX_REPORTS_PER_RUN", "GAP_KINDS", "DEFAULT_GLOBS",
+    "HarvestError", "Report", "Candidate", "normalize", "strip_untrusted",
+    "candidate_key", "ledger_candidate_keys", "discover_reports", "load_state",
+    "save_state", "pending", "build_packet", "parse_candidates", "gate",
+]
+
 PROMPT_VERSION = "harvest-extract-v1"
 MIN_CONFIDENCE = 0.6
 MIN_TEXT, MAX_TEXT = 40, 500
+MIN_EVIDENCE = 24  # normalized chars; below this an empty/near-empty quote can slip past a naive substring check
 MAX_PER_REPORT = 3
 MAX_REPORTS_PER_RUN = 5
 GAP_KINDS = frozenset({"rubric-gap", "persona-gap", "recipe-gap", "benchmark-stale", "guardrail-lesson"})
@@ -25,32 +47,12 @@ DEFAULT_GLOBS = ("plans/**/reports/*.md",)
 _STATE_REL = Path("design") / "harvest-state.json"
 _TARGET_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.md(#[a-z0-9-]+)?$")
 _WS_RE = re.compile(r"\s+")
-_FENCE_RE = re.compile(r"^```(?:json)?\s*\n(.*)\n```\s*$", re.DOTALL)
-
-class HarvestError(Exception):
-    """A model output that cannot be trusted — never a bare exception (`code` for the envelope)."""
-
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        super().__init__(message)
 
 @dataclass(frozen=True)
 class Report:
     rel: str  # project-relative posix path — the provenance ref
     sha256: str
     text: str
-
-@dataclass(frozen=True)
-class Candidate:
-    kind: str  # "insight" | "gap"
-    text: str
-    evidence: str
-    source: str
-    durable: bool
-    actionable: bool
-    confidence: float
-    target: str | None = None  # required iff kind == "gap"
-    gap_kind: str | None = None  # required iff kind == "gap"
 
 def normalize(s: str) -> str:
     """Lower + collapse whitespace — shared by the evidence check and batch dedupe."""
@@ -113,47 +115,13 @@ def pending(
     return due[:MAX_REPORTS_PER_RUN], due[MAX_REPORTS_PER_RUN:]
 
 def build_packet(prompt: str, reports: Sequence[Report]) -> str:
-    """The prompt, then one fenced block per report headed by its rel path."""
+    """The prompt, then one fenced block per report headed by its rel path. Each report's
+    text is run through `strip_untrusted` first — reports are untrusted input."""
     parts = [prompt.rstrip(), ""]
     for r in reports:
-        parts += [f"--- REPORT: {r.rel} ---", r.text, f"--- END REPORT: {r.rel} ---", ""]
+        body = strip_untrusted(r.text)
+        parts += [f"--- REPORT: {r.rel} ---", body, f"--- END REPORT: {r.rel} ---", ""]
     return "\n".join(parts).rstrip() + "\n"
-
-def parse_candidates(raw: str) -> list[Candidate]:
-    """Strip an optional ```json fence, parse, validate the envelope shape. Raises
-    :class:`HarvestError` (`BAD_CANDIDATES`) on prose/malformed/missing-field input — never
-    a bare exception. An empty `candidates` list is a valid answer."""
-    text = raw.strip()
-    m = _FENCE_RE.match(text)
-    if m:
-        text = m.group(1).strip()
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as e:
-        raise HarvestError("BAD_CANDIDATES", f"model output is not valid JSON: {e}") from e
-    if not isinstance(payload, dict) or not isinstance(payload.get("candidates"), list):
-        raise HarvestError("BAD_CANDIDATES", "expected an object with a 'candidates' array")
-    candidates: list[Candidate] = []
-    for i, c in enumerate(payload["candidates"]):
-        if not isinstance(c, dict):
-            raise HarvestError("BAD_CANDIDATES", f"candidate {i} is not an object")
-        try:
-            kind, ctext = str(c["kind"]), str(c["text"])
-            evidence, source = str(c["evidence"]), str(c["source"])
-            durable, actionable = bool(c["durable"]), bool(c["actionable"])
-            confidence = float(c["confidence"])
-        except KeyError as e:
-            raise HarvestError("BAD_CANDIDATES", f"candidate {i} missing field {e}") from e
-        except (TypeError, ValueError) as e:
-            raise HarvestError("BAD_CANDIDATES", f"candidate {i} malformed field: {e}") from e
-        target, gap_kind = c.get("target"), c.get("gapKind")
-        candidates.append(Candidate(
-            kind=kind, text=ctext, evidence=evidence, source=source,
-            durable=durable, actionable=actionable, confidence=confidence,
-            target=str(target) if target is not None else None,
-            gap_kind=str(gap_kind) if gap_kind is not None else None,
-        ))
-    return candidates
 
 def gate(
     cands: Sequence[Candidate], reports: Sequence[Report]
@@ -170,6 +138,11 @@ def gate(
     for c in cands:
         if c.source not in report_by_rel:
             drop("unread-source")
+        elif len(normalize(c.evidence)) < MIN_EVIDENCE:
+            # Must run BEFORE the substring check below: "" (and any near-empty string)
+            # is a substring of every report, so an empty-evidence candidate would
+            # otherwise sail through the anti-hallucination gate untouched.
+            drop("evidence-too-short")
         elif normalize(c.evidence) not in norm_reports[c.source]:
             drop("evidence-not-in-source")
         elif not (c.durable and c.actionable):

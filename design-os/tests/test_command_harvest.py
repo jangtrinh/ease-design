@@ -276,6 +276,50 @@ def test_prompt_version_matches_the_prompt_filename() -> None:
     assert harvest_cmd._PROMPT_PATH.is_file()
 
 
+def test_non_json_model_output_degrades_to_skipped_exit_zero_and_leaves_the_cursor(
+    runner: CliRunner, tmp_path: Path, fake_bin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _project(tmp_path)
+    fake_bin.make_stub("modelcmd", "echo 'I looked at the report and found nothing worth noting.'\n")
+    monkeypatch.setenv("DESIGN_OS_MODEL_CMD", "modelcmd")
+
+    res = runner.invoke(app, ["harvest", "--dir", str(project), "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    data = json.loads(res.stdout)["data"]
+    assert data["status"] == "skipped"
+    assert data["skipReason"] == "bad-candidates"
+    assert not (project / "design" / "harvest-state.json").exists()
+    inbox = list((project / "design" / "harvest-inbox").glob("*.md"))
+    assert len(inbox) == 1
+
+
+def test_a_candidate_already_in_the_ledger_from_a_partial_write_is_not_recorded_again(
+    runner: CliRunner, tmp_path: Path, fake_bin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _project(tmp_path)
+    log = _install_ui(fake_bin, monkeypatch, tmp_path)
+    _install_model(fake_bin, monkeypatch, [_insight_candidate()])
+
+    # Simulate a prior partial write: the insight for this exact (kind, text, source)
+    # already made it into the ledger before the run that wrote it died mid-batch.
+    key = harvest_cmd.harvest_core.candidate_key("insight", _INSIGHT_TEXT, "plans/p/reports/r.md")
+    ledger = project / "design" / "memory.events.jsonl"
+    ledger.write_text(json.dumps({
+        "v": 1, "id": "e1", "t": "2020-01-01T00:00:00Z", "type": "insight",
+        "data": {"text": _INSIGHT_TEXT, "evidence": _EVIDENCE, "harvestKey": key},
+    }) + "\n")
+
+    res = runner.invoke(app, ["harvest", "--dir", str(project), "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    data = json.loads(res.stdout)["data"]
+    assert data["recorded"] == {"insight": 0, "gap": 0}
+    lines = log.read_text().strip("\n").split("\n") if log.exists() else []
+    assert all(line.split()[2] != "insight" for line in lines)
+    assert any(line.split()[2] == "harvested" for line in lines)
+
+
 def test_json_envelope_reports_dropped_candidates_by_reason(
     runner: CliRunner, tmp_path: Path, fake_bin: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
