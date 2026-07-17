@@ -37,10 +37,18 @@ ui scan --json
 ```
 
 The envelope's `data` carries `framework`, `styling`, `tailwindConfig`,
-`cssFiles`, `htmlFiles`, `componentDirs`, `designMd`, `dsStatus`, and a
-`verdict`. Summarise the findings for the user in **one short paragraph** — the
-framework, the styling approach, how many component dirs / HTML files were seen,
-and the verdict — not a raw dump.
+`cssFiles`, `htmlFiles`, `componentDirs`, `designMd`, `dsStatus`, `truncated`,
+`visited`, and a `verdict`. Summarise the findings for the user in **one short
+paragraph** — the framework, the styling approach, how many component dirs /
+HTML files were seen, and the verdict — not a raw dump.
+
+**Truncation comes first.** If `truncated` is `true`, say so **before** stating
+the verdict: the walk budget ran out (`visited` entries scanned) before the
+whole tree was covered, so any empty or thin finding may just be unreached
+ground, not a verdict on the project. `componentDirs: []` with `truncated: true`
+must read as *"the budget ran out before any UI was found"* — never as *"this
+project has no components"*. Only state "no UI here" outright when
+`truncated` is `false`.
 
 If `verdict` is already `ds-present`, tell the user a compiled DS exists and stop
 unless they explicitly want to re-learn (e.g. after a major redesign);

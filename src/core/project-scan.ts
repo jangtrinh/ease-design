@@ -3,9 +3,14 @@
  * signals in a project root. Powers `ui scan` and the `ui init` next-step hint.
  *
  * Pure except fs reads (readdir/stat/readFile) and loadDesignSystem (fs reads
- * only). No network, no writes, no Date.now, no randomness. The directory walk
- * visits entries in sorted (alphabetical) order so results are byte-identical
- * across runs — including when the 4000-entry cap truncates a huge tree.
+ * only). No network, no writes, no Date.now, no randomness. Byte-identical
+ * results come from the SORT, not the traversal order: every directory's
+ * entries are visited in sorted (alphabetical) order. The walk itself is
+ * breadth-first — a full level is visited before any one subtree is
+ * descended into, so a shallow UI dir is found before an
+ * alphabetically-earlier-but-deeper sibling can burn the entry cap. Either
+ * cap (MAX_ENTRIES, MAX_DEPTH) sets `truncated: true` — never a silent
+ * partial map reported as a complete one.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, sep } from "node:path";
@@ -33,13 +38,25 @@ export interface ScanResult {
   dsStatus: "none" | "present" | "tampered";
   /** Routing verdict derived from the signals above. */
   verdict: "greenfield" | "brownfield-code" | "brownfield-html" | "ds-present";
+  /** True when the walk hit MAX_ENTRIES or MAX_DEPTH and the map is therefore partial. */
+  truncated: boolean;
+  /** Directory entries visited. Equals MAX_ENTRIES when truncated by the entry cap. */
+  visited: number;
 }
 
 // ─── Tunables ───────────────────────────────────────────────────────────────────
 
+// Ecosystem-scoped, not "plausible": an entry earns its place by files-burned
+// on a real repo (9-project measurement), not by guessing every tool's cache
+// dir. JS/JS-tooling entries predate this comment; .venv/venv/__pycache__
+// (Python) were added after dana-desktop — a polyglot (Electron+React+Python)
+// repo — showed a 8187-file .venv alone was 54% of its whole tree and sorted
+// ahead of the real UI. .vercel/.pytest_cache measured too (<10 files each,
+// noise) and .tox/target/Pods/.gradle/etc. measured 0/9 — none of those ship.
 const SKIP_DIRS = new Set([
   "node_modules", "dist", "build", "out", "coverage", "vendor", ".git",
   ".next", ".turbo", ".cache", ".agent", ".claude", "design",
+  ".venv", "venv", "__pycache__",
 ]);
 const MAX_DEPTH = 6;
 const MAX_ENTRIES = 4000;
@@ -96,6 +113,7 @@ interface WalkAccum {
   tailwindConfigs: string[];
   componentDirs: Array<{ path: string; files: number }>;
   visited: number;
+  truncated: boolean;
 }
 
 function sortedEntries(dir: string): Dirent[] {
@@ -109,34 +127,41 @@ function sortedEntries(dir: string): Dirent[] {
   return entries;
 }
 
-function walk(root: string, dir: string, depth: number, acc: WalkAccum): void {
-  if (depth > MAX_DEPTH || acc.visited >= MAX_ENTRIES) return;
-  const entries = sortedEntries(dir);
+// BFS: a queue of {dir, depth}. Within each level, entries keep sortedEntries'
+// alphabetical order (Art I — see header comment). Component-dir detection
+// happens as each dir is dequeued — the same check that ran depth-first before.
+function walk(root: string, start: string, acc: WalkAccum): void {
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: start, depth: 0 }];
+  while (queue.length > 0) {
+    if (acc.visited >= MAX_ENTRIES) { acc.truncated = true; return; }
+    const { dir, depth } = queue.shift()!;
+    if (depth > MAX_DEPTH) { acc.truncated = true; continue; }
+    const entries = sortedEntries(dir);
 
-  // Component-dir detection: this dir qualifies if its name matches and it has
-  // >=3 direct code-file children.
-  const base = basename(dir).toLowerCase();
-  if (COMPONENT_DIR_NAMES.has(base)) {
-    const directCode = entries.filter(
-      (e) => e.isFile() && CODE_EXT.has(extname(e.name).toLowerCase()),
-    ).length;
-    if (directCode >= 3) acc.componentDirs.push({ path: relPath(root, dir), files: directCode });
-  }
+    // >=3 direct code-file children in a components|ui|widgets dir qualifies it.
+    const base = basename(dir).toLowerCase();
+    if (COMPONENT_DIR_NAMES.has(base)) {
+      const directCode = entries.filter(
+        (e) => e.isFile() && CODE_EXT.has(extname(e.name).toLowerCase()),
+      ).length;
+      if (directCode >= 3) acc.componentDirs.push({ path: relPath(root, dir), files: directCode });
+    }
 
-  for (const e of entries) {
-    if (acc.visited >= MAX_ENTRIES) return;
-    acc.visited++;
-    const full = join(dir, e.name);
-    if (e.isDirectory()) {
-      if (SKIP_DIRS.has(e.name)) continue;
-      walk(root, full, depth + 1, acc);
-    } else if (e.isFile()) {
-      const lower = e.name.toLowerCase();
-      if (TAILWIND_CONFIG_RE.test(lower)) acc.tailwindConfigs.push(relPath(root, full));
-      const ext = extname(lower);
-      if (ext === ".css") acc.css.push({ path: relPath(root, full), bytes: fileBytes(full) });
-      else if (ext === ".scss") acc.scssCount++;
-      else if (ext === ".html") acc.html.push({ path: relPath(root, full), bytes: fileBytes(full) });
+    for (const e of entries) {
+      if (acc.visited >= MAX_ENTRIES) { acc.truncated = true; return; }
+      acc.visited++;
+      const full = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (SKIP_DIRS.has(e.name)) continue;
+        queue.push({ dir: full, depth: depth + 1 });
+      } else if (e.isFile()) {
+        const lower = e.name.toLowerCase();
+        if (TAILWIND_CONFIG_RE.test(lower)) acc.tailwindConfigs.push(relPath(root, full));
+        const ext = extname(lower);
+        if (ext === ".css") acc.css.push({ path: relPath(root, full), bytes: fileBytes(full) });
+        else if (ext === ".scss") acc.scssCount++;
+        else if (ext === ".html") acc.html.push({ path: relPath(root, full), bytes: fileBytes(full) });
+      }
     }
   }
 }
@@ -167,8 +192,9 @@ export function scanProject(root: string): ScanResult {
 
   const acc: WalkAccum = {
     css: [], html: [], scssCount: 0, tailwindConfigs: [], componentDirs: [], visited: 0,
+    truncated: false,
   };
-  walk(root, root, 0, acc);
+  walk(root, root, acc);
 
   const tailwindConfig =
     acc.tailwindConfigs.length > 0 ? [...acc.tailwindConfigs].sort()[0]! : null;
@@ -201,5 +227,6 @@ export function scanProject(root: string): ScanResult {
   return {
     framework, styling, tailwindConfig, cssFiles, htmlFiles,
     componentDirs, designMd, dsStatus, verdict,
+    truncated: acc.truncated, visited: acc.visited,
   };
 }
