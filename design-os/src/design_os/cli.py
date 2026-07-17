@@ -18,6 +18,7 @@ import typer
 from design_os import plugins
 from design_os.commands import audit as audit_cmd
 from design_os.commands import doctor as doctor_cmd
+from design_os.commands import harvest as harvest_cmd
 from design_os.commands import heartbeat as heartbeat_cmd
 from design_os.commands import ui_passthrough
 from design_os.commands import update as update_cmd
@@ -68,6 +69,7 @@ def root() -> None:
 # raw args / unknown options reach ``ctx.args`` untouched.
 app.command(name="audit")(audit_cmd.audit)
 app.command(name="doctor")(doctor_cmd.doctor)
+app.command(name="harvest")(harvest_cmd.harvest)
 app.command(name="heartbeat")(heartbeat_cmd.heartbeat)
 app.command(name="update")(update_cmd.update)
 app.command(name="vr-matrix")(vr_matrix_cmd.vr_matrix)
