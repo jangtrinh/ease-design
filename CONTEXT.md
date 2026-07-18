@@ -62,3 +62,26 @@ The manifest's hash over the compiled DS (`compiledHash` + `registryHash` + `gen
 A sanctioned command that mutates a sealed artifact must **reseal** — recompute the hashes,
 bump the generation, append the changelog — or the next load reports `DS_TAMPERED`.
 _Avoid_: lock, signature, checksum
+
+**Role recognition**:
+Understanding which of a project's own tokens plays which canonical role (background, primary,
+danger…) WITHOUT renaming it — an annotation, not a rewrite. `surface-content` stays
+`surface-content`; the tool records that it plays `background`. Stored in
+`$extensions["design-os.role"]`, baked at import, owner-editable.
+_Avoid_: mapping, conversion, normalization (all imply renaming — forbidden)
+
+**Family role**:
+The intent/purpose a token serves — background, foreground, card, primary, secondary, muted,
+accent, border, input, ring, destructive, success, warning, info. One axis of role recognition.
+_Avoid_: semantic role (too broad — a token has a family AND a position)
+
+**Surface position**:
+The other recognition axis — whether a token is a surface (`bg`) or the text on it (`fg`/`text`).
+`badge-danger-bg` = danger family, bg position; `badge-danger-text` = danger family, fg position.
+The paired axis `ui ds a11y` checks for contrast.
+_Avoid_: foreground/background (name the axis, not one value)
+
+**Gap (design-system)**:
+A canonical role with no token recognized for it — surfaced as a help-grow list, never
+auto-filled. The user adds it in their own name via `ui ds change-token`.
+_Avoid_: missing token, hole
