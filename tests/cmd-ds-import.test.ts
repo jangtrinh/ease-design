@@ -57,7 +57,11 @@ describe("ui ds import — writes the DS store", () => {
     expect(data.byType.color).toBe(2);
 
     const written = JSON.parse(readFileSync(dtokens, "utf8"));
-    expect(written.colors.primary).toEqual({ $value: "#3366ff", $type: "color" });
+    // spec 011 P2: `ds import` bakes role recognition before sealing — "primary" is a
+    // self-declaring family keyword, so it gains the annotation losslessly.
+    expect(written.colors.primary).toEqual({
+      $value: "#3366ff", $type: "color", $extensions: { "design-os.role": "primary" },
+    });
   });
 });
 
@@ -214,7 +218,10 @@ describe("ui ds import — F2: alias-valued tokens survive import (spec 009 P3 D
     expect(data.imported).toBe(2);
 
     const written = JSON.parse(readFileSync(join(tmp, "design", "design.tokens.json"), "utf8"));
-    expect(written.color["text-primary"]).toEqual({ $value: "{color.gray-900}", $type: "color" });
+    // "text-primary" recognizes via the leading text- prefix → foreground (spec 011 P2).
+    expect(written.color["text-primary"]).toEqual({
+      $value: "{color.gray-900}", $type: "color", $extensions: { "design-os.role": "foreground" },
+    });
 
     const compiled = capture(["tokens", "compile", join(tmp, "design", "design.tokens.json"), "--target", "css"]);
     expect(compiled.code).toBe(0);

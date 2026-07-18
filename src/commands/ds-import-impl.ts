@@ -15,6 +15,7 @@ import { canonicalStringify, canonicalHash, newManifest } from "../core/ds-manif
 import { createEmptyRegistry } from "../core/registry-store.js";
 import { parseTokenFile } from "../core/token-model.js";
 import { importFlatTokens } from "../core/token-import.js";
+import { recognizeRoles } from "../core/role-recognition.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -91,30 +92,41 @@ export function runImport(parsed: ParsedArgs): CommandResult {
     return err("BAD_JSON", `internal: emitted DTCG did not validate: ${e instanceof Error ? e.message : String(e)}`);
   }
 
+  // Bake role recognition (spec 011 Phase 2) BEFORE sealing, so the seal covers
+  // the annotated tree — deterministic, so the hash is stable. Lossless: every
+  // name/value survives verbatim; only $extensions["design-os.role"] is added.
+  // Never renames, drops, or injects a token (see role-recognition.ts).
+  const recognition = recognizeRoles(dtcg);
+  const annotated = recognition.annotated;
+
   // Seal a minimal store: tokens + empty registry + manifest.
   const registry = createEmptyRegistry();
   const manifest = newManifest({
     name,
     persona: { slug: "imported", family: "imported" },
     intent: `imported from ${src}`,
-    compiledHash: canonicalHash(dtcg),
+    compiledHash: canonicalHash(annotated),
     registryHash: canonicalHash(registry),
   });
   try {
     mkdirSync(designDir, { recursive: true });
     // canonicalStringify already appends a trailing "\n" (ds-manifest.ts) — do not double it.
-    writeFileSync(paths.tokens, canonicalStringify(dtcg));
+    writeFileSync(paths.tokens, canonicalStringify(annotated));
     writeFileSync(paths.registry, canonicalStringify(registry));
     writeFileSync(paths.manifest, canonicalStringify(manifest));
   } catch (e) {
     return err("WRITE_ERROR", `could not write DS store: ${e instanceof Error ? e.message : String(e)}`);
   }
 
-  const summary = { name, dir: designDir, ...stats, categories: Object.keys(dtcg).length };
+  const summary = {
+    name, dir: designDir, ...stats, categories: Object.keys(annotated).length,
+    rolesRecognized: recognition.recognized, roleGaps: recognition.gaps,
+  };
   if (useJson) return okJsonWithExit(CMD, summary, 0);
   const typeLine = Object.entries(stats.byType).map(([t, n]) => `${n} ${t}`).join(", ");
   const lines = [
     `ds import: ${stats.imported} token(s) [${typeLine}] across ${summary.categories} categories → ${designDir}`,
+    `  ${recognition.recognized} roles recognized, ${recognition.gaps.length} gaps: ${recognition.gaps.join(", ")}`,
     ...(stats.skipped > 0 ? [`  skipped ${stats.skipped} un-typeable token(s): ${stats.skippedKeys.slice(0, 6).map((s) => s.key).join(", ")}${stats.skipped > 6 ? " …" : ""}`] : []),
     `  next: ui ds a11y --dir ${parsed.flags["dir"] ?? "."}  ·  ui ds status --dir ${parsed.flags["dir"] ?? "."}`,
   ];

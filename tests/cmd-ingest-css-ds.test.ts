@@ -148,7 +148,11 @@ describe("ui ingest-css-ds — UC-03: extract-tokens → ingest-css-ds → ds im
 
     const compiled = JSON.parse(readFileSync(join(dsDir, "design", "design.tokens.json"), "utf8"));
     expect(compiled.color["text-primary"].$value).toBe("{color.gray-900}");
-    expect(compiled.color.bg.$extensions).toEqual({ "mode.dark": { $value: "#111111" } });
+    // spec 011 P2: `ds import` bakes role recognition — "bg" (leading bg- prefix) also
+    // gains its role annotation, merged alongside the pre-existing mode.dark extension.
+    expect(compiled.color.bg.$extensions).toEqual({
+      "mode.dark": { $value: "#111111" }, "design-os.role": "background",
+    });
 
     const css = capture(["tokens", "compile", join(dsDir, "design", "design.tokens.json"), "--target", "css"]);
     expect(css.code).toBe(0);

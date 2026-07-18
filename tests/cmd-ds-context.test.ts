@@ -507,3 +507,79 @@ describe("ui ds context — soul chain budget exemption", () => {
     expect(Array.isArray(data.semantic)).toBe(true);
   });
 });
+
+// ─── ds context — roles section (spec 011 Phase 2) ───────────────────────────
+// Reads the BAKED $extensions["design-os.role"] annotation ('ds import' or a
+// 'ds set-role' correction) — never recomputes recognition.
+
+describe("ui ds context — roles section", () => {
+  function importDs(tmp: string): void {
+    const src = join(tmp, "src-tokens.json");
+    writeFileSync(
+      src,
+      JSON.stringify({ color: { "surface-content": "#FFFFFF", "zorp-glimble": "#123456" } }),
+      "utf8",
+    );
+    const r = capture(["ds", "import", src, "--dir", tmp, "--json"]);
+    expect(r.exitCode).toBe(0);
+  }
+
+  it("a DS with baked roles (via 'ds import') emits both '## Roles' and '## Missing roles'", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-roles-"));
+    importDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("## Roles");
+    expect(r.stdout).toContain("background → color.surface-content");
+    expect(r.stdout).toContain("## Missing roles");
+    // zorp-glimble is unrecognized by name — "primary" never got a token, so it's a gap.
+    expect(r.stdout).toMatch(/primary/);
+  });
+
+  it("a DS with no baked roles (plain 'ds init') omits both sections — never an error", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-roles-none-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("## Roles");
+    expect(r.stdout).not.toContain("## Missing roles");
+  });
+
+  it("a 'ds set-role' correction is what context reads — the owner edit sticks, never recomputed", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-roles-setrole-"));
+    importDs(tmp);
+    const before = capture(["ds", "context", "--dir", tmp]);
+    expect(before.stdout).toContain("background → color.surface-content");
+    expect(before.stdout).toMatch(/foreground.*\(no token/);
+
+    const set = capture(["ds", "set-role", "color.surface-content", "foreground", "--dir", tmp, "--json"]);
+    expect(set.exitCode).toBe(0);
+
+    const after = capture(["ds", "context", "--dir", tmp]);
+    expect(after.exitCode).toBe(0);
+    // background now has zero tokens → it moves to the gap list.
+    expect(after.stdout).toMatch(/background.*\(no token/);
+    expect(after.stdout).toContain("foreground → color.surface-content");
+    expect(after.stdout).not.toContain("background → color.surface-content");
+  });
+
+  it("--format json exposes roles/roleGaps arrays", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-roles-json-"));
+    importDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout).data;
+    expect(data.roles).toContainEqual({ role: "background", paths: ["color.surface-content"] });
+    expect(data.roleGaps).toContain("primary");
+  });
+
+  it("--format json: a DS with no baked roles returns empty roles/roleGaps arrays", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ease-ctx-roles-json-none-"));
+    initDs(tmp);
+    const r = capture(["ds", "context", "--dir", tmp, "--format", "json", "--json"]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout).data;
+    expect(data.roles).toEqual([]);
+    expect(data.roleGaps).toEqual([]);
+  });
+});

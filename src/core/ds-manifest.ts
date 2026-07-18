@@ -13,11 +13,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 export interface DSChangelogEntry {
   ts: string;       // ISO-8601 UTC
-  kind: "init" | "change-token" | "register";
-  by: string;       // "ui ds init" | "ui ds change-token" | "ui registry register"
-  path?: string;    // change-token: token path
-  from?: string;    // change-token: previous serialized $value
-  to?: string;      // change-token: new serialized $value
+  kind: "init" | "change-token" | "register" | "set-role";
+  by: string;       // "ui ds init" | "ui ds change-token" | "ui registry register" | "ui ds set-role"
+  path?: string;    // change-token/set-role: token path
+  from?: string;    // change-token: previous serialized $value; set-role: previous role (absent if none)
+  to?: string;      // change-token: new serialized $value; set-role: new role
   reason?: string;
   note?: string;
 }
@@ -94,7 +94,7 @@ const MANIFEST_ROOT_KEYS = new Set([
 const CHANGELOG_KEYS = new Set([
   "ts", "kind", "by", "path", "from", "to", "reason", "note",
 ]);
-const CHANGELOG_KINDS = new Set(["init", "change-token", "register"]);
+const CHANGELOG_KINDS = new Set(["init", "change-token", "register", "set-role"]);
 const SEMVER_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const HASH_RE = /^sha256-[A-Za-z0-9_-]+$/;
 const SLUG_RE = /^[a-z][a-z0-9-]*$/;

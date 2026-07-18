@@ -8,6 +8,7 @@ import { runDiff } from "./ds-diff-impl.js";
 import { runDocs } from "./ds-docs-impl.js";
 import { runA11y } from "./ds-a11y-impl.js";
 import { runChangeToken } from "./ds-change-token-impl.js";
+import { runSetRole } from "./ds-set-role-impl.js";
 import { runStatus } from "./ds-status-impl.js";
 import { runImport } from "./ds-import-impl.js";
 import { runSpecimen } from "./ds-specimen-impl.js";
@@ -24,6 +25,7 @@ Usage:
   ui ds init <name> --persona <slug> --intent "<text>" [options]
   ui ds context [--strict] [--with-theme] [--format markdown|json] [options]
   ui ds change-token <path> --value <v> [options]
+  ui ds set-role <token.path> <role> [--dir <project>] [--json]
   ui ds status   [--dir <project-dir>] [--json]
   ui ds diff <base-dir> <head-dir> [--format markdown|json|pr-comment] [--base-version <v>]
   ui ds docs [--dir <project>] [--out <file>] [--format markdown|json]
@@ -37,6 +39,8 @@ Subcommands:
   import         Onboard an EXISTING flat tokens.json → the DTCG store (so ds a11y/status/diff work)
   context        Emit the active design system as a context block for the host model
   change-token   Update one token's $value (only sanctioned mutation post-init)
+  set-role       Set/correct one token's recognized role — the owner-edit path for
+                 recognition (spec 011 P2); 'ds context' reads this, never recomputes it
   status         Show the manifest summary (generation, persona, hashes)
   diff           Compare two DS states (dirs with design.tokens.json) → semver + visual-breaking classification
   docs           Regenerate component reference docs from the registry (decay-proof)
@@ -80,6 +84,11 @@ Subcommands:
   $type per value (color/dimension/number/fontFamily/fontWeight/duration). Nested
   groups are hoisted to <cat>-<sub>. Un-typeable values (box-shadow strings,
   bezier easings) are SKIPPED and reported — never emitted with a bad type.
+  Also BAKES role recognition into every $type:color token before sealing
+  (spec 011 P2): each recognized token gets $extensions["design-os.role"],
+  lossless (never renames/drops/injects). Output reports "N roles recognized,
+  M gaps: <role list>" — the gaps are reported, never auto-injected. Correct a
+  mis-recognition afterwards with 'ui ds set-role'.
 
 'ds specimen' options:
   --dir <path>       Project directory holding design/ (default: cwd)
@@ -105,6 +114,17 @@ Subcommands:
   --reason "<text>"  Changelog note recorded with the mutation
   --dir <path>       Override the project directory
 
+'ds set-role' options:
+  <token.path>       Existing token path (e.g. color.surface-content) — BAD_TOKEN if unknown
+  <role>             One of the canonical roles (background, foreground, card, popover,
+                     primary, secondary, muted, accent, border, input, ring, destructive,
+                     success, warning, info, neutral) — BAD_ROLE if not
+  --dir <path>       Override the project directory
+  The owner-edit path for recognition (decision 2: editable). Sets
+  $extensions["design-os.role"] on the ONE named token and reseals (bumps
+  generation, appends a changelog entry) — never renames the token, never
+  touches any other token. 'ds context' reads exactly what this writes.
+
 'ds context' options:
   --strict       Prepend the registered-components-only enforcement preamble
   --with-theme   Also emit the compiled Tailwind v4 @theme block (full token map,
@@ -122,6 +142,12 @@ Subcommands:
   the project section since the project always wins on conflict. Either,
   both, or neither may exist; a missing file just omits its section, never
   an error.
+  The 'tokens' section also emits '## Roles' (role → your own token name,
+  e.g. background → color.surface-content) and '## Missing roles' (the gap
+  list, e.g. "card, popover (no token — add via 'ui ds change-token' in your
+  own name)") — read from the BAKED $extensions["design-os.role"] annotation
+  ('ds import' or 'ds set-role'), never recomputed, so a 'ds set-role'
+  correction always sticks. A DS with no baked roles omits both, never an error.
 
 'ds soul' options:
   init           Write the design/soul.md scaffold (status: draft)
@@ -177,6 +203,7 @@ Error codes:
   BAD_TOKEN          Compiled token set failed validation on 'ds init'
   PERSONA_NOT_FOUND  --persona slug not in personas.json
   TOKEN_NOT_FOUND    'change-token' on a non-existent path
+  BAD_ROLE           'set-role' <role> is not one of the canonical roles
   UNKNOWN_FLAG       Unrecognised --flag
   BAD_ARG            Missing <tokens.json> on 'ds import'
   FILE_NOT_FOUND     'ds import' source file does not exist
@@ -216,6 +243,7 @@ export const dsCommand = {
       case "import":       return runImport(parsed);
       case "context":      return runContext(parsed);
       case "change-token": return runChangeToken(parsed);
+      case "set-role":     return runSetRole(parsed);
       case "status":       return runStatus(parsed);
       case "diff":         return runDiff(parsed);
       case "docs":         return runDocs(parsed);

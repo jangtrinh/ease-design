@@ -9,6 +9,8 @@ import { isAlias } from "./token-model.js";
 import { soulSectionForContext } from "./ds-soul.js";
 import { studioSoulSectionForContext } from "./ds-soul-studio.js";
 import { factorySoulSectionForContext } from "./ds-soul-factory.js";
+import { summarizeRoles, rolesMarkdownLines } from "./ds-context-roles.js";
+import type { RolesSummary } from "./ds-context-roles.js";
 import type { DesignSystem } from "./design-system.js";
 import type { ResolvedToken } from "./token-model.js";
 
@@ -55,6 +57,15 @@ export interface StructuredContext {
   registry: { name: string; category: string; tokensUsed: string[] }[];
   naming: { rule: string }[];
   antiPatterns: string[];
+  /**
+   * Roles recognized (spec 011 P2) from the BAKED `$extensions["design-os.role"]`
+   * annotation — never recomputed here (an owner's `ds set-role` correction must
+   * stick). Empty when the "tokens" section is excluded or no token in the DS
+   * carries a baked role (e.g. imported before this feature shipped).
+   */
+  roles: { role: string; paths: string[] }[];
+  /** Canonical roles with zero recognized tokens; same omission rule as `roles`. */
+  roleGaps: string[];
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -202,6 +213,10 @@ function applyTruncation(
 export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
   const { include, strict, maxBytes, soul, studioSoul } = opts;
   const sem = semanticTokens(ds);
+  // Roles read the BAKED annotation off the full raw tree (not just the
+  // "semantic" filter above — a role can live on a literal-valued token too,
+  // e.g. dana's surface-content). Never recomputed — see ds-context-roles.ts.
+  const rolesSummary = summarizeRoles(ds.tokens);
   const regRows = ds.registry.components.map((c) => ({
     name: c.name,
     category: c.category,
@@ -278,6 +293,17 @@ export function formatMarkdown(ds: DesignSystem, opts: ContextOptions): string {
       );
     }
     prefixLines.push(factorySoulSectionForContext(), "");
+  }
+
+  // Roles + gaps (spec 011 P2) are declared metadata, not variable data — a real
+  // LIVE run on dana's 414-token DS (100 recognized) showed the role list itself
+  // can be large enough to blow the default 4096-byte budget, truncating the
+  // "## Missing roles" gap list right out of the output. Exempt the whole
+  // section from `maxBytes`, same reasoning as the soul chain above: read from
+  // the BAKED annotation, never recomputed, so an owner's `ds set-role`
+  // correction is never silently dropped by a byte budget either.
+  if (include.includes("tokens")) {
+    prefixLines.push(...rolesMarkdownLines(rolesSummary));
   }
 
   // ── Variable tail: token / registry / naming / anti-pattern tables ───────────
@@ -366,6 +392,7 @@ function buildStructured(
   include: ContextSection[],
   soul: string | null,
   studioSoul: string | null,
+  rolesSummary: RolesSummary | null,
   ap: string[],
   reg: { name: string; category: string; tokensUsed: string[] }[],
   tok: ResolvedToken[],
@@ -389,6 +416,13 @@ function buildStructured(
       ? NAMING_RULES.map((r) => ({ rule: r }))
       : [],
     antiPatterns: include.includes("anti-patterns") ? ap : [],
+    // Roles ride the same "tokens" include and the same exemption as the soul
+    // chain — read from the BAKED annotation, never recomputed (see
+    // ds-context-roles.ts), so an owner's `ds set-role` correction always wins.
+    roles: include.includes("tokens") && rolesSummary !== null
+      ? rolesSummary.roles.map((r) => ({ role: r.role, paths: r.paths }))
+      : [],
+    roleGaps: include.includes("tokens") && rolesSummary !== null ? [...rolesSummary.gaps] : [],
   };
 }
 
@@ -434,6 +468,8 @@ export function formatStructured(ds: DesignSystem, opts: ContextOptions): Struct
   // The soul chain is always at full (capped) text — never dropped for budget.
   const soulText = opts.soul !== undefined ? soulSectionForContext(opts.soul) : null;
   const studioSoulText = opts.studioSoul !== undefined ? studioSoulSectionForContext(opts.studioSoul) : null;
+  // Roles ride the same exemption — read from the baked annotation, never recomputed.
+  const rolesSummary = summarizeRoles(ds.tokens);
 
   // Try progressively more aggressive truncation of the VARIABLE rows only —
   // drop rows, never mid-string slice; the soul chain stays whole throughout.
@@ -445,7 +481,7 @@ export function formatStructured(ds: DesignSystem, opts: ContextOptions): Struct
     for (const regLimit of regLimits) {
       for (const tokLimit of tokLimits) {
         const ctx = buildStructured(
-          ds, include, soulText, studioSoulText,
+          ds, include, soulText, studioSoulText, rolesSummary,
           antiPatterns.slice(0, apLimit),
           regRows.slice(0, regLimit),
           sem.slice(0, tokLimit),
@@ -459,7 +495,7 @@ export function formatStructured(ds: DesignSystem, opts: ContextOptions): Struct
 
   // Budget is too small even for zero variable rows — the soul chain still rides
   // through whole (it is exempt); only the row sections collapse to empty.
-  return buildStructured(ds, include, soulText, studioSoulText, [], [], []);
+  return buildStructured(ds, include, soulText, studioSoulText, rolesSummary, [], [], []);
 }
 
 // ─── Include parser ───────────────────────────────────────────────────────────

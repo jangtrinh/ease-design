@@ -540,6 +540,15 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
         ],
         errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "DS_NOT_FOUND", "DS_TAMPERED", "BAD_MANIFEST", "TOKEN_NOT_FOUND", "BAD_VALUE", "ALIAS_CYCLE", "DANGLING_ALIAS", "TYPE_MISMATCH", "WRITE_ERROR"],
       },
+      "set-role": {
+        summary: "Set/correct one token's recognized role (owner-edit path, spec 011 P2)",
+        positionals: [
+          { name: "<token.path>", required: true, summary: "Existing token path (e.g. color.primary)" },
+          { name: "<role>", required: true, summary: "One of the canonical roles (background, foreground, card, popover, primary, secondary, muted, accent, border, input, ring, destructive, success, warning, info, neutral)" },
+        ],
+        flags: [{ name: "dir", type: "string", summary: "Override the project directory" }],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "DS_NOT_FOUND", "DS_TAMPERED", "BAD_MANIFEST", "BAD_TOKEN", "BAD_ROLE", "WRITE_ERROR"],
+      },
       status: {
         summary: "Show the manifest summary (generation, persona, hashes)",
         positionals: [],

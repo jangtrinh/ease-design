@@ -51,6 +51,10 @@ export function buildChangelog(
       const move = c.from !== undefined && c.to !== undefined ? `: ${c.from} → ${c.to}` : "";
       const why = c.reason !== undefined ? ` — ${c.reason}` : "";
       entries.push({ date, type: "Changed", text: `Token ${path}${move}${why}`, provenance: by });
+    } else if (c.kind === "set-role") {
+      const path = c.path ?? "(token)";
+      const move = c.from !== undefined ? `${c.from} → ${c.to}` : `${c.to}`;
+      entries.push({ date, type: "Changed", text: `Role ${path}: ${move}`, provenance: by });
     }
   }
 

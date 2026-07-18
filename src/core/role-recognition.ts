@@ -18,7 +18,7 @@ export type Role =
   | "muted" | "accent" | "border" | "input" | "ring" | "destructive"
   | "success" | "warning" | "info" | "neutral";
 
-const CANONICAL_ROLES: readonly Role[] = [
+export const CANONICAL_ROLES: readonly Role[] = [
   "background", "foreground", "card", "popover", "primary", "secondary", "muted",
   "accent", "border", "input", "ring", "destructive", "success", "warning", "info", "neutral",
 ];
