@@ -11,20 +11,23 @@ function tree(color: Record<string, { $value: string; $extensions?: Record<strin
 }
 
 describe("recognizeRoles — Phase 1 contract", () => {
-  it("a primitive gets no role (blue-100 literal)", () => {
-    const result = recognizeRoles(tree({ "blue-100": { $value: "#DBEAFE" } }));
-    expect(result.annotated.color?.["blue-100"]?.$extensions).toBeUndefined();
-    expect(result.recognized).toBe(0);
-    expect(result.unrecognized).toEqual([]);
-  });
-
-  it("a hue re-export gets no role (color-blue-100 alias)", () => {
+  it("a hue-scale name gets no role, literal or alias (blue-100, color-blue-100)", () => {
     const result = recognizeRoles(
       tree({ "blue-100": { $value: "#DBEAFE" }, "color-blue-100": { $value: "{color.blue-100}" } }),
     );
+    expect(result.annotated.color?.["blue-100"]?.$extensions).toBeUndefined();
     expect(result.annotated.color?.["color-blue-100"]?.$extensions).toBeUndefined();
     expect(result.recognized).toBe(0);
-    expect(result.unrecognized).toEqual(["color.color-blue-100"]);
+    expect(result.unrecognized).toEqual(["color.blue-100", "color.color-blue-100"]);
+  });
+
+  it("recognizes by NAME regardless of $value shape — a literal-valued semantic token still gets its role (coordinator fix 1)", () => {
+    const result = recognizeRoles(tree({ "badge-danger-text": { $value: "#FFFFFF" } }));
+    expect(result.annotated.color?.["badge-danger-text"]?.$extensions).toEqual({
+      "design-os.role": "destructive",
+      "design-os.role-position": "fg",
+    });
+    expect(result.recognized).toBe(1);
   });
 
   it("a semantic token is annotated with its family role (surface-content → background)", () => {
@@ -108,6 +111,58 @@ describe("recognizeRoles — Phase 1 contract", () => {
     expect(result.gaps).toContain("popover");
     expect(result.gaps).not.toContain("destructive");
   });
+
+  // ─── FIX 2: leading-prefix priority (coordinator correction) ─────────────────
+
+  it("a leading surface-/bg- prefix wins background regardless of what follows (surface-content, surface-chrome)", () => {
+    const result = recognizeRoles(
+      tree({
+        "surface-content": { $value: "{color.gray-25}" },
+        "surface-chrome": { $value: "{color.gray-900}" },
+        "bg-danger": { $value: "{color.error-700}" },
+      }),
+    );
+    expect(result.annotated.color?.["surface-content"]?.$extensions).toEqual({ "design-os.role": "background" });
+    expect(result.annotated.color?.["surface-chrome"]?.$extensions).toEqual({ "design-os.role": "background" });
+    expect(result.annotated.color?.["bg-danger"]?.$extensions).toEqual({ "design-os.role": "background" });
+  });
+
+  it("a leading text-/fg-/on- prefix wins foreground regardless of what follows (text-primary, Material's on-surface)", () => {
+    const result = recognizeRoles(
+      tree({
+        "text-primary": { $value: "{color.brand-600}" },
+        "on-surface": { $value: "{color.gray-950}" },
+        "fg-danger": { $value: "{color.error-700}" },
+      }),
+    );
+    expect(result.annotated.color?.["text-primary"]?.$extensions).toEqual({ "design-os.role": "foreground" });
+    expect(result.annotated.color?.["on-surface"]?.$extensions).toEqual({ "design-os.role": "foreground" });
+    expect(result.annotated.color?.["fg-danger"]?.$extensions).toEqual({ "design-os.role": "foreground" });
+  });
+
+  it("the leading-prefix rule does not fire mid-name — badge-danger-bg still gets destructive+bg, not background", () => {
+    const result = recognizeRoles(tree({ "badge-danger-bg": { $value: "{color.error-700}" } }));
+    expect(result.annotated.color?.["badge-danger-bg"]?.$extensions).toEqual({
+      "design-os.role": "destructive",
+      "design-os.role-position": "bg",
+    });
+  });
+
+  // ─── FIX 2: genuine ties are flagged ambiguous, never guessed ────────────────
+
+  it("a genuine tie between two self-named families lands in `ambiguous`, not a guessed role (border-success)", () => {
+    const result = recognizeRoles(tree({ "border-success": { $value: "{color.success-500}" } }));
+    expect(result.annotated.color?.["border-success"]?.$extensions).toBeUndefined();
+    expect(result.ambiguous).toEqual(["color.border-success"]);
+    expect(result.unrecognized).toEqual([]);
+    expect(result.recognized).toBe(0);
+  });
+
+  it("an unambiguous weight difference still resolves cleanly, not ambiguous (border-error: border self-name beats error synonym)", () => {
+    const result = recognizeRoles(tree({ "border-error": { $value: "{color.error-500}" } }));
+    expect(result.annotated.color?.["border-error"]?.$extensions).toEqual({ "design-os.role": "border" });
+    expect(result.ambiguous).toEqual([]);
+  });
 });
 
 // ─── LIVE (Art III) — dana's real design.tokens.json ───────────────────────────
@@ -139,20 +194,20 @@ describe.skipIf(!existsSync(DANA_PATH))("recognizeRoles — LIVE on dana's real 
     expect(result.unrecognized.length).toBeGreaterThan(0);
   });
 
-  it("surface-content and surface-chrome — the flagged ambiguous case (report only, no strict assertion)", () => {
+  it("surface-content (a real dana LITERAL) now recognizes as background — coordinator fix 1 recovers the flagship token", () => {
     const raw = JSON.parse(readFileSync(DANA_PATH, "utf-8"));
     const result = recognizeRoles(parseTokenFile(raw));
-    // surface-content is a LITERAL in dana's real file (#FFFFFF) — a primitive,
-    // so it correctly gets no role under the primitive/alias split, even though
-    // it plays the background role by convention. See p1-recognition-core.md.
-    // (Its real $extensions already carries dana's own mode.classic/mode.dark —
-    // must stay untouched, no "design-os.role" key added.)
-    expect(result.annotated.color?.["surface-content"]?.$extensions).not.toHaveProperty("design-os.role");
-    // surface-chrome IS an alias ({color.gray-900}) but has no single-word
-    // reduction (surface + chrome) — correctly falls to unrecognized rather
-    // than a forced guess. See p1-recognition-core.md. (Its real $extensions
-    // already carries dana's own mode.classic/mode.dark — must stay untouched,
-    // no "design-os.role" key added.)
-    expect(result.annotated.color?.["surface-chrome"]?.$extensions).not.toHaveProperty("design-os.role");
+    // dana's real surface-content is $value: "#FFFFFF" (a literal, not an alias)
+    // — Phase 1's original isAlias skip dropped it; fix 1 removes that skip, so
+    // it's recognized by NAME like any other token. See p1-recognition-core.md.
+    expect(result.annotated.color?.["surface-content"]?.$extensions).toMatchObject({
+      "design-os.role": "background",
+    });
+    // surface-chrome — a real dana alias — also resolves via the leading
+    // surface- prefix rule (fix 2), even though "chrome" itself is not a
+    // recognized word.
+    expect(result.annotated.color?.["surface-chrome"]?.$extensions).toMatchObject({
+      "design-os.role": "background",
+    });
   });
 });

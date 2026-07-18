@@ -1,106 +1,108 @@
 # Report — Spec 011 Phase 1: the role-recognition core
 
 **Date**: 2026-07-18 · **Branch**: `feat/role-recognition` · **Files**: `src/core/role-recognition.ts`
-(184 lines), `tests/role-recognition.test.ts` (14 tests, incl. 2 LIVE-on-dana)
+(198 lines), `tests/role-recognition.test.ts` (19 tests, incl. 2 LIVE-on-dana)
 
-## Four gates
+This report supersedes the first pass. The coordinator sent two corrections after reading the
+first pass's flagged findings; both are landed and re-verified below.
+
+## Four gates (after both corrections)
 
 `typecheck` / `lint` / `build` / `test` — all green. `ui knowledge check` — 0 findings. Full suite:
-139 files, 2112 tests passed, 4 skipped (unrelated).
+139 files, 2117 tests passed, 4 skipped (unrelated).
 
-## What was built
+## What changed from the first pass
 
-`recognizeRoles(tree: TokenTree): { annotated, recognized, gaps, unrecognized }` — pure, zero
-deps. Per token: primitive (`!isAlias`) → skip untouched. Alias matching the hue-re-export regex
-(`{knownHue}-{number}`, optional `color-` prefix) → skip, no role. Alias otherwise → classify via
-a weighted keyword table transcribed from `role-synonym-dictionary.md` (cited inline per role) →
-`$extensions["design-os.role"]` (+ `"design-os.role-position"` when a distinct bg/fg signal
-disambiguates a compound, e.g. `badge-danger-bg` → `destructive` + `bg`). Existing `$extensions`
-(dana's `mode.*`) are merged, never overwritten. Every input token appears in `annotated` verbatim
-— pinned by a lossless test.
+**Fix 1 — deleted the `isAlias` primitive-skip.** A token's role is about its NAME/intent, not
+whether `$value` is a literal or an alias. dana defines many semantic tokens as literals
+(`surface-content: '#FFFFFF'`); the old primitive-skip dropped 126 of dana's role-named tokens,
+including its own flagship background token. The only skip left is the hue-scale name pattern
+(`HUE_RE`) — a real primitive palette re-export, never a UI role. Confirmed on sodeal/spaflow/
+traicaybentre too: all three are 100%-or-near-100%-literal projects whose primitives are still
+named `accent`, `bg-base`, `border`, `color-brand-500`, `color-danger`, `color-primary-600` —
+genuinely role-shaped names sitting on literal hex values. The old skip was silently blind to all
+of them.
 
-## LIVE numbers (Art III)
+**Fix 2 — leading-prefix priority + a new `ambiguous` bucket.** A leading `surface-`/`bg-`
+morpheme is `background` regardless of what follows (`surface-chrome`, `surface-content`); a
+leading `text-`/`fg-`/`on-` morpheme is `foreground` (mirrors Material's `on-surface`, shadcn's
+own `-foreground`). This is checked before the specific-family table and wins outright — grounded
+across the dictionary, not tuned to one project. When the specific-family table still ties (two+
+roles at equal weight, e.g. `border-success`: `border` self-name vs `success` self-name, both
+weight 2) the token is now added to a new `ambiguous: string[]` field — never guessed, never
+silently tie-broken. `RecognitionResult` is now `{ annotated, recognized, gaps, unrecognized,
+ambiguous }`.
 
-| Project | Total tokens | Primitive | Alias (semantic) | Recognized | Unrecognized (hue / genuine) | Gaps (of 16) |
-|---|---|---|---|---|---|---|
-| **dana-desktop** | 414 | 186 | 228 | **154** | 74 (60 hue / **14 genuine**) | 3: `foreground`, `popover`, `input` |
-| **traicaybentre** | 35 | 32 | 3 | **0** | 3 (0 hue / 3 genuine) | all 16 |
-| **sodeal** | 47 | 47 | 0 | **0** | 0 | all 16 |
-| **spaflow** | 33 | 33 | 0 | **0** | 0 | all 16 |
+The SCRIM TRAP negative rule (`overlay`/`scrim` never auto-maps) is checked before the leading-
+prefix rule, so it still catches `surface-overlay` even though it has a leading `surface-` — this
+wasn't asked for explicitly but wasn't asked to be removed either; flagging it here for visibility
+since "Keep everything else" is how I read it.
 
-sodeal and spaflow are 100% primitive (0 aliases) — chosen as the primitive-heavy pair since they're
-the most extreme case in the fixture set (traicaybentre also primitive-heavy but has 3 aliases).
+## LIVE numbers (Art III, re-run after both fixes)
 
-**Finding — my dana number differs from the brainstorm's ~166**: I get **154 recognized**, not
-~166 (74 unrecognized, not ~62). Both numbers sum correctly to 228 (154+74=228), so this isn't a
-bug in totals — it's a stricter recognition rule than the brainstorm assumed. The 12-token gap is
-mostly `citation-bg`/`citation-bg-active`/`citation-bg-hover`/`surface-chrome*`/`surface-overlay` —
-domain-prefixed tokens where the ONLY signal is a bare position word (`-bg`/`surface-`) sitting next
-to a non-role custom word (`citation`, `chrome`, `overlay`). I deliberately did NOT grant family
-from a bare position word plus an unrecognized custom prefix — because the dictionary's own
-"Consequences" section (point 3) cites `citation-bg` BY NAME as the example of a token with no
-canonical role that must be preserved losslessly, not force-mapped. Forcing `-bg`/`-surface` alone
-into `background` would have contradicted that example and silently mapped `surface-overlay` (a
-scrim, per the dictionary's own "SCRIM TRAP") to a role it isn't. I'm reporting this instead of
-tuning to hit 166 — my number is the real one, per the brief.
+| Project | Total tokens | Recognized | Ambiguous | Unrecognized (hue / genuine) | Gaps (of 16) |
+|---|---|---|---|---|---|
+| **dana-desktop** | 414 | **232** | **10** | 172 (120 hue / 52 genuine) | 2: `popover`, `input` |
+| **traicaybentre** | 35 | **22** | 0 | 13 (0 hue / 13 genuine) | 9: card, popover, input, ring, destructive, success, warning, info, neutral |
+| **sodeal** | 47 | **40** | 0 | 7 (0 hue / 7 genuine) | 10: popover, secondary, muted, input, ring, destructive, success, warning, info, neutral |
+| **spaflow** | 33 | **18** | 0 | 15 (0 hue / 15 genuine) | 10: background, foreground, card, popover, secondary, muted, border, input, ring, neutral |
 
-**Finding — total degradation on 100%-primitive projects (the open question in plan.md)**:
-sodeal and spaflow recognize **0 tokens** — not "few", zero, because recognition only ever looks at
-alias-valued tokens and neither project has any. This is the sharpest possible confirmation of the
-plan's open question: name-recognition is *structurally* inert on a stock-primitive-only project;
-usage-inference (deferred, MoSCoW "Could/later spec") is not an optimization for that shape, it's
-the ONLY mechanism that could ever recognize anything there. traicaybentre (32 primitive + 3 alias)
-shows the same floor even with a few aliases present: its 3 aliases (`dash-status-active/-done/-pending`)
-carry no shadcn-shaped role word at all → 0 recognized, all 16 roles gap.
+**Not predicting or tuning to a number, per the brief — this is what it actually is.**
 
-## `surface-content` / `surface-chrome` — the flagged ambiguous case (as instructed)
+### The headline change: recognition on 100%-primitive projects is no longer zero
 
-Tested directly on dana's real file. **Neither resolves the way the plan's worked example implies,
-for two different reasons — this is the required finding, not a tuned-away edge case:**
+Before fix 1, sodeal/spaflow recognized **0** tokens (every token was literal, so the primitive
+skip ate all of them). After fix 1, sodeal recognizes **40/47** and spaflow **18/33** — because
+their primitives are genuinely named `accent`, `bg-base`, `border`, `color-brand-500`,
+`color-danger`, `color-primary-*`: real role-shaped names on literal hex values, exactly the case
+fix 1 was written for. traicaybentre went from 0 to **22/35** the same way. This confirms the
+coordinator's diagnosis was the real bug, not a marginal one — it was the dominant source of missed
+recognition on every primitive-styled project in the fixture set, not just dana.
 
-1. **`surface-content` itself is a LITERAL in dana's real file** (`"$value": "#FFFFFF"`, no alias) —
-   a **primitive**, not a semantic token, even though by convention it plays the `background` role
-   (dana's own flagship "background" token). Rule 1 (primitive → no role) is unconditional on the
-   `$value` shape, not the name, so it correctly gets **no annotation** — but that means the
-   contract's own headline example (`surface-content → background`) does not fire on dana's real
-   data at all. I pinned the *intended* behavior with a synthetic unit test (an alias-valued
-   `surface-content`, which does resolve to `background`), and separately pinned dana's real,
-   literal `surface-content` staying unannotated — both are correct under the letter of the
-   contract, but they diverge, and that divergence is real: a hand-authored hex on a
-   semantically-named token is invisible to name recognition. Worth a follow-up decision (does a
-   future phase want a "looks-semantic-but-is-literal" flag?).
-2. **`surface-chrome` IS an alias** (`{color.gray-900}`) but resolves to **unrecognized**, not
-   `background`. Its segments are `{surface, chrome}` — `surface` is a bg-position word but `chrome`
-   is a genuine domain word (dana's own name for a dark app-shell/toolbar surface, distinct from the
-   light `surface-content` main background — confirmed by their values: `chrome` family is
-   `gray-900`/`gray-950`, near-black; `content` family is `white`/`gray-25`/`gray-50`). Recognizing
-   both as one generic `background` role would have collapsed two real, different surface concepts
-   dana's DS actually distinguishes — I chose to leave `chrome` unrecognized (honest gap) rather
-   than force it, per Art VIII and the explicit instruction not to guess a rule that fits one
-   project.
-3. **A related, resolved ambiguity I want to surface explicitly**: plan.md's compound-position rule
-   text ("`surface`=bg-family, `content`=fg-position … the POSITION morpheme decides position") read
-   literally would make bare `surface-content` resolve to **`foreground`**, contradicting the named
-   test's own expected `background`. I resolved this by reading "content decides position" as
-   applying only when attaching a *position field* to an already-established specific family (e.g.
-   `badge-danger-bg`/`-text`, where fg genuinely wins ties — pinned by test), while for the
-   background/foreground fallback itself (no specific family present), a bg-word among the
-   meaningful segments wins the **family** call, matching the named test and matching dana's real
-   `surface-content-hover`/`-active`/`-alt` (all light grays — genuinely background-shaped, not
-   text-shaped; tagging them `foreground` would have been backwards). This is a judgment call on an
-   internally ambiguous sentence in plan.md, made explicit here rather than silently baked in —
-   flagging per Art V in case the owner wants a different resolution.
+Dana's own recognized count moved from 154 (first pass, alias-only) → **232** (all tokens by name).
+The 126-token gap the coordinator measured lines up: `badge-danger-text` (`#FFFFFF`),
+`text-primary`/`text-secondary`/`text-heading`, `border-default`/`border-strong`/`border-subtle`,
+and dozens more of dana's literal-valued semantics are now recognized that were invisible before.
+
+### `surface-content` / `surface-chrome` — now resolved, not flagged
+
+Both now recognize as `background` on dana's real file: `surface-content` because fix 1 stopped
+skipping its literal `#FFFFFF` value, and both because fix 2's leading `surface-` prefix rule
+decides family outright ("later morphemes qualify WHICH surface, they don't flip it"). Pinned by a
+LIVE test. The prefix rule is grounded in the dictionary (Material's `on-`, shadcn's `-foreground`,
+and background/foreground being genuinely position-shaped roles across systems), not a one-project
+tune.
+
+### Genuine ambiguity, dana's real 10
+
+`badge-neutral-border`, `border-success`, `color-accent-border`, `color-info-border`,
+`color-success-border`, `color-warning-border`, `semantic-error-bg-subtle`,
+`semantic-info-border`, `semantic-success-border`, `semantic-warning-border`. All are real ties:
+e.g. `color-accent-border` has both `accent` (weight-2 self-name) and `border` (weight-2
+self-name) — genuinely undecidable by name alone (is this the accent family's border, or the
+border family generically tinted for accent state?). `semantic-error-bg-subtle` ties `error`
+(destructive synonym, weight 1) against `subtle` (muted synonym, weight 1) — the OLD design would
+have silently resolved this via an arbitrary priority order; now it's flagged for the owner to
+settle via `ds set-role` in Phase 2. None of these appeared in the pre-fix report because the old
+design either dropped them (primitive skip) or silently guessed one side of the tie.
+
+### Noise observation (not fixed, flagging for Phase 2 judgment)
+
+Recognition now runs on every token in the tree, not just `color` — so dana's 52 "genuinely
+unrecognized" list includes `dimension.space-4`, `dimension.radius-lg`, `font.font-family-sans`,
+`number.z-modal`, etc. None of these carry a role-shaped name, so they correctly land as
+unrecognized (honest, not a false positive) — but the list is noisier than a color-only scan would
+be. The instructions didn't ask for a `$type === "color"` filter and I didn't add one unasked; flag
+this in case a future phase wants to scope `unrecognized` to color tokens only for readability.
 
 ## Unresolved questions
 
-1. Should a future phase treat a hand-authored-literal token with a semantic-looking name (like
-   dana's `surface-content`) as a candidate for recognition anyway (e.g. "looks like a role but is
-   a primitive" warning), or is primitive-vs-alias the correct, permanent line? Currently: no —
-   strictly primitive-skip, per the contract as written.
-2. `surface-chrome`/`surface-overlay`-style domain-specific surface concepts (distinct from the
-   generic `background`) recur across real DSes (Atlassian's `elevation.surface.raised` vs
-   `.overlay` namespace split, cited in the dictionary). Is a richer surface taxonomy (chrome/scrim/
-   content as sub-roles) worth a future spec, or does usage-inference subsume it?
-3. Confirmed my dana recognized count (154) differs from the brainstorm's ~166 — flagging per the
-   brief rather than tuning the table to match; no action needed unless the owner wants the looser
-   (bare-position-word) rule reinstated, which would re-introduce the `citation-bg` mis-map risk.
+1. Should recognition scope to `$type: "color"` tokens only, to keep `unrecognized` legible (see
+   noise observation above)? Currently: no, runs on every token by name.
+2. The SCRIM TRAP negative check still runs ahead of the leading-prefix rule (`surface-overlay`
+   stays unrecognized, not `background`) — kept from the first pass since it wasn't asked to be
+   removed. Confirm this is the intended interaction, since fix 2's prefix rule is otherwise
+   unconditional.
+3. `border-success`-style ties (10 on dana) are real and will recur on any DS pairing a
+   component-state word with a family self-name. Phase 2's `ds set-role` is the intended
+   resolution path — confirming that's still the plan.
