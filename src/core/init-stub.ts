@@ -105,6 +105,21 @@ export interface InitManifest {
    * Present only when `status === "ready"`.
    */
   templateHashes?: Record<string, string>;
+  /**
+   * The host-model wrapper script `ui init` wrote for this runtime (spec 013 P1) —
+   * lets the learning loop's harvest/reflect step call the user's own host model
+   * with zero manual `DESIGN_OS_MODEL_CMD` config. Deliberately NOT part of
+   * `adapters[]` (adapter-wrapper-lint expects workflow/skill/AGENTS.md shapes).
+   * Present only when `status === "ready"`.
+   */
+  modelAdapter?: {
+    runtime: Runtime;
+    /** Manifest-relative (POSIX) path to the wrapper script, e.g. ".claude/design-os-model.sh". */
+    wrapper: string;
+    mode: "stdin" | "arg";
+    /** Date the invocation in model-adapter-registry.ts was last live-probed. */
+    verifiedAt: string;
+  };
 }
 
 /** @deprecated Use `InitManifest`. Kept for back-compat with pre-ready installs. */
@@ -125,6 +140,7 @@ const ROADMAP_POINTER =
  * @param input.status         "stub" (default) or "ready".
  * @param input.adapters       Relative paths of generated adapter files (ready only).
  * @param input.templateHashes sha256 per referenced template file (ready only).
+ * @param input.modelAdapter   Host-model wrapper record (spec 013 P1; ready only).
  */
 export function buildManifest(input: {
   runtime: Runtime;
@@ -134,6 +150,7 @@ export function buildManifest(input: {
   status?: "stub" | "ready";
   adapters?: string[];
   templateHashes?: Record<string, string>;
+  modelAdapter?: InitManifest["modelAdapter"];
 }): InitManifest {
   const status = input.status ?? "stub";
   const manifest: InitManifest = {
@@ -150,6 +167,9 @@ export function buildManifest(input: {
   }
   if (status === "ready" && input.templateHashes !== undefined) {
     manifest.templateHashes = input.templateHashes;
+  }
+  if (status === "ready" && input.modelAdapter !== undefined) {
+    manifest.modelAdapter = input.modelAdapter;
   }
   return manifest;
 }

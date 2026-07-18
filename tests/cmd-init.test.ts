@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { mkdirSync, existsSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, existsSync, rmSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { run } from "../src/cli.js";
 
 function captureRun(args: string[]): { code: number; out: string; err: string } {
@@ -348,5 +348,102 @@ describe("ui init next-step hint", () => {
     const { out } = captureRun(["init", "--runtime", "claude", "--cwd", cwd, "--json"]);
     const json = JSON.parse(out) as { data: { nextStep?: string } };
     expect(json.data.nextStep).toBe("generate");
+  });
+});
+
+// ── Model-adapter wrapper (spec 013 P1) ───────────────────────────────────────
+
+interface ManifestWithModelAdapter {
+  modelAdapter?: { runtime: string; wrapper: string; mode: string; verifiedAt: string };
+  adapters?: string[];
+}
+
+describe("ui init writes the model-adapter wrapper (spec 013 P1)", () => {
+  it("claude: .claude/design-os-model.sh exists, executable, shebang; manifest.modelAdapter mode 'stdin'", () => {
+    const cwd = makeTmpDir();
+    const { code } = captureRun(["init", "--runtime", "claude", "--cwd", cwd]);
+    expect(code).toBe(0);
+
+    const wrapperPath = join(cwd, ".claude", "design-os-model.sh");
+    expect(existsSync(wrapperPath)).toBe(true);
+    const stat = statSync(wrapperPath);
+    expect(stat.mode & 0o111).not.toBe(0);
+    const content = readFileSync(wrapperPath, "utf8");
+    expect(content.startsWith("#!/usr/bin/env sh")).toBe(true);
+
+    const manifest = JSON.parse(
+      readFileSync(join(cwd, ".claude", "ease-design.json"), "utf8"),
+    ) as ManifestWithModelAdapter;
+    expect(manifest.modelAdapter?.wrapper).toBe(".claude/design-os-model.sh");
+    expect(manifest.modelAdapter?.mode).toBe("stdin");
+    expect(manifest.modelAdapter?.runtime).toBe("claude");
+    // Not part of the adapters[] contract (adapter-wrapper-lint expects only
+    // workflow/skill/AGENTS.md shapes — see adapters/index.ts's doc comment).
+    expect(manifest.adapters?.some((p) => p.includes("design-os-model.sh"))).toBe(false);
+  });
+
+  it("codex: design-os-model.sh exists at cwd root, executable, shebang; manifest.modelAdapter mode 'stdin'", () => {
+    const cwd = makeTmpDir();
+    const { code } = captureRun(["init", "--runtime", "codex", "--cwd", cwd]);
+    expect(code).toBe(0);
+
+    const wrapperPath = join(cwd, "design-os-model.sh");
+    expect(existsSync(wrapperPath)).toBe(true);
+    const stat = statSync(wrapperPath);
+    expect(stat.mode & 0o111).not.toBe(0);
+    const content = readFileSync(wrapperPath, "utf8");
+    expect(content.startsWith("#!/usr/bin/env sh")).toBe(true);
+    expect(content).toContain("exec codex exec");
+
+    const manifest = JSON.parse(
+      readFileSync(join(cwd, "AGENTS.ease-design.json"), "utf8"),
+    ) as ManifestWithModelAdapter;
+    expect(manifest.modelAdapter?.wrapper).toBe("design-os-model.sh");
+    expect(manifest.modelAdapter?.mode).toBe("stdin");
+  });
+
+  it("antigravity: .agent/design-os-model.sh exists, executable, shebang, stdin→arg normalization; manifest.modelAdapter mode 'arg'", () => {
+    const cwd = makeTmpDir();
+    const { code } = captureRun(["init", "--runtime", "antigravity", "--cwd", cwd]);
+    expect(code).toBe(0);
+
+    const wrapperPath = join(cwd, ".agent", "design-os-model.sh");
+    expect(existsSync(wrapperPath)).toBe(true);
+    const stat = statSync(wrapperPath);
+    expect(stat.mode & 0o111).not.toBe(0);
+    const content = readFileSync(wrapperPath, "utf8");
+    expect(content.startsWith("#!/usr/bin/env sh")).toBe(true);
+    expect(content).toContain('prompt="$(cat)"');
+    expect(content).toContain('agy --dangerously-skip-permissions -p "$prompt"');
+
+    const manifest = JSON.parse(
+      readFileSync(join(cwd, ".agent", "ease-design.json"), "utf8"),
+    ) as ManifestWithModelAdapter;
+    expect(manifest.modelAdapter?.wrapper).toBe(".agent/design-os-model.sh");
+    expect(manifest.modelAdapter?.mode).toBe("arg");
+  });
+
+  it("--all writes all three wrappers + records each manifest's modelAdapter", () => {
+    const cwd = makeTmpDir();
+    const { code } = captureRun(["init", "--all", "--cwd", cwd]);
+    expect(code).toBe(0);
+
+    expect(existsSync(join(cwd, ".claude", "design-os-model.sh"))).toBe(true);
+    expect(existsSync(join(cwd, ".agent", "design-os-model.sh"))).toBe(true);
+    expect(existsSync(join(cwd, "design-os-model.sh"))).toBe(true);
+
+    const claudeManifest = JSON.parse(
+      readFileSync(join(cwd, ".claude", "ease-design.json"), "utf8"),
+    ) as ManifestWithModelAdapter;
+    const agManifest = JSON.parse(
+      readFileSync(join(cwd, ".agent", "ease-design.json"), "utf8"),
+    ) as ManifestWithModelAdapter;
+    const codexManifest = JSON.parse(
+      readFileSync(join(cwd, "AGENTS.ease-design.json"), "utf8"),
+    ) as ManifestWithModelAdapter;
+
+    expect(claudeManifest.modelAdapter?.mode).toBe("stdin");
+    expect(agManifest.modelAdapter?.mode).toBe("arg");
+    expect(codexManifest.modelAdapter?.mode).toBe("stdin");
   });
 });

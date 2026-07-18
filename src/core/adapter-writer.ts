@@ -13,6 +13,7 @@
  * stderr but does not change the error code.
  */
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -157,6 +158,7 @@ export function writeAdapterArtifacts(
       if (art.mode === "write") {
         mkdirSync(dirname(art.absPath), { recursive: true });
         writeFileSync(art.absPath, art.content, "utf8");
+        if (art.executable === true) chmodSync(art.absPath, 0o755);
         writtenThisRun.push(art.absPath);
         results.push({ path: art.absPath, written: true, replaced: existedBefore });
       } else {

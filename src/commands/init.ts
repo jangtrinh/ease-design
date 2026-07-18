@@ -44,6 +44,10 @@ import {
   findSentinelBlock,
 } from "../core/adapter-writer.js";
 import {
+  MODEL_ADAPTERS,
+  modelWrapperRelPath,
+} from "../core/model-adapter-registry.js";
+import {
   WORKFLOW_VERBS,
   SKILL_NAMES,
   JOURNEY_NAMES,
@@ -314,8 +318,14 @@ export const initCommand = {
         }
       }
 
+      // The model-adapter wrapper (spec 013 P1) is generated alongside the rest of
+      // the tree (so it shares the same write/rollback/collision pipeline below)
+      // but is excluded from `adapters[]` — see generateAdapter()'s doc comment.
+      const wrapperAbsPath = join(targetCwd, modelWrapperRelPath(entry.runtime));
+      const nonWrapperArtifacts = artifacts.filter((a) => a.absPath !== wrapperAbsPath);
+
       // Build relative adapter paths for the manifest
-      const adapterRelPaths = artifacts.map((a) => {
+      const adapterRelPaths = nonWrapperArtifacts.map((a) => {
         return a.absPath.startsWith(targetCwd)
           ? a.absPath.slice(targetCwd.length).replace(/^[\\/]/, "")
           : a.absPath;
@@ -329,6 +339,14 @@ export const initCommand = {
         status: "ready",
         adapters: adapterRelPaths,
         templateHashes,
+        modelAdapter: {
+          runtime: entry.runtime,
+          wrapper: modelWrapperRelPath(entry.runtime),
+          mode: MODEL_ADAPTERS[entry.runtime].mode,
+          // Date the invocations in model-adapter-registry.ts were live-probed
+          // (specs/013-host-model-fuel-line/plan.md's verified adapter table).
+          verifiedAt: "2026-07-18",
+        },
       });
 
       // Write the manifest first
@@ -380,7 +398,7 @@ export const initCommand = {
       });
       adapterResults.push({
         runtime: entry.runtime,
-        paths: artifacts.map((a) => a.absPath),
+        paths: nonWrapperArtifacts.map((a) => a.absPath),
       });
     }
 
@@ -405,7 +423,8 @@ export const initCommand = {
             : targetCwd;
         return (
           `manifest written: ${m.path}\n` +
-          `adapters written: ${adapterPaths.length} files under ${dir}`
+          `adapters written: ${adapterPaths.length} files under ${dir}\n` +
+          `model adapter: ${modelWrapperRelPath(m.runtime)} (${MODEL_ADAPTERS[m.runtime].mode})`
         );
       })
       .join("\n");
