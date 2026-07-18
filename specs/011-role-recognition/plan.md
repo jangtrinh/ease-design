@@ -14,11 +14,18 @@
 
 ## The recognition contract (measured, §8 of brainstorm)
 
-For each token in a DS (**recognition keys off the NAME, not the value form** — corrected
-2026-07-18; a role token may be literal-valued, e.g. dana's `surface-content: '#FFFFFF'`):
-1. **`{knownHue}-{number}`** (e.g. `blue-100`, `color-blue-100` — a palette scale / Tailwind
-   re-export, literal OR alias) → **no role.** The only skip. Not a UI role.
-2. **Every other token** → recognize the role by NAME from the counted dictionary:
+Recognition runs on **`$type: color` tokens only** (background/primary/danger are colour roles;
+`radius.button`, `font-size.md` are not — corrected 2026-07-18, they added noise).
+
+For each colour token (**recognition keys off the NAME, not the value form**; a role token may be
+literal-valued, e.g. dana's `surface-content: '#FFFFFF'`):
+1. **`{anyword}-{lightnessScale}`** — N in `{25,50,75,100,150,200,300,400,500,600,700,800,900,950}`
+   → **no role.** A palette scale step, whether the word is a known hue (`blue-500`) or a
+   role-named hue (`brand-500`, `accent-300`, `ink-600`). **Measured: 174 such tokens across 4
+   corpus projects** were being over-recognized as their role. The role lives in the un-numbered
+   semantic, not each step. Do NOT skip role tiers: `layer-01`/`field-01` (Carbon, `01`/`02`) and
+   Radix `accent-9` (`1`-`12`) — those numbers are disjoint from the lightness set and stay roles.
+2. **Every other colour token** → recognize the role by NAME from the counted dictionary:
    - **family role**: background · foreground · card · popover · primary · secondary · muted ·
      accent · border · input · ring · destructive · success · warning · info · neutral
    - **surface position**: `bg` vs `fg`/`text` (the paired axis F11 already handles)
