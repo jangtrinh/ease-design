@@ -46,17 +46,32 @@ detail. Read-only, deterministic, no model.
 - **LIVE (Art III)**: run on dana-desktop (real, → DEAD-LOOP) and VSF-PCP (real, → ALIVE). Paste
   both verdicts in the report. If dana isn't DEAD or VSF isn't ALIVE, that's a finding — report it.
 
-## Phase 2 — `ui init` wires the fuel line (so a fresh inject can evolve)
+## Phase 2 — wire the fuel line at DS-store creation (`ds init` AND `ds import`)
 
-- Write `design/heartbeat.json` — VSF's proven 5-task shape (`ds-a11y` 1d, `specimen` 1d,
-  `harvest` 12h, `reflect` 24h; `figma-audit` only if a figma file is known). By default (§6.2).
-- Scaffold `design/soul.md` (draft, `status: draft` — owner ratifies; never fabricate a stance).
-  If `/ui:learn` already drafts it from evidence, don't duplicate — wire the scaffold only when
-  absent.
-- Create `design/harvest-inbox/` (where harvest writes with no model adapter).
-- **Never** write fake insights/soul content. init makes the loop AVAILABLE; use fills it.
-- Test: after `ui init`, `design-os evolution` on the fresh project reports the loop is WIRED
-  (heartbeat present) though not yet FIRED (no events) — distinct from dead-loop.
+**Plan correction (measured 2026-07-18): the seam is `ds init`/`ds import`, NOT `ui init`.** `ui init`
+writes only the runtime adapter tree; it never creates `design/`. The fuel line lives in `design/`,
+which is born at `ds init`/`ds import`. Measured gaps:
+- `ds init` scaffolds a soul (`writeSoulScaffold`, `ds-init-impl.ts:250`) — but **`ds import` does
+  NOT**. dana was onboarded via `ds import` (the code road) → no soul. **That is why dana has no
+  soul.md.**
+- **Nothing writes `heartbeat.json`** — VSF's was hand-authored by the P5 gate. No project gets a
+  heartbeat at creation.
+
+The fix, at BOTH `ds init` and `ds import`:
+1. **Soul scaffold** — `ds import` gains `writeSoulScaffold` (draft, `status: draft`), same as
+   `ds init` already has. Closes the dana-no-soul gap. (Only when `soul.md` absent — `/ui:learn`'s
+   evidence-draft must not be clobbered.)
+2. **Default `heartbeat.json`** — both write it if absent: the Figma-independent tasks `ds-a11y`
+   (1d), `specimen` (1d), `harvest` (12h), `reflect` (24h). **NOT `figma-audit`** (needs a figma
+   file — omit from the default; add only when one is configured).
+3. **`harvest-inbox/`** — create the dir (where harvest writes with no model adapter).
+- **Never** fabricate soul content or insights. This makes the loop AVAILABLE; use fills it (the
+  mindset: scaffold, don't fake).
+- A static template file (heartbeat.json, soul scaffold) is deterministic — the kernel writing it
+  is fine (like the existing soul scaffold), and does not couple the kernel to the conductor's
+  runtime; it only seeds a config the conductor later reads.
+- Test: after `ds import`, `design-os evolution` reports the loop WIRED (heartbeat present, soul
+  scaffolded) though not yet FIRED (no events) — a distinct state from DEAD-LOOP.
 
 ## Phase 3 (Should, follow-up) — the dynamic gate
 inject → run a real slice (lints/audit) → `design-os evolution` shows the ledger diversified.
