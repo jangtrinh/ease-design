@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "a11y",
+      "type": "ds-a11y",
+      "interval": "1d"
+    },
+    {
+      "id": "specimen",
+      "type": "specimen",
+      "interval": "1d"
+    },
+    {
+      "id": "harvest",
+      "type": "harvest",
+      "interval": "12h"
+    },
+    {
+      "id": "reflect",
+      "type": "reflect",
+      "interval": "24h",
+      "params": {
+        "minEvents": 5
+      }
+    }
+  ]
+}

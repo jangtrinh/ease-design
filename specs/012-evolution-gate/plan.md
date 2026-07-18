@@ -73,9 +73,16 @@ The fix, at BOTH `ds init` and `ds import`:
 - Test: after `ds import`, `design-os evolution` reports the loop WIRED (heartbeat present, soul
   scaffolded) though not yet FIRED (no events) — a distinct state from DEAD-LOOP.
 
-## Phase 3 (Should, follow-up) — the dynamic gate
-inject → run a real slice (lints/audit) → `design-os evolution` shows the ledger diversified.
-Needs the heartbeat/harvest to run; E2E, its own follow-up.
+## Phase 3 (Should) — the dynamic gate — **BUILT 2026-07-18** (`phase-03-dynamic-gate.md`)
+The uncovered half was TRANSITION, not a "real slice": every existing test reads a static
+store; none walks one store as work accrues. The gate does — WIRED → (mechanical work) WIRED
+[the anti-lie] → (heartbeat fired, no model) DEAD-LOOP → (an insight lands) ALIVE — driving the
+real `design-os evolution` CLI at each rung. Deterministic/hermetic (no model needed); the
+harvest→insight *producer* chain stays covered by test_command_harvest/heartbeat_runner_harvest.
+Measured real-data run (Art III): real dana import → WIRED; real heartbeat fire with no model →
+DEAD-LOOP (a11y/specimen run `ok` but record nothing; harvest/reflect skip). The sobering
+finding it encodes: **wiring alone doesn't evolve a loop; reaching ALIVE needs real work AND a
+model adapter.**
 
 ## Risks
 | Risk | Mitigation |

@@ -1,0 +1,28 @@
+{
+  "changelog": [
+    {
+      "by": "ui ds init",
+      "kind": "init",
+      "note": "compiled from persona=data-dense-observatory",
+      "ts": "2026-07-18T16:09:51.638Z"
+    }
+  ],
+  "compiledHash": "sha256-YhknDll3nhoq4r8rBHC0poYJWRa0OF8awQ6OBumzFkA",
+  "createdAt": "2026-07-18T16:09:51.637Z",
+  "generation": 1,
+  "intent": "settings screen for a desktop app: API key management, model selection, theme toggle",
+  "name": "brandkit",
+  "persona": {
+    "antiPatterns": [
+      "decorative images",
+      "large whitespace",
+      "playful aesthetics",
+      "rounded pill buttons",
+      "serif fonts"
+    ],
+    "family": "functional-saas",
+    "slug": "data-dense-observatory"
+  },
+  "registryHash": "sha256-iTZrnVLR_364De8qKNMveNQ0OBMw1YCtUedbE2gEaHY",
+  "version": "1.0.0"
+}
