@@ -23,8 +23,12 @@ For each token in a DS:
      accent · border · input · ring · destructive · success · warning · info · neutral
    - **surface position**: `bg` vs `fg`/`text` (the paired axis F11 already handles)
    - Store `$extensions["design-os.role"] = "<family>"` (+ position where it disambiguates a pair).
-   - A semantic token matching NO family → leave unannotated, list in the "unrecognized" report
-     (honesty — do not force a role).
+   - **Family disambiguation (prefix-priority, corrected 2026-07-18)**: a leading `surface-`/`bg-`
+     → background; leading `text-`/`fg-`/`on-` → foreground (Material `on-surface`, dana
+     `surface-content`); else strongest family morpheme + position morpheme. A token STILL matching
+     two families with no prefix winner → the `ambiguous` list (owner resolves via `ds set-role`),
+     NOT a guessed role.
+   - A token matching NO family → `unrecognized` (honesty — do not force a role).
 
 ## Seams under test
 
