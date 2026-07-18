@@ -55,13 +55,14 @@ contract (packet on stdin, argv is fixed config). A guessed invocation = a silen
   has all 3; `init --runtime {claude,codex,antigravity}` writes an executable wrapper + manifest
   `modelAdapter`; the arg-mode wrapper (agy) contains the stdin→arg normalization, the stdin ones
   don't; `--all` writes all three. A wrapper-shape lint (like the existing adapter-wrapper-lint) if cheap.
-- **P2** — Python: `resolve_model_cmd` reads the manifest (env still wins); harvest/heartbeat pick up
-  the wrapper with NO env set. **Tests**: a project with a wired manifest → `resolve_model_cmd`
-  returns the wrapper argv; env override still wins; multi-manifest host-detection picks correctly;
-  no manifest → None.
-- **P3 (Art III)** — LIVE end-to-end: `ui init --runtime claude` on a scratch project with a design
-  store + a real report, run `design-os harvest` with **NO `DESIGN_OS_MODEL_CMD` in env** → the
-  wrapper is used, a real insight lands, `design-os evolution` → ALIVE. The whole point, proven once.
+- **P2 (DONE)** — Python: `resolve_model_cmd(project_dir)` reads the manifest (env still wins); all
+  three call sites (harvest, heartbeat harvest, heartbeat reflect) pass `project_dir`. 6 new tests
+  (manifest wrapper resolved; env override wins; no manifest → None; missing wrapper file → None;
+  running host marker wins; declared order breaks the tie). Full design-os suite 263 green.
+- **P3 (DONE, Art III)** — LIVE end-to-end proved: `ui init --runtime claude` → `ds init` store →
+  a real report → `design-os harvest` with **NO `DESIGN_OS_MODEL_CMD` in env** → the wrapper
+  (`exec claude -p`) was auto-used, 1 real insight landed, `design-os evolution` → **ALIVE**. A
+  freshly-injected project reaches ALIVE with zero manual model config. The whole point, proven.
 
 ## Constraints & risks
 - Art I: the kernel writing a static wrapper + manifest field is deterministic (like the existing

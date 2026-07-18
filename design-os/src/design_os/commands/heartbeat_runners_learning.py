@@ -70,7 +70,7 @@ def _run_harvest(project_dir: Path, params: dict[str, Any]) -> dict[str, Any]:
         return {"status": "skipped", "summary": {}, "detail": "", "skipReason": "no-new-reports"}
 
     packet = harvest_core.build_packet(_PROMPT_PATH.read_text(encoding="utf-8"), to_harvest)
-    cmd = resolve_model_cmd()
+    cmd = resolve_model_cmd(project_dir)
     if cmd is None:
         _write_inbox(project_dir, packet, to_harvest)
         return {"status": "skipped", "summary": {}, "detail": "", "skipReason": "no-model-adapter"}
@@ -176,7 +176,7 @@ def _run_reflect(project_dir: Path, params: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(packet, dict) or "instruction" not in packet:
         return {"status": "error", "summary": {"failures": 1}, "detail": "reflect: `recall reflect` printed no valid packet"}
     prompt = reflect_core.build_reflect_prompt(packet)
-    cmd = resolve_model_cmd()
+    cmd = resolve_model_cmd(project_dir)
     if cmd is None:
         return {"status": "skipped", "summary": {}, "detail": "", "skipReason": "no-model-adapter"}
 

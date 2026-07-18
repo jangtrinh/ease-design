@@ -114,7 +114,7 @@ def harvest(
         _skip(dir_, json_, reason="emit-packet", deferred=deferred, reports_read=len(to_harvest), packet=path)
         return
 
-    cmd = resolve_model_cmd()
+    cmd = resolve_model_cmd(dir_)
     if cmd is None:
         path = _write_inbox(dir_, packet, to_harvest)
         _skip(dir_, json_, reason="no-model-adapter", deferred=deferred, reports_read=len(to_harvest), packet=path)
