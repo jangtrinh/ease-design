@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ease-design/schemas/qualification-record.schema.json",
+  "title": "ease-design qualification record",
+  "type": "object",
+  "required": ["kind", "version", "contractRef", "attempt", "status", "machineGates", "renderedViewports", "mustCriteria", "unsupportedClaimCount", "unresolvedFindings"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": { "const": "qualification-record" },
+    "version": { "const": 1 },
+    "contractRef": { "type": "string", "minLength": 1 },
+    "attempt": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "status": { "enum": ["QUALIFIED", "DRAFT_WITH_CONCERNS", "BLOCKED_BY_EVIDENCE"] },
+    "machineGates": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["name", "passed"], "additionalProperties": false,
+        "properties": { "name": { "type": "string" }, "passed": { "type": "boolean" } }
+      }
+    },
+    "renderedViewports": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+    "mustCriteria": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["id", "covered"], "additionalProperties": false,
+        "properties": { "id": { "type": "string" }, "covered": { "type": "boolean" } }
+      }
+    },
+    "unsupportedClaimCount": { "type": "integer", "minimum": 0 },
+    "unresolvedFindings": { "type": "array", "items": { "type": "string" } },
+    "blocker": { "type": "string" }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "kind": "generation-contract",
+  "version": 1,
+  "briefRef": "design-brief-valid.json",
+  "direction": {
+    "thesis": "Scale learning while preserving creator voice",
+    "structure": "Editorial landing page",
+    "focalMechanism": "Central creator campaign",
+    "signatureDevice": "Campaign evidence orbit",
+    "risk": "Evidence cards may overpower the message"
+  },
+  "sections": ["Hero", "System", "Method", "Reporting", "CTA"],
+  "viewports": [1440, 768, 390],
+  "requiredGates": ["validate-layout", "a11y-lint", "taste-lint", "content-lint", "ds-usage-lint", "ds-a11y"],
+  "output": "html"
+}

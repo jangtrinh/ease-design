@@ -1,0 +1,20 @@
+{
+  "kind": "design-brief",
+  "version": 1,
+  "rawRequest": "Build this website",
+  "surface": "marketing-landing",
+  "audience": "Consumer growth teams",
+  "context": "Planning a creator-commerce campaign",
+  "primaryOutcome": "Choose a credible campaign workflow",
+  "primaryAction": "Start a campaign",
+  "requiredContent": ["Positioning", "Campaign workflow", "Reporting", "Call to action"],
+  "constraints": ["Original adaptation", "Responsive"],
+  "prohibitedClaims": ["Customer logos", "Guaranteed conversion lift"],
+  "criteria": [
+    { "id": "must-cta", "priority": "must", "text": "Primary action is visible at every canonical viewport" },
+    { "id": "must-proof", "priority": "must", "text": "No unsupported proof appears" }
+  ],
+  "assumptions": [
+    { "facet": "audience", "value": "Consumer growth teams", "provenance": "inferred", "confidence": "medium" }
+  ]
+}

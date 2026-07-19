@@ -1,0 +1,19 @@
+{
+  "kind": "qualification-record",
+  "version": 1,
+  "contractRef": "generation-contract-valid.json",
+  "attempt": 1,
+  "status": "QUALIFIED",
+  "machineGates": [
+    { "name": "validate-layout", "passed": true },
+    { "name": "a11y-lint", "passed": true },
+    { "name": "taste-lint", "passed": false },
+    { "name": "content-lint", "passed": true },
+    { "name": "ds-usage-lint", "passed": true },
+    { "name": "ds-a11y", "passed": true }
+  ],
+  "renderedViewports": [1440, 390],
+  "mustCriteria": [{ "id": "must-cta", "covered": false }],
+  "unsupportedClaimCount": 1,
+  "unresolvedFindings": ["Mobile CTA collision"]
+}

@@ -68,6 +68,17 @@ const STDIN_FILE: PositionalSignature = {
 // ─── The table ────────────────────────────────────────────────────────────────
 
 export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
+  delivery: {
+    summary: "Validate Qualified Delivery contracts and verdicts",
+    subcommands: {
+      validate: {
+        summary: "Validate a design brief, generation contract, or qualification record",
+        positionals: [{ name: "<file.json>", required: true, summary: "Qualified Delivery artifact" }],
+        flags: [],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "FILE_NOT_FOUND", "READ_ERROR", "BAD_DELIVERY"],
+      },
+    },
+  },
   color: {
     summary: "OKLCH color math",
     subcommands: {
