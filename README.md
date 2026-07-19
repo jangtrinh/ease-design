@@ -14,7 +14,7 @@
 
 <p align="center"><sub>
 <code>v0.1.0</code> · Node ≥ 20 · MIT · zero-dependency <code>ui</code> kernel ·
-1,891 tests green · 26 personas · a 27-component kit · four deterministic linters ·
+2,173 tests green · 26 personas · a 27-component kit · four deterministic linters ·
 a 1:1 Figma mirror
 </sub></p>
 
@@ -72,7 +72,7 @@ The whole tool fits in six moves. Everything else is depth on demand.
 
 | Verb | What it does |
 | --- | --- |
-| `/ui:generate <intent>` | Fresh design from plain words. Personas picked, DS compiled, variants scored through the gate before you see them. |
+| `/ui:generate <intent>` | Weak intent compiled into a typed brief and generation contract; one candidate is rendered, repaired, and delivered by qualification status. |
 | `/ui:learn` | Brownfield onboarding — compile the DS from **your project's own evidence** (code, a URL, or Figma) instead of a persona default. |
 | `/ui:iterate` · `/ui:refine` | Tweak in plain words; surgical line-diffs, re-scored; the DS hash-seal stays intact. |
 | `/ui:from-url <url>` | Extract a live site's design system into a portable folder (spec + tokens + audit). |
@@ -126,10 +126,52 @@ Then open your agent CLI in that project and type:
 /ui:generate a pricing page for a developer-tools SaaS — 3 tiers, dark theme
 ```
 
-That's the whole loop: **describe → pick → refine.** Have an existing app? Run
+That's the whole loop: **describe → compile → qualify.** Have an existing app? Run
 `/ui:learn` first so the DS is compiled from your product's own evidence.
 
 > Once published to npm, a global install replaces the clone-and-link step.
+
+---
+
+## Qualified Delivery
+
+A better prompt improves the first draft. It does not prove the draft is ready.
+`/ui:generate` now treats generation as a typed, evidence-bearing release process:
+
+```text
+raw request
+  → design-brief.json
+  → generation-contract.json
+  → candidate + 1440/768/390 renders
+  → qualification-record.json
+  → QUALIFIED | DRAFT_WITH_CONCERNS | BLOCKED_BY_EVIDENCE
+```
+
+The host model owns design reasoning. The zero-dependency `ui` kernel only validates
+contracts and rejects false-green verdicts:
+
+```sh
+ui delivery validate design-brief.json
+ui delivery validate generation-contract.json
+ui delivery validate qualification-record.json
+```
+
+`QUALIFIED` is deliberately difficult to emit. It requires:
+
+- all six declared static gates passing;
+- rendered evidence at desktop, tablet, and mobile widths;
+- every Must acceptance criterion covered;
+- zero unsupported claims;
+- zero unresolved findings.
+
+The repair loop is capped at three attempts. Missing rendered evidence never silently
+passes; the result remains `DRAFT_WITH_CONCERNS`. Automated checks narrow known failure
+classes—they do not claim WCAG conformance, desirability, or business performance.
+
+The schemas are public contracts:
+[design brief](schemas/design-brief.schema.json) ·
+[generation contract](schemas/generation-contract.schema.json) ·
+[qualification record](schemas/qualification-record.schema.json).
 
 ---
 
@@ -209,7 +251,7 @@ commit** — prose-only rules drift; enforced rules hold.
 flowchart LR
     U["You — plain words"] --> HM["Host model<br/>Claude Code · Codex · Antigravity<br/>16 /ui:* workflows"]
     HM -- reads --> K["knowledge/<br/>taste rubric · 26 personas · figma-craft<br/>page-structures · color science"]
-    HM -- shells out --> UI["ui kernel — 28 deterministic commands<br/>ds · tokens · color · 4 linters · vr · memory"]
+    HM -- shells out --> UI["ui kernel — 29 deterministic commands<br/>delivery · ds · tokens · color · 4 linters · vr · memory"]
     HM -- orchestrates --> DOS["design-os conductor<br/>doctor · audit · reference · vr-matrix · update"]
     DOS -- verbatim envelopes --> UI
     DOS --> FA["figma-agent hand<br/>WS broker 9410 · multi-file"]
@@ -387,16 +429,16 @@ bring changes, audits, and evidence to the file.**
 ## How the loop works, mechanically
 
 1. **You describe intent** → `/ui:generate landing page for a new gym`.
-2. **Personas + DS compile** — the model scores intent against 26 personas, picks a
-   diverse top-K; `ui ds init` compiles semantic paired tokens + the component registry +
-   a hash-sealed manifest, emitting a Tailwind `@theme` the HTML consumes as utilities.
-3. **Variants come back** — each from a different persona; the critique gate scores them
-   *before* you see them; failures regenerate. The page **shape** is picked first
-   (`knowledge/page-structures.md` — 21 macrostructures, honest copy, no invented
-   metrics), the dress second.
-4. **You refine in plain words** — edits apply surgically; the gate re-scores; the DS
-   hash-seal keeps refinements on-system.
-5. **Memory compounds** — decisions land in the ledger; `recall query` primes the next
+2. **Intent compiles** — the raw request is preserved in a provenance-tagged brief with
+   outcome, action, constraints, prohibited claims, and evaluable Must criteria.
+3. **The generation contract locks direction** — page structure, focal mechanism,
+   signature device, sections, canonical viewports, and required gates are validated
+   before code.
+4. **One candidate earns delivery** — static gates run first; desktop/tablet/mobile
+   renders feed an isolated curator; the worst finding is repaired for at most three rounds.
+5. **Status stays honest** — only clean evidence emits `QUALIFIED`; unresolved work remains
+   `DRAFT_WITH_CONCERNS` or `BLOCKED_BY_EVIDENCE`.
+6. **Memory compounds** — decisions land in the ledger; `recall query` primes the next
    job; `recall reflect` distills the lesson at the end. Neither ever calls a model.
 
 ---
@@ -407,6 +449,7 @@ The recent wave, newest first — full history in [CHANGELOG.md](CHANGELOG.md).
 
 | Date | Change | Commit |
 |---|---|---|
+| 2026-07-19 | **Qualified Delivery (Spec 014 P0)** — weak prompt → provenance-tagged brief → generation contract → canonical renders → bounded repair → honest delivery status; `ui delivery validate` blocks false `QUALIFIED` verdicts | `59686cd` |
 | 2026-07-16 | **Figma mirror (1:1)** — each component's registry record is a rebuildable reflection of its Figma node; `mirror-verify` proves the scan→rebuild→scan **fixed point** live (bindings by publish key, instances, variant swaps, inner overrides), `equal:true` across a real 27-screen DS. Plus a per-operation activity feed in the plugin panel | `b9b7255`…`7959464` |
 | 2026-07-16 | **Figma live-sync** — `documentchange` → append-only ledger → 5-min idle → 1-click panel Sync → `reconcile --apply`; the registry follows the canvas near-real-time | `#34`…`#38` |
 | 2026-07-15 | **Journey skills** — `design-os-{onboard,daily,deliver}`: the full user journey as three installable skills (entry router, audit disambiguation, delivery playbook), all skills renamed `design-os-*`, command-consistency + drift linters | *(this commit)* |
@@ -437,6 +480,10 @@ production 27-screen design system (9/9 diverse components round-trip to `equal:
 every remaining gap was a real bug caught on the live canvas, not a fixture).
 
 Still open, stated plainly:
+
+- **Qualified Delivery calibration** — the deterministic contract and known-bad false-green
+  fixtures ship for marketing/landing surfaces. Independent blind runs, human reviewer
+  agreement, and dashboard/app/flow corpora remain before any repeatable “world-class” claim.
 
 - **`figma-agent audit-ds` live acceptance** — unit-tested + fixture-proven; the
   ground-truth comparison against a hand-classified 129-component audit runs on the next
