@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-21 - Suite-level IMPROVING graduation gate
+
+- Changed: the living-agent proof grants `IMPROVING` only from a preregistered suite —
+  at least three holdout cases across at least two categories, mean curator delta ≥ +10,
+  aggregate repair reduction ≥ 25%, aggregate repeated-correction reduction ≥ 70%, every
+  case wins, zero regressions. A single qualifying comparison can no longer graduate; the
+  deterministic engine computes the suite verdict itself.
+- Fixed: a `0 → 0` metric is no longer reported as 100% improvement (zero-denominator
+  reductions are undefined and never graduate).
+- The verdict is unchanged — DESIGN:OS remains `APPLIED`. Thresholds were not weakened and
+  the deterministic boundary is intact.
+
 ## 2026-07-21 - GSAP motion direction skill
 
 - Added `design-os-gsap-motion`, distributed by `ui init` to Claude Code, Antigravity, and Codex.

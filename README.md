@@ -712,6 +712,7 @@ The recent wave, newest first — full history in [CHANGELOG.md](CHANGELOG.md).
 
 | Date | Change | Commit |
 |---|---|---|
+| 2026-07-21 | **Suite-level IMPROVING gate** — the living-agent proof graduates only from a preregistered suite (≥3 holdouts across ≥2 categories, mean +10, aggregate repair/recurrence reductions, every case wins); a single comparison can no longer graduate and a 0→0 metric no longer reads as 100%. Verdict stays `APPLIED` | `591016c` |
 | 2026-07-21 | **Interaction boundary benchmark** — animated DESIGN:OS, native-mobile Nutrition, and premium Architecture treatments with desktop/mobile renders and honest claim boundaries | `b706b8e`…`f1ee62f` |
 | 2026-07-21 | **Official GSAP motion skill** — advanced web choreography, ScrollTrigger, lifecycle cleanup, plugin restraint, reduced-motion and performance evidence; adapted from GreenSock's MIT skill suite | `982c30b` |
 | 2026-07-19 | **Qualified Delivery (Spec 014 P0)** — weak prompt → provenance-tagged brief → generation contract → canonical renders → bounded repair → honest delivery status; `ui delivery validate` blocks false `QUALIFIED` verdicts | `59686cd` |

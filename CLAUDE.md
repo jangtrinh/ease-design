@@ -37,6 +37,29 @@ The rules below summarize repo practice; the constitution wins on conflict.
   brainstorm); do not relitigate them. The pre-spec-kit brainstorm archive is
   single-machine under `plans/` and may not exist on every clone.
 
+## Post-merge documentation protocol (README + changelog)
+
+A merge to `main` is **not done** until the README and changelog reflect it. Run this as the
+final step of any task that merges — ideally BEFORE the merge commit so it ships in the same push
+(if already pushed, backfill in a follow-up commit). README carries two jobs on different clocks:
+a slow, taste-sensitive **marketing body** and a fast, mechanical **changelog** — never mix them.
+
+1. **Classify the merge** (significance gate — most merges stop cheaply here):
+   - **INTERNAL** — refactor/fix with no user- or agent-visible change, no story change → update nothing.
+   - **USER-VISIBLE** — observable behavior, flags, or output changed → changelog only.
+   - **STORY-CHANGING** — a new capability, a proof-level/claim change, a new demo, or a brand change
+     → changelog **and** README marketing body.
+2. **Act by class:**
+   - USER-VISIBLE / STORY-CHANGING → append a dated entry to `CHANGELOG.md` (newest first,
+     Keep-a-Changelog verbs) **and** add a top row to the README `## Changelog` recent-wave table
+     (`Date | Change | Commit`). Keep that table to the recent wave; retire old rows to `CHANGELOG.md`.
+     This path is mechanical (Sonnet-tier).
+   - STORY-CHANGING **only** → also edit the README **marketing body** (hero, proof narrative, demos).
+     This surface is taste-sensitive: Opus edits, Fable audits against `brand/` + `knowledge/taste-rubric.md`.
+     Never let changelog noise leak into the marketing body.
+3. Marketing prose is expensive; the gate exists so only story-changing merges pay for it. When in
+   doubt between USER-VISIBLE and STORY-CHANGING, do the changelog line and ask before touching the hero.
+
 ## Hard-won rules (from the dogfood loop — each cost a real bug)
 
 - **A standard needs an emitter AND a linter.** Prose-only standards drift — our own compiler
