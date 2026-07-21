@@ -71,6 +71,8 @@ The orchestrated workflow won all three categories with no critical visual failu
 confidence was 0.91-0.97 per case. The mean blind lift over the non-orchestrated candidates was
 1.77 points.
 
-This passes the first independent-category gate. It does not yet pass the repeatability gate:
-each workflow still needs at least three fresh generations per case, followed by the same blind
-evaluation.
+This passed the first independent-category gate. The later orchestrated-only repeatability study
+completed three fresh generations per case and scored 8.96/10 with 0.25 population standard
+deviation. It passed the blind visual thresholds but did not earn an unguarded production-default
+verdict because deterministic audit found two mobile overflow failures and repeated binary-rule
+misses. See `repeatability-study/result.md`.

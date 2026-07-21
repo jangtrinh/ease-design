@@ -62,10 +62,82 @@ capture.
   </tr>
 </table>
 
-The independent blind visual audit scored the set **8.96 / 10** with **0.25 population
-standard deviation**. The study also exposed deterministic compliance gaps, including two mobile
-overflow failures, which are retained as test evidence rather than hidden. See the
-[repeatability result](experiments/world-class-benchmark/evidence/repeatability-study/result.md)
+### The actual prompts
+
+The user prompts were intentionally short. DESIGN:OS did not receive a polished creative brief:
+
+```text
+Architecture: Build a premium site-specific residential architecture landing page.
+Nutrition: Build an AI nutrition experience that helps someone understand a meal.
+Planning: Build a planning SaaS landing page for connected decision context.
+```
+
+Before implementation, DESIGN:OS compiled each sentence into the generation packet the host model
+actually received. The product-specific audience, outcome, and action changed per case; the
+orchestration contract below stayed fixed:
+
+```yaml
+directions: 3
+selectBy: topic fit, evidence strength, execution risk, convergence risk
+regions: [hero, proof, context, process-or-connection, conclusion]
+eachRegionMustDeclare:
+  - purpose and narrative role
+  - distinct layout family
+  - composition anchor and hierarchy event
+  - visual type and rationale
+  - responsive transformation
+  - craft investment
+imagery:
+  - plan section-specific image prompts before implementation
+  - use purposeful evidence where CSS would become a placeholder
+  - keep labels, controls, data, and product state as live HTML
+hero:
+  - fit message, action, and primary demonstration in the initial desktop viewport
+  - show hierarchy, state, and consequence
+depth: preserve topic specificity and design investment through the conclusion
+composition: test content-led and golden-ratio candidates; release the ratio when content fails
+preflight:
+  - no placeholder primary visual
+  - no generated fake product screenshot
+  - no repeated section shell without rationale
+  - no quality decline toward the footer
+```
+
+Nothing is hidden behind a marketing paraphrase. Read the exact packets for
+[Architecture](experiments/world-class-benchmark/evidence/repeatability-study/run-packets/d01-orchestrated-r1.json),
+[Nutrition](experiments/world-class-benchmark/evidence/repeatability-study/run-packets/d02-orchestrated-r1.json),
+and [Planning](experiments/world-class-benchmark/evidence/repeatability-study/run-packets/d03-orchestrated-r1.json).
+
+### Why this is our best-performing method
+
+A longer prompt is not the advantage. The advantage is converting vague intent into decisions the
+builder and curator can verify:
+
+1. **Product truth before styling.** Audience, outcome, action, and prohibited claims constrain
+   what the page must communicate.
+2. **Divergence before convergence.** Three structural directions are compared before one visual
+   language becomes expensive to change.
+3. **Every section has a job.** Region contracts prevent the familiar strong-hero, weak-footer
+   quality collapse.
+4. **Visual evidence is planned.** Image prompts, aspect ratios, crop behavior, and narrative jobs
+   are decided before imagery is generated or sourced.
+5. **Product truth stays editable.** Controls, labels, data, and states remain live HTML rather
+   than being flattened into a convincing but unusable generated screenshot.
+6. **Qualification requires evidence.** Desktop/mobile renders and deterministic gates can reject
+   work the model would otherwise describe as finished.
+
+In the controlled three-way study, orchestration beat raw prompting and prompt enhancement in all
+three categories. Independent blind review measured a **1.77-point mean lift** over the strongest
+non-orchestrated candidate. The follow-up repeatability study scored nine fresh orchestrated runs
+at **8.96 / 10** with **0.25 population standard deviation**.
+
+That makes orchestration the best-performing method **in the workflows tested here**, not a claim
+that DESIGN:OS is universally best. The same study exposed binary-rule misses and two mobile
+overflow failures. Those failures are public because the next product improvement is a
+deterministic repair gate, not a stronger adjective.
+
+Full evidence: [controlled comparison](experiments/world-class-benchmark/evidence/controlled-three-way-comparison.md),
+[repeatability result](experiments/world-class-benchmark/evidence/repeatability-study/result.md),
 and [blind curator report](experiments/world-class-benchmark/evidence/repeatability-study/blind-curation/report.md).
 
 ---
