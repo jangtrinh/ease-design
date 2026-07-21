@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/readme/design-os-logo.png" width="112" alt="DESIGN:OS orange spherical mark" /></p>
+
 <h1 align="center">DESIGN:OS</h1>
 
 <p align="center"><b>Describe what you want in plain words — get production-grade, on-system UI back.</b></p>
@@ -9,7 +11,7 @@
   [<a href="#the-agent-learns-in-the-work">Living proof</a>] ·
   [<a href="#advanced-motion-direction">Motion</a>] ·
   [<a href="#built-by-the-studio-behind-designos">Studio gallery</a>] ·
-  [<a href="#workflow-map--every-way-in-every-way-out">Workflow map</a>] ·
+  [<a href="#workflow-map--current-generation-and-learning-loop">Workflow map</a>] ·
   [<a href="#the-machine-floor">The machine floor</a>] ·
   [<a href="#the-figma-hand">The Figma hand</a>] ·
   [<a href="#changelog">Changelog</a>]
@@ -41,37 +43,12 @@ responsive composition, and topic-specific material studies. Open the
 [interactive page](specs/018-improving-proof-benchmark/runs/architecture-premium-service/index.html)
 or watch the [full-quality video](specs/018-improving-proof-benchmark/runs/architecture-premium-service/demo/architecture-demo.mp4).
 
-Nine untouched first deliveries from three independent orchestrated runs per brief. Each run
-received the same product intent and DESIGN:OS generation contract, then produced its own layout,
-responsive behavior, imagery, and live interactions. No manual visual repair was applied before
-capture.
-
-<table>
-  <tr>
-    <th colspan="3">Architecture</th>
-  </tr>
-  <tr>
-    <td width="33%"><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d01-orchestrated-r1/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d01-orchestrated-r1/preview.webp" alt="Architecture generation 1: editorial mountain-home landing page with site study and construction narrative" /></a></td>
-    <td width="33%"><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d01-orchestrated-r2/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d01-orchestrated-r2/preview.webp" alt="Architecture generation 2: mountain residence landing page with terrain analysis and human ritual sections" /></a></td>
-    <td width="33%"><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d01-orchestrated-r3/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d01-orchestrated-r3/preview.webp" alt="Architecture generation 3: site-led residential studio page with photographic proof and process accordion" /></a></td>
-  </tr>
-  <tr>
-    <th colspan="3">Nutrition</th>
-  </tr>
-  <tr>
-    <td><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d02-orchestrated-r1/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d02-orchestrated-r1/preview.webp" alt="Nutrition generation 1: food-first meal analysis page with contextual next actions" /></a></td>
-    <td><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d02-orchestrated-r2/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d02-orchestrated-r2/preview.webp" alt="Nutrition generation 2: calm meal-reading experience with visual balance explanation" /></a></td>
-    <td><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d02-orchestrated-r3/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d02-orchestrated-r3/preview.webp" alt="Nutrition generation 3: responsive meal guidance landing page with selectable intent states" /></a></td>
-  </tr>
-  <tr>
-    <th colspan="3">Planning</th>
-  </tr>
-  <tr>
-    <td><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d03-orchestrated-r1/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d03-orchestrated-r1/preview.webp" alt="Planning generation 1: dark decision-context product page with live planning graph" /></a></td>
-    <td><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d03-orchestrated-r2/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d03-orchestrated-r2/preview.webp" alt="Planning generation 2: editorial planning system page showing linked outcomes, owners, signals, and reasoning" /></a></td>
-    <td><a href="experiments/world-class-benchmark/evidence/repeatability-study/runs/d03-orchestrated-r3/index.html"><img src="experiments/world-class-benchmark/evidence/repeatability-study/runs/d03-orchestrated-r3/preview.webp" alt="Planning generation 3: connected execution landing page with decision trail and consequence map" /></a></td>
-  </tr>
-</table>
+The earlier repeatability study remains available as evidence, but its nine static captures are
+temporarily removed from this README. Browse the runnable
+[Architecture](experiments/world-class-benchmark/evidence/repeatability-study/runs/d01-orchestrated-r1/index.html),
+[Nutrition](experiments/world-class-benchmark/evidence/repeatability-study/runs/d02-orchestrated-r1/index.html),
+and [Planning](experiments/world-class-benchmark/evidence/repeatability-study/runs/d03-orchestrated-r1/index.html)
+families or read the [repeatability result](experiments/world-class-benchmark/evidence/repeatability-study/result.md).
 
 ### Interaction boundary benchmark
 
@@ -97,7 +74,7 @@ Full-quality recordings: [DESIGN:OS](specs/018-improving-proof-benchmark/runs/de
 [Nouri](specs/018-improving-proof-benchmark/runs/nutrition-native-mobile/demo/nutrition-native-mobile.mp4),
 and [Rill Architecture](specs/018-improving-proof-benchmark/runs/architecture-premium-service/demo/architecture-demo.mp4).
 
-### The actual prompts
+### Prompts used in the repeatability study
 
 The user prompts were intentionally short. DESIGN:OS did not receive a polished creative brief:
 
@@ -138,10 +115,23 @@ preflight:
   - no quality decline toward the footer
 ```
 
-Nothing is hidden behind a marketing paraphrase. Read the exact packets for
+Nothing is hidden behind a marketing paraphrase. Read the exact historical packets for
 [Architecture](experiments/world-class-benchmark/evidence/repeatability-study/run-packets/d01-orchestrated-r1.json),
 [Nutrition](experiments/world-class-benchmark/evidence/repeatability-study/run-packets/d02-orchestrated-r1.json),
 and [Planning](experiments/world-class-benchmark/evidence/repeatability-study/run-packets/d03-orchestrated-r1.json).
+
+The current interaction-boundary benchmark deliberately changed two surfaces. Its raw requests
+were:
+
+```text
+DESIGN:OS: Build a promotional page for DESIGN:OS and push interaction and animation craft.
+Nutrition: Build a native mobile nutrition interface, not a responsive website.
+Architecture: Build a premium site-specific residential architecture service page.
+```
+
+The resulting [benchmark contract](specs/018-improving-proof-benchmark/benchmark-contract.md)
+keeps the web and native claims separate: the Nouri browser prototype communicates native-mobile
+direction but does not count as native implementation evidence.
 
 ### Why this is our best-performing method
 
@@ -200,18 +190,10 @@ The first dogfood study used three real project histories:
 | VSF-PCP | **LEARNING** | Persistent project identity and harvested project lessons |
 | platform-design-system | **APPLIED** | Escaped defects became executable gates with negative fixtures and later detections |
 
-The controlled Nutrition Planning run produced this result:
-
-<table>
-  <tr>
-    <th>Memory-disabled control · 89/100</th>
-    <th>Learning-enabled treatment · 94/100</th>
-  </tr>
-  <tr>
-    <td width="50%"><a href="specs/017-living-agent-proof/benchmark/control/index.html"><img src="specs/017-living-agent-proof/benchmark/control-preview.webp" alt="Control Nutrition Planning landing page generated without accumulated DESIGN:OS lessons" /></a></td>
-    <td width="50%"><a href="specs/017-living-agent-proof/benchmark/treatment/index.html"><img src="specs/017-living-agent-proof/benchmark/treatment-preview.webp" alt="Treatment Nutrition Planning landing page generated with accumulated DESIGN:OS lessons and one blind feedback iteration" /></a></td>
-  </tr>
-</table>
+The controlled Nutrition Planning run compared a
+[memory-disabled control](specs/017-living-agent-proof/benchmark/control/index.html) at 89/100
+against a [learning-enabled treatment](specs/017-living-agent-proof/benchmark/treatment/index.html)
+at 94/100. Static comparison images are intentionally omitted from this README.
 
 The treatment eliminated prohibited text/Unicode interface glyphs **27 → 0**, added motivated
 scroll reveals, preserved reduced-motion handling, and won the independent blind review by five
@@ -278,9 +260,9 @@ scanned, hygiene-audited, contrast-proven, and VR-baselined end to end.
 
 ---
 
-## Six verbs
+## Six daily verbs
 
-The whole tool fits in six moves. Everything else is depth on demand.
+These are the six common moves. The full adapter exposes 16 workflows when the task needs more.
 
 | Verb | What it does |
 | --- | --- |
@@ -506,80 +488,84 @@ commit** — prose-only rules drift; enforced rules hold.
 
 ---
 
-## Workflow map — every way in, every way out
+## Workflow map — current generation and learning loop
 
-### The surfaces at a glance
-
-```mermaid
-flowchart LR
-    U["You — plain words"] --> HM["Host model<br/>Claude Code · Codex · Antigravity<br/>16 /ui:* workflows"]
-    HM -- reads --> K["knowledge/<br/>taste rubric · 26 personas · figma-craft<br/>page-structures · color science"]
-    HM -- shells out --> UI["ui kernel — 36 deterministic commands<br/>delivery · prompt-plan · ds · linters · vr · memory"]
-    HM -- orchestrates --> DOS["design-os conductor<br/>doctor · audit · reference · vr-matrix · update"]
-    DOS -- verbatim envelopes --> UI
-    DOS --> FA["figma-agent hand<br/>WS broker 9410 · multi-file"]
-    DOS --> AX["a11y-audit + page-shot<br/>axe over live Chrome · PNG renders"]
-    HM -. "recall query at job start" .-> RC["recall mind<br/>local embeddings, no network"]
-    RC -. "recall reflect at land" .-> HM
-    FA <--> FIG["Figma Desktop<br/>compact plugin panel"]
-    UI --> DS[("design/ store<br/>tokens · registry · manifest · evidence · memory")]
-```
-
-### The journeys — six ways in, one store, two gate tiers, four ways out
+The host agent performs the design reasoning. The `ui` kernel validates artifacts and gates; it
+never generates assets, calls a model, or accesses the network.
 
 ```mermaid
 flowchart TD
-    E1["Nothing yet — an intent"] --> GEN
-    E2["An existing codebase"] --> SCAN["ui scan"] --> LEARN["/ui:learn — DS from your own evidence"] --> STORE
-    E3["A live URL you admire"] --> FURL["/ui:from-url — spec + tokens + audit folder"] --> STORE
-    E4["A Figma file"] --> FSTAT["design-os figma scan"] --> ING["ui ingest-figma-ds"] --> STORE
-    E4 --> FAUD["design-os figma audit<br/>10 hygiene detectors"] --> CLEAN["cleanup plan:<br/>delete · dedupe · consolidate"] -.-> FSTAT
-    E5["A shadcn / DTCG token set"] --> IMP["ui ds import"] --> STORE
-    E6["Reference shots · brand mood"] --> RADD["design-os reference add"] --> DNA["DNA doc → persona seed"] --> DSINIT
-    E1 -.-> DSINIT["ui ds init — persona compiles a<br/>27-component, paired-token DS"]
-    DSINIT --> STORE[("design/ store")]
-    STORE --> GEN["Generate — /ui:generate · /ui:design · /ui:slides<br/>shape picked per page-structures, then dressed"]
-    GEN --> IT["Refine — /ui:iterate · /ui:refine<br/>surgical edits, hash-seal intact"]
-    IT --> GATES{"Quality gates"}
-    GATES -- static, every build --> SG["design-os audit<br/>validate-layout · a11y · taste · content · ds a11y"]
-    GATES -- rendered, at land --> RG["a11y-audit (axe) · page-shot<br/>ui vr gate · design-os vr-matrix"]
-    SG -- fail: fix and re-run --> IT
-    RG -- fail: fix and re-run --> IT
-    GATES -- pass --> SHIP
-    subgraph SHIP["Ship"]
-      O1["Production HTML / slide deck"]
-      O2["Idiomatic Figma canvas — /ui:to-figma"]
-      O3["Specimen + preview pages — ui ds preview"]
-      O4["Audit reports · VR baselines"]
-    end
-    GEN -. "ui memory record" .-> MEM["memory + recall<br/>recall query starts a job · recall reflect lands it"]
-    MEM -. "preference prior" .-> GEN
-    STORE --> OPS["Evolve the system:<br/>ds change-token · diff · docs · specimen --strict · lifecycle status"]
-    OPS --> STORE
+    U["1 · User intent or reference"] --> B["2 · Preserve raw request<br/>compile design-brief.json"]
+    B --> PP["3 · Compile prompt-plan.json<br/>3 structural directions · region jobs · visual DNA"]
+    PP --> PF{"ui prompt-plan<br/>validate + preflight"}
+    PF -- fail --> B
+    PF -- pass --> G["4 · Ground the project<br/>scan · DS context · soul · memory prior"]
+    G --> S["5 · Select direction<br/>content-led vs golden candidate"]
+    S --> C["6 · generation-contract.json v2<br/>sections · assets · states · viewports · motion"]
+    C --> A["7 · Resolve assets<br/>project → approved source → image generation → no image"]
+    A --> I["8 · Implement one candidate<br/>semantic responsive UI · Phosphor · GSAP only when justified"]
+    I --> SG{"9 · Six static gates"}
+    SG -- fail --> R["Targeted repair<br/>worst evidence-backed finding only"]
+    SG -- pass --> RE["10 · Render evidence<br/>1440 · 768 · 390 · states · reduced motion · no-JS"]
+    RE --> Q["11 · Independent curator<br/>qualification-record.json"]
+    Q -- DRAFT_WITH_CONCERNS --> R
+    R --> SG
+    Q -- BLOCKED_BY_EVIDENCE --> ASK["Ask for missing product truth"]
+    Q -- QUALIFIED --> D["12 · Deliver with evidence<br/>then integrate through code-surface intake"]
+    D --> EXP{"Quality-learning task?"}
+    EXP -- no --> RCPT["13 · Record evidence receipt"]
+    EXP -- yes --> AD["Art-direct qualified control<br/>section reference boards · max 3 ceiling revisions"]
+    AD --> LR["Blinded comparison + learning-record.json"]
+    LR --> PR{"Expert approval or<br/>3 wins across 2 categories?"}
+    PR -- no --> HYP["Keep as hypothesis or counterevidence"]
+    PR -- yes --> PROM["Promote bounded lesson with causal receipt"]
+    RCPT -. "relevant weak prior on a later job" .-> G
+    PROM -. "relevant weak prior on a later job" .-> G
 ```
 
-Every path composes with every other: a team can enter at **E4** (audit + clean a messy
-Figma library), exit with a specimen page, re-enter at **E2** on the app repo, and land
-both through the same gates — the store is the meeting point, the gates are the contract.
+The repair loop is capped at three attempts. Missing rendered evidence cannot become
+`QUALIFIED`. Memory can influence a decision only as a cited weak prior; project truth, current
+evidence, and the ratified soul outrank it.
+
+### Entry surfaces and outputs
+
+```mermaid
+flowchart LR
+    subgraph IN["Entry surfaces"]
+      E1["Plain intent"]
+      E2["Existing codebase"]
+      E3["Live URL"]
+      E4["Figma file"]
+      E5["Tokens / existing DS"]
+      E6["Image reference"]
+    end
+    E1 --> W["16 /ui:* workflows"]
+    E2 --> W
+    E3 --> W
+    E4 --> W
+    E5 --> W
+    E6 --> W
+    W --> H["Host model + DESIGN:OS knowledge and 12 installed skills"]
+    H --> K["36-command deterministic ui kernel"]
+    H --> O1["Responsive production UI"]
+    H --> O2["Idiomatic Figma canvas"]
+    H --> O3["Design-system artifacts"]
+    H --> O4["Evidence, audit, and learning records"]
+    K --> DS[("design/ store<br/>tokens · registry · manifest · memory")]
+```
+
+Brownfield work routes through `/ui:learn` before generation unless the user explicitly chooses a
+fresh direction. Figma, rendered accessibility, screenshots, image generation, SVGL, GSAP, and
+semantic recall remain optional hands used by the host workflow, not hidden dependencies of `ui`.
 
 ---
 
 ## The Figma hand
 
-<table>
-  <tr>
-    <td><img src="docs/assets/readme/figma-panel-compact.png" alt="The figma-agent plugin panel, compact mode — 300 by 170, connected state in flat orange with ink text" /></td>
-    <td><img src="docs/assets/readme/figma-panel-expanded.png" alt="The panel expanded — activity log and connection details: port, protocol, heartbeat, file, page" /></td>
-    <td>
-      <b>figma-agent</b> drives a Figma plugin over a local self-healing broker:
-      reconnect back-off, heartbeats, a park queue that holds commands through a broker
-      respawn, and a <b>multi-file registry</b> — several open files stay connected at
-      once, commands route to the most-recently-active one (pin with
-      <code>FIGMA_AGENT_FILE</code>). The panel opens compact (300×170) and stays out of
-      your way.
-    </td>
-  </tr>
-</table>
+`figma-agent` drives a Figma plugin over a local self-healing broker: reconnect back-off,
+heartbeats, a park queue that holds commands through a broker respawn, and a multi-file registry.
+Several open files stay connected at once; commands route to the most-recently-active one or to
+the file pinned with `FIGMA_AGENT_FILE`. Static panel screenshots are intentionally omitted here.
 
 Four moves, both directions:
 
@@ -644,7 +630,7 @@ bring changes, audits, and evidence to the file.**
 
 | Surface | Path | What it is | Tests |
 |---|---|---|---|
-| **`ui` kernel** | `src/` | 36 deterministic commands — prompt-plan and delivery validation, DS compile/mutate/preview, tokens, OKLCH color math, static gates, VR, memory, evidence. Zero runtime dependencies, no network, no model calls. | 2,231 |
+| **`ui` kernel** | `src/` | 36 deterministic commands — prompt-plan and delivery validation, DS compile/mutate/preview, tokens, OKLCH color math, static gates, VR, memory, evidence. Zero runtime dependencies, no network, no model calls. | 2,234 |
 | **`design-os` conductor** | `design-os/` | Python/Typer umbrella that composes everything: `doctor` · `audit` · `heartbeat` (deterministic design-health rhythm — due/compare/notify, zero model calls) · `reference` · `vr-matrix` · `figma status/scan/audit` · `update` (one-command toolchain refresh on any machine) · entry-point plugins. Re-emits every underlying envelope **verbatim** — one source of truth per verdict. | 148 |
 | **`figma-agent` hand** | `figma-agent/` | CLI + WS broker + Figma plugin: canvas authoring, DS scan, the 10-detector hygiene audit, exec-js, capture. | 453 |
 | **rendered-tier hands** | `a11y/` | `a11y-audit` (axe-core over installed Chrome — wording never claims "compliant") + `page-shot` (deterministic full-page PNG). | — |
@@ -700,17 +686,21 @@ bring changes, audits, and evidence to the file.**
 ## How the loop works, mechanically
 
 1. **You describe intent** → `/ui:generate landing page for a new gym`.
-2. **Intent compiles** — the raw request is preserved in a provenance-tagged brief with
-   outcome, action, constraints, prohibited claims, and evaluable Must criteria.
-3. **The generation contract locks direction** — page structure, focal mechanism,
-   signature device, sections, canonical viewports, and required gates are validated
-   before code.
-4. **One candidate earns delivery** — static gates run first; desktop/tablet/mobile
-   renders feed an isolated curator; the worst finding is repaired for at most three rounds.
-5. **Status stays honest** — only clean evidence emits `QUALIFIED`; unresolved work remains
+2. **Intent compiles** — the raw request becomes a provenance-tagged brief and a validated
+   prompt plan with three structural directions, explicit region jobs, and visual DNA.
+3. **The project grounds the decision** — current DS, soul, evidence, and memory context load;
+   current product truth outranks recalled preference.
+4. **Direction and assets resolve before code** — content-led and golden candidates are compared;
+   icons, logos, imagery, states, responsive transformations, and motion receive explicit roles.
+5. **One candidate earns delivery** — six static gates run first; desktop/tablet/mobile and
+   behavioral renders feed an independent curator.
+6. **Repair stays bounded** — only the worst evidence-backed finding is repaired per round, for
+   at most three attempts, with affected gates and renders rerun.
+7. **Status stays honest** — only clean evidence emits `QUALIFIED`; unresolved work remains
    `DRAFT_WITH_CONCERNS` or `BLOCKED_BY_EVIDENCE`.
-6. **Memory compounds** — decisions land in the ledger; `recall query` primes the next
-   job; `recall reflect` distills the lesson at the end. Neither ever calls a model.
+8. **Learning needs causality** — evidence, application, artifact, and outcome form a receipt.
+   Quality-learning tasks preserve controls, use blinded comparison, and promote a lesson only
+   after expert approval or repeated wins across categories.
 
 ---
 
@@ -720,7 +710,8 @@ The recent wave, newest first — full history in [CHANGELOG.md](CHANGELOG.md).
 
 | Date | Change | Commit |
 |---|---|---|
-| 2026-07-21 | **Official GSAP motion skill** — advanced web choreography, ScrollTrigger, lifecycle cleanup, plugin restraint, reduced-motion and performance evidence; adapted from GreenSock's MIT skill suite | *(this commit)* |
+| 2026-07-21 | **Interaction boundary benchmark** — animated DESIGN:OS, native-mobile Nutrition, and premium Architecture treatments with desktop/mobile renders and honest claim boundaries | `b706b8e`…`f1ee62f` |
+| 2026-07-21 | **Official GSAP motion skill** — advanced web choreography, ScrollTrigger, lifecycle cleanup, plugin restraint, reduced-motion and performance evidence; adapted from GreenSock's MIT skill suite | `982c30b` |
 | 2026-07-19 | **Qualified Delivery (Spec 014 P0)** — weak prompt → provenance-tagged brief → generation contract → canonical renders → bounded repair → honest delivery status; `ui delivery validate` blocks false `QUALIFIED` verdicts | `59686cd` |
 | 2026-07-16 | **Figma mirror (1:1)** — each component's registry record is a rebuildable reflection of its Figma node; `mirror-verify` proves the scan→rebuild→scan **fixed point** live (bindings by publish key, instances, variant swaps, inner overrides), `equal:true` across a real 27-screen DS. Plus a per-operation activity feed in the plugin panel | `b9b7255`…`7959464` |
 | 2026-07-16 | **Figma live-sync** — `documentchange` → append-only ledger → 5-min idle → 1-click panel Sync → `reconcile --apply`; the registry follows the canvas near-real-time | `#34`…`#38` |
