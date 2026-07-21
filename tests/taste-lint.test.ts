@@ -6,6 +6,7 @@ import {
   checkTinyBodyText,
   checkOffGridSpacing,
   checkMixedIconFamilies,
+  checkTextArrowAsInterfaceIcon,
   checkPureBlackShadow,
   checkLinearOrAllTransition,
   checkAnimationNoReducedMotion,
@@ -167,6 +168,38 @@ describe("checkMixedIconFamilies", () => {
 
   it("does NOT flag a document with no icons", () => {
     expect(checkMixedIconFamilies("<div>plain</div>")).toHaveLength(0);
+  });
+
+  it("recognizes Phosphor and flags it when mixed with another family", () => {
+    const html = '<script src="@phosphor-icons/web"></script><span data-lucide="user"></span>';
+    const findings = checkMixedIconFamilies(html);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.message).toContain("Phosphor");
+  });
+});
+
+describe("checkTextArrowAsInterfaceIcon", () => {
+  it("flags Unicode arrows used inside links and buttons", () => {
+    const html = '<a href="/start">Get started ↗</a>\n<button>Continue →</button>';
+    const findings = checkTextArrowAsInterfaceIcon(html);
+    expect(findings).toHaveLength(2);
+    expect(findings.every((finding) => finding.axis === "Iconography")).toBe(true);
+    expect(findings[0]?.checkId).toBe("text-arrow-as-interface-icon");
+  });
+
+  it("flags Unicode arrows used as compact metric/status iconography", () => {
+    const html = "<span>↗ 18% vs plan</span><strong>Revenue ↑</strong>";
+    expect(checkTextArrowAsInterfaceIcon(html)).toHaveLength(2);
+  });
+
+  it("does not flag a Phosphor component in an interactive control", () => {
+    const html = '<a href="/start">Get started <ArrowUpRight aria-hidden="true" /></a>';
+    expect(checkTextArrowAsInterfaceIcon(html)).toHaveLength(0);
+  });
+
+  it("does not flag arrow characters in prose or code samples", () => {
+    const html = "<p>Revenue → retention is the model.</p><code>left → right</code>";
+    expect(checkTextArrowAsInterfaceIcon(html)).toHaveLength(0);
   });
 });
 

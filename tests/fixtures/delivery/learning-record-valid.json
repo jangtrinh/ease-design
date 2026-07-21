@@ -1,0 +1,185 @@
+{
+  "kind": "learning-record",
+  "version": 1,
+  "benchmarkId": "world-class-loop-01",
+  "rubricVersion": "ceiling-v1",
+  "trials": [
+    {
+      "caseId": "D01",
+      "category": "architecture",
+      "blindEvaluation": true,
+      "controlledInputs": true,
+      "evaluatorRefs": ["D01/blind-scorecard.json"],
+      "convergenceAnalysis": {
+        "recentCaseRefs": ["historical/architecture-01"],
+        "repeatedAxes": ["paletteFamily"],
+        "justifiedAxes": ["paletteFamily"],
+        "verdict": "evidence-justified-repeat"
+      },
+      "variants": [
+        {
+          "workflow": "raw",
+          "artifactRef": "D01/raw",
+          "evidenceRefs": ["D01/raw-1440.png"],
+          "criticalFailures": 1,
+          "identitySignature": {
+            "paletteFamily": "warm-neutral",
+            "typePairing": "sans-sans",
+            "heroArchitecture": "centered",
+            "signatureTechnique": "none",
+            "ctaGarment": "pill",
+            "shapeLanguage": "soft"
+          },
+          "ceilingScores": {
+            "originality": 4,
+            "hierarchy": 5,
+            "composition": 4,
+            "emotionalImpact": 4,
+            "motionCraft": 2,
+            "responsiveArtDirection": 3,
+            "referenceFidelity": 4
+          }
+        },
+        {
+          "workflow": "enhanced",
+          "artifactRef": "D01/enhanced",
+          "evidenceRefs": ["D01/enhanced-1440.png"],
+          "criticalFailures": 0,
+          "identitySignature": {
+            "paletteFamily": "warm-neutral",
+            "typePairing": "grotesk-mono",
+            "heroArchitecture": "split",
+            "signatureTechnique": "parallax",
+            "ctaGarment": "outlined-pill",
+            "shapeLanguage": "soft"
+          },
+          "ceilingScores": {
+            "originality": 5,
+            "hierarchy": 6,
+            "composition": 5,
+            "emotionalImpact": 5,
+            "motionCraft": 4,
+            "responsiveArtDirection": 5,
+            "referenceFidelity": 6
+          }
+        },
+        {
+          "workflow": "qualified",
+          "artifactRef": "D01/qualified",
+          "evidenceRefs": ["D01/qualified-1440.png"],
+          "criticalFailures": 0,
+          "identitySignature": {
+            "paletteFamily": "stone-copper",
+            "typePairing": "refined-grotesk",
+            "heroArchitecture": "editorial-offset",
+            "signatureTechnique": "layered-depth",
+            "ctaGarment": "framed-link",
+            "shapeLanguage": "hairline"
+          },
+          "ceilingScores": {
+            "originality": 6,
+            "hierarchy": 7,
+            "composition": 7,
+            "emotionalImpact": 6,
+            "motionCraft": 6,
+            "responsiveArtDirection": 7,
+            "referenceFidelity": 7
+          }
+        },
+        {
+          "workflow": "art-directed",
+          "artifactRef": "D01/art-directed",
+          "evidenceRefs": ["D01/art-directed-1440.png"],
+          "boardRefs": ["D01/boards/hero.png", "D01/boards/materials.png"],
+          "artDirection": {
+            "designRead": {
+              "pageKind": "architecture marketing landing page",
+              "audience": "custom-home clients",
+              "vibe": "cinematic, precise, quietly premium",
+              "systemFamily": "editorial architecture"
+            },
+            "dials": {
+              "designVariance": 8,
+              "motionIntensity": 5,
+              "visualDensity": 4
+            },
+            "majorSections": ["hero", "materials"],
+            "boards": [
+              {
+                "sectionId": "hero",
+                "boardRef": "D01/boards/hero.png",
+                "selectionRationale": "Boundary-crossing residence supports the spatial thesis without obscuring the CTA.",
+                "rerollDecision": "accepted",
+                "compositionAnchor": "residence roofline crossing the lower-right card boundary"
+              },
+              {
+                "sectionId": "materials",
+                "boardRef": "D01/boards/materials.png",
+                "selectionRationale": "Material cutaway continues the architectural section rhythm at a smaller scale.",
+                "rerollDecision": "rerolled",
+                "compositionAnchor": "material sample interrupts the left text rail"
+              }
+            ],
+            "fidelity": {
+              "typographyRef": "D01/fidelity.md#typography",
+              "spacingRef": "D01/fidelity.md#spacing",
+              "paletteRef": "D01/fidelity.md#palette",
+              "componentRef": "D01/fidelity.md#components",
+              "motifRef": "D01/fidelity.md#motifs",
+              "renderedOutputRef": "D01/art-directed-1440.png"
+            },
+            "assetManifest": [
+              {
+                "id": "architecture-hero",
+                "role": "hero residence",
+                "sourceType": "generated",
+                "sourceRef": "D01/prompts/architecture-hero.txt",
+                "localRef": "D01/public/architecture-hero.webp",
+                "status": "production",
+                "paletteGradeFamily": "stone-copper dusk",
+                "usedIn": ["hero", "project-preview"]
+              },
+              {
+                "id": "rejected-generic-house",
+                "role": "hero residence candidate",
+                "sourceType": "generated",
+                "sourceRef": "D01/prompts/architecture-hero-attempt-01.txt",
+                "localRef": null,
+                "status": "rejected",
+                "paletteGradeFamily": "cool gray daylight",
+                "usedIn": []
+              }
+            ]
+          },
+          "criticalFailures": 0,
+          "identitySignature": {
+            "paletteFamily": "stone-copper",
+            "typePairing": "refined-grotesk",
+            "heroArchitecture": "image-boundary-crossing",
+            "signatureTechnique": "grade-shift",
+            "ctaGarment": "architectural-bracket",
+            "shapeLanguage": "hairline"
+          },
+          "ceilingScores": {
+            "originality": 8,
+            "hierarchy": 8,
+            "composition": 9,
+            "emotionalImpact": 8,
+            "motionCraft": 8,
+            "responsiveArtDirection": 8,
+            "referenceFidelity": 9
+          }
+        }
+      ]
+    }
+  ],
+  "learnings": [
+    {
+      "id": "L01",
+      "class": "contextual-recipe",
+      "statement": "Architecture heroes benefit from a subject crossing the hero boundary when the CTA remains unobstructed.",
+      "status": "hypothesis",
+      "evidenceCaseIds": ["D01"]
+    }
+  ]
+}

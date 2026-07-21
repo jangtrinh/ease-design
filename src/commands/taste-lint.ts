@@ -39,6 +39,7 @@ Checks (the machine-verifiable subset of knowledge/taste-rubric.md; error unless
   uppercase-tight-line-height Typography    all-caps text with line-height below 1.0
   off-grid-spacing           Spacing        Tailwind spacing not on the 4px base grid
   mixed-icon-families        Iconography    two or more icon libraries in one UI
+  text-arrow-as-interface-icon Iconography  Unicode arrow in a link/button instead of an icon component
   pure-black-shadow          Depth/Surface  hard/opaque black shadow (should be tinted)
   z-index-inflation          Depth/Surface  all-nines z-index (9999) — an un-designed stacking scale
   linear-easing              Motion         transition uses linear easing

@@ -26,6 +26,9 @@ directly** while designing UI — curated design taste that sets the quality flo
 | `versioning-semver.md` | Semver for a design system — how `ui ds diff` classifies a change (token/component add·remove·change) as **breaking/additive/patch**, incl. *computed* visual-breaking-change (colour ΔEOK, dimension %), and the cross-artifact dangling-reference check. Read when releasing a DS version or generating a design PR comment. |
 | `user-evidence.md` | **Grounding design in real user evidence** — the `ui evidence` ledger + its anti-fabrication gate: a `quote` finding must be a *verbatim substring* of its committed source, so the model can't invent user words. The three support levels (quote / metric / observation=unsupported), the self-contained git-committable store (`design/research.events.jsonl` + `research-sources/`), and the T0 loop-closure (`ui critique-coverage --evidence-dir` resolves a criterion's `evidence[]` as ledger ids — a broken citation fails the gate). Read when sourcing acceptance criteria or recording research. The binary records + verifies; it never writes findings. |
 | `qualified-delivery.md` | **Weak prompt → evidence-qualified delivery** — typed brief, generation contract, canonical renders, isolated curator, bounded repair, and honest statuses. Read before generating a marketing/landing surface. |
+| `generation-craft-defaults.md` | **Implementation-grade generation defaults** — Phosphor/SVGL/GPT Image 2 asset policy, responsive transformations, motion/loading floors, accessible custom controls, bold composition, and the evidence required to qualify them. |
+| `world-class-learning-loop.md` | **Qualification → art direction → reusable learning** — four-way controlled trials, floor/ceiling separation, bounded refinement, and anti-overfitting lesson promotion. |
+| `prompt-plan-orchestration.md` | **Weak request → production strategy** — provenance-bound facets, product truth, three structural directions, per-region briefs, content-led vs golden-ratio comparison, compact builder packet, and traceable curator findings. |
 | `visual-regression.md` | **The rendered-output floor** — how `ui vr diff`/`gate`/`accept` catch visual changes a code diff can't (a token tweak that moved every button, a deleted shadow). The constitutional split (binary compares, host renders), why the #1 flake source is *render environment* not the algorithm (pin baseline + gate to the same font stack), the pixelmatch + anti-aliasing + mask defence, and the LAND-time gate workflow (render → gate → deliberately `accept` intended changes). Read when setting up a VR gate or reasoning about screenshot flake. VR guards *change*, not *quality*. |
 | `accessibility.md` | **The two-tier a11y model — honesty-first** — tier 1 STATIC (`ui a11y-lint`, `ui ds a11y`: source AST + declared token pairs, free/every build) vs tier 2 RENDERED (the optional `a11y-audit` workspace, axe-core over live Chrome: computed contrast, ARIA-in-context, review gates). What each tier CAN and CANNOT prove, the manual-judgment residue (focus-visibility quality, reading-order sense, alt-text *quality*, motion honoured in practice), when to run which, and the non-negotiable never-claim-"compliant"/"accessible" wording rule. Read when reasoning about accessibility or adding an a11y check. |
 | `content-design.md` | **Voice, tone & the microcopy floor** — voice vs tone (voice dimensions + the non-tunable voice constants), the tone-by-situation matrix (the load-bearing artefact; humour/enthusiasm track inversely to user stress), the error-message standard (NN/g + WCAG 3.3.1/3.3.3), i18n-readiness rules, and the deterministic `ui content-lint` floor (lorem-ipsum · placeholder-copy · placeholder-name · click-here-link · error-code-alone · exclamation-overload · insensitive-terms · plural-s-hack · text-in-image · all-caps-shout). Read when writing UI copy or scoring content; the curator scores tone-cell conformance, never free-form copyediting. |
@@ -54,12 +57,14 @@ constraint-language rules, provenance grammar, and quarantine rules `ui knowledg
 enforces.
 
 **Generate a design from an intent**
-1. `persona-index.md` — auto-select personas from the intent
-2. `personas/<family>.md` — load the full DNA of each chosen persona
-3. `signature-devices.md` — when the persona reads on-brief but forgettable, compose one hero
+1. `prompt-plan-orchestration.md` — compile and validate product truth, directions, regions,
+   visual DNA, and proportion candidates
+2. `persona-index.md` — auto-select personas from the intent
+3. `personas/<family>.md` — load the full DNA of each chosen persona
+4. `signature-devices.md` — when the persona reads on-brief but forgettable, compose one hero
    signature move (at most two) onto its DNA
-4. `mode-constraints.md` — apply the UI mode's constraints + `TECHNICAL_RULES`
-5. `taste-rubric.md` — score the result; refine the failing axes
+5. `mode-constraints.md` — apply the UI mode's constraints + `TECHNICAL_RULES`
+6. `taste-rubric.md` — score the result; refine the failing axes
 
 **Establish / compile a design system**
 - `token-taxonomy.md` — token tiers and immutability rules

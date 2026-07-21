@@ -86,9 +86,9 @@ describe('panel mode (P5.1) — compact-first, expand on demand', () => {
     expect(togglePanelMode('expanded')).toBe('compact');
     expect(togglePanelMode(togglePanelMode('compact'))).toBe('compact');
   });
-  it('detailsLabel invites with ▾ and collapses with ▴', () => {
-    expect(detailsLabel('compact')).toBe('Details ▾');
-    expect(detailsLabel('expanded')).toBe('Details ▴');
+  it('detailsLabel stays textual while the Phosphor caret communicates state', () => {
+    expect(detailsLabel('compact')).toBe('Details');
+    expect(detailsLabel('expanded')).toBe('Details');
   });
   it('compactMeta covers ONLY the disconnected wait — next-step copy, no pill echo', () => {
     expect(compactMeta('disconnected')).toBe('First CLI command starts it');

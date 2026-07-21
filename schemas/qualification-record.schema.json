@@ -7,27 +7,131 @@
   "additionalProperties": false,
   "properties": {
     "kind": { "const": "qualification-record" },
-    "version": { "const": 1 },
+    "version": { "enum": [1, 2] },
     "contractRef": { "type": "string", "minLength": 1 },
     "attempt": { "type": "integer", "minimum": 1, "maximum": 3 },
     "status": { "enum": ["QUALIFIED", "DRAFT_WITH_CONCERNS", "BLOCKED_BY_EVIDENCE"] },
     "machineGates": {
       "type": "array",
       "items": {
-        "type": "object", "required": ["name", "passed"], "additionalProperties": false,
-        "properties": { "name": { "type": "string" }, "passed": { "type": "boolean" } }
+        "type": "object",
+        "required": ["name", "passed"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "passed": { "type": "boolean" }
+        }
       }
     },
     "renderedViewports": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
     "mustCriteria": {
       "type": "array",
       "items": {
-        "type": "object", "required": ["id", "covered"], "additionalProperties": false,
-        "properties": { "id": { "type": "string" }, "covered": { "type": "boolean" } }
+        "type": "object",
+        "required": ["id", "covered"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "covered": { "type": "boolean" }
+        }
       }
     },
     "unsupportedClaimCount": { "type": "integer", "minimum": 0 },
     "unresolvedFindings": { "type": "array", "items": { "type": "string" } },
-    "blocker": { "type": "string" }
-  }
+    "blocker": { "type": "string" },
+    "assetEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "sourceRef", "verified"],
+        "additionalProperties": false,
+        "properties": {
+          "role": { "type": "string", "minLength": 1 },
+          "sourceRef": { "type": "string", "minLength": 1 },
+          "verified": { "type": "boolean" }
+        }
+      }
+    },
+    "responsiveEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["viewport", "renderRef", "passed", "overflowFree"],
+        "additionalProperties": false,
+        "properties": {
+          "viewport": { "type": "integer", "minimum": 1 },
+          "renderRef": { "type": "string", "minLength": 1 },
+          "passed": { "type": "boolean" },
+          "overflowFree": { "type": "boolean" }
+        }
+      }
+    },
+    "motionEvidence": {
+      "type": "object",
+      "required": ["defaultCapture", "reducedMotionCapture", "jsFailureChecked", "contentVisibleWithoutJs", "loadingLayoutStable"],
+      "additionalProperties": false,
+      "properties": {
+        "defaultCapture": { "type": "string", "minLength": 1 },
+        "reducedMotionCapture": { "type": "string", "minLength": 1 },
+        "jsFailureChecked": { "type": "boolean" },
+        "contentVisibleWithoutJs": { "type": "boolean" },
+        "loadingLayoutStable": { "type": "boolean" }
+      }
+    },
+    "controlEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "keyboardPassed", "pointerPassed", "statesCaptured"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "keyboardPassed": { "type": "boolean" },
+          "pointerPassed": { "type": "boolean" },
+          "statesCaptured": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "compositionReview": {
+      "type": "object",
+      "required": ["thesisObserved", "signatureMoveObserved", "whitespaceSupportsHierarchy", "finding"],
+      "additionalProperties": false,
+      "properties": {
+        "thesisObserved": { "type": "boolean" },
+        "signatureMoveObserved": { "type": "boolean" },
+        "whitespaceSupportsHierarchy": { "type": "boolean" },
+        "finding": { "type": ["string", "null"] }
+      }
+    },
+    "sectionReview": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sectionId", "renderedRef", "topicFitObserved", "distinctCompositionObserved", "contentLayoutCoupled", "finding", "decisionRefs", "cause"],
+        "additionalProperties": false,
+        "properties": {
+          "sectionId": { "type": "string", "minLength": 1 },
+          "renderedRef": { "type": "string", "minLength": 1 },
+          "topicFitObserved": { "type": "boolean" },
+          "distinctCompositionObserved": { "type": "boolean" },
+          "contentLayoutCoupled": { "type": "boolean" },
+          "finding": { "type": ["string", "null"] },
+          "decisionRefs": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^decision:" }
+          },
+          "cause": {
+            "type": ["string", "null"],
+            "enum": ["missing-evidence", "weak-decision", "implementation-drift", "taste-preference", "floor-regression", null]
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "version": { "const": 2 } } },
+      "then": { "required": ["assetEvidence", "responsiveEvidence", "motionEvidence", "controlEvidence", "compositionReview", "sectionReview"] }
+    }
+  ]
 }

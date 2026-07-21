@@ -183,11 +183,12 @@ export function checkOffGridSpacing(html: string): TasteFinding[] {
  * mixed-icon-families: more than one icon library referenced. The rubric is
  * explicit: "use exactly one icon family for the whole UI"; anti-pattern: "two
  * or more icon sets in one UI". Detects the common CDN/library signatures.
- * Lucide is the project default (autofix injects lucide.createIcons), so Lucide
- * alone never flags; Lucide + a second family does.
+ * Phosphor is the generated-code default. Legacy Lucide documents remain
+ * detectable as one family; mixing either with a second family fails.
  */
 export function checkMixedIconFamilies(html: string): TasteFinding[] {
   const families: { name: string; re: RegExp }[] = [
+    { name: "Phosphor",      re: /@phosphor-icons|phosphor-icons|data-phosphor|class=["'][^"']*\bph-/i },
     { name: "Lucide",        re: /\blucide\b|data-lucide\s*=|lucide\.createIcons/i },
     { name: "Font Awesome",  re: /\bfa-(?:solid|regular|brands|light|duotone)\b|\bfas\b|\bfar\b|\bfab\b|font-?awesome/i },
     { name: "Material Icons", re: /material-icons|material-symbols/i },
@@ -205,6 +206,35 @@ export function checkMixedIconFamilies(html: string): TasteFinding[] {
     }];
   }
   return [];
+}
+
+/**
+ * text-arrow-as-interface-icon: Unicode arrows inside interface chrome are text
+ * glyphs, not icons. They inherit font metrics, vary by platform, and bypass the
+ * declared icon family. Generated UI must use the declared icon component
+ * (Phosphor for greenfield v2 work) and mark decorative arrows aria-hidden.
+ *
+ * Precision boundary: interactive and compact UI tags are scanned. Paragraphs,
+ * headings, code samples, and preformatted content are excluded.
+ */
+export function checkTextArrowAsInterfaceIcon(html: string): TasteFinding[] {
+  const findings: TasteFinding[] = [];
+  const interactive = /<(a|button|span|b|strong|small|i|label)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
+  const arrow = /[←↑→↓↖↗↘↙⇐⇑⇒⇓⟵⟶⟷⟹➜➝➞➟➠]/;
+  let match: RegExpExecArray | null;
+  while ((match = interactive.exec(html)) !== null) {
+    const visibleText = (match[2] ?? "").replace(/<[^>]*>/g, "");
+    const glyph = arrow.exec(visibleText)?.[0];
+    if (glyph === undefined) continue;
+    findings.push({
+      checkId: "text-arrow-as-interface-icon",
+      axis: "Iconography",
+      severity: "error",
+      message: `interactive text uses Unicode arrow '${glyph}' instead of the declared icon family — replace it with a Phosphor arrow component (decorative icons aria-hidden)`,
+      line: lineOf(html, match.index),
+    });
+  }
+  return findings;
 }
 
 // ─── Depth/Surface: shadows tinted, not pure black (rubric lines 228, 231) ──────

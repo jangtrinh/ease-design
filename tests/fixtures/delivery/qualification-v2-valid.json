@@ -1,0 +1,82 @@
+{
+  "kind": "qualification-record",
+  "version": 2,
+  "contractRef": "generation-contract-v2-valid.json",
+  "attempt": 2,
+  "status": "QUALIFIED",
+  "machineGates": [
+    { "name": "validate-layout", "passed": true },
+    { "name": "a11y-lint", "passed": true },
+    { "name": "taste-lint", "passed": true },
+    { "name": "content-lint", "passed": true },
+    { "name": "ds-usage-lint", "passed": true },
+    { "name": "ds-a11y", "passed": true }
+  ],
+  "renderedViewports": [1440, 768, 390],
+  "mustCriteria": [
+    { "id": "must-cta", "covered": true },
+    { "id": "must-proof", "covered": true }
+  ],
+  "unsupportedClaimCount": 0,
+  "unresolvedFindings": [],
+  "assetEvidence": [
+    {
+      "role": "integration-logo",
+      "sourceRef": "https://svgl.app/library/slack.svg",
+      "verified": true
+    },
+    {
+      "role": "hero-art",
+      "sourceRef": "asset-map:hero-art",
+      "verified": true
+    }
+  ],
+  "responsiveEvidence": [
+    {
+      "viewport": 1440,
+      "renderRef": "evidence/1440.png",
+      "passed": true,
+      "overflowFree": true
+    },
+    {
+      "viewport": 768,
+      "renderRef": "evidence/768.png",
+      "passed": true,
+      "overflowFree": true
+    },
+    {
+      "viewport": 390,
+      "renderRef": "evidence/390.png",
+      "passed": true,
+      "overflowFree": true
+    }
+  ],
+  "motionEvidence": {
+    "defaultCapture": "evidence/motion-default.webm",
+    "reducedMotionCapture": "evidence/motion-reduced.webm",
+    "jsFailureChecked": true,
+    "contentVisibleWithoutJs": true,
+    "loadingLayoutStable": true
+  },
+  "controlEvidence": [
+    {
+      "id": "campaign-filter",
+      "keyboardPassed": true,
+      "pointerPassed": true,
+      "statesCaptured": ["default", "open", "focus-visible", "disabled", "error"]
+    }
+  ],
+  "compositionReview": {
+    "thesisObserved": true,
+    "signatureMoveObserved": true,
+    "whitespaceSupportsHierarchy": true,
+    "finding": null
+  },
+  "sectionReview": [
+    { "sectionId": "Hero", "renderedRef": "evidence/hero.png", "topicFitObserved": true, "distinctCompositionObserved": true, "contentLayoutCoupled": true, "finding": null, "decisionRefs": ["decision:hero:layout"], "cause": null },
+    { "sectionId": "System", "renderedRef": "evidence/system.png", "topicFitObserved": true, "distinctCompositionObserved": true, "contentLayoutCoupled": true, "finding": null, "decisionRefs": ["decision:system:layout"], "cause": null },
+    { "sectionId": "Method", "renderedRef": "evidence/method.png", "topicFitObserved": true, "distinctCompositionObserved": true, "contentLayoutCoupled": true, "finding": null, "decisionRefs": ["decision:method:layout"], "cause": null },
+    { "sectionId": "Reporting", "renderedRef": "evidence/reporting.png", "topicFitObserved": true, "distinctCompositionObserved": true, "contentLayoutCoupled": true, "finding": null, "decisionRefs": ["decision:reporting:layout"], "cause": null },
+    { "sectionId": "CTA", "renderedRef": "evidence/cta.png", "topicFitObserved": true, "distinctCompositionObserved": true, "contentLayoutCoupled": true, "finding": null, "decisionRefs": ["decision:cta:layout"], "cause": null }
+  ]
+}

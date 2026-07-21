@@ -68,6 +68,23 @@ const STDIN_FILE: PositionalSignature = {
 // ─── The table ────────────────────────────────────────────────────────────────
 
 export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
+  "prompt-plan": {
+    summary: "Validate design prompt orchestration plans",
+    subcommands: {
+      validate: {
+        summary: "Validate the complete prompt-plan v1 contract",
+        positionals: [{ name: "<file.json>", required: true, summary: "Prompt plan artifact" }],
+        flags: [],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "FILE_NOT_FOUND", "READ_ERROR", "BAD_PROMPT_PLAN"],
+      },
+      preflight: {
+        summary: "Emit deterministic generation-gate findings",
+        positionals: [{ name: "<file.json>", required: true, summary: "Prompt plan artifact" }],
+        flags: [],
+        errorCodes: ["BAD_ARG", "UNKNOWN_FLAG", "FILE_NOT_FOUND", "READ_ERROR", "BAD_PROMPT_PLAN"],
+      },
+    },
+  },
   delivery: {
     summary: "Validate Qualified Delivery contracts and verdicts",
     subcommands: {

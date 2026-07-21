@@ -20,6 +20,7 @@
  *   Spacing       → off-grid-spacing        (Tailwind spacing not on 4px grid)
  *   Spacing       → tap-target-undersized   (interactive control < 44px; warning)
  *   Iconography   → mixed-icon-families     (≥ 2 icon libraries)
+ *   Iconography   → text-arrow-as-interface-icon (Unicode arrow in link/button)
  *   Typography    → italic-display-heading, uppercase-tight-line-height
  *   Depth/Surface → pure-black-shadow       (hard/opaque black shadow)
  *   Depth/Surface → z-index-inflation       (all-nines z-index)
@@ -39,6 +40,7 @@ import {
   checkTinyBodyText,
   checkOffGridSpacing,
   checkMixedIconFamilies,
+  checkTextArrowAsInterfaceIcon,
   checkPureBlackShadow,
   checkLinearOrAllTransition,
   checkAnimationNoReducedMotion,
@@ -130,6 +132,7 @@ export function lintTaste(html: string, opts: TasteLintOptions = {}): TasteLintR
     ...checkUppercaseTightLineHeight(stripped),
     ...checkOffGridSpacing(stripped),
     ...checkMixedIconFamilies(stripped),
+    ...checkTextArrowAsInterfaceIcon(stripped),
     ...checkPureBlackShadow(stripped),
     ...checkZIndexInflation(stripped),
     ...checkZIndexOffLadder(stripped),

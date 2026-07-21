@@ -78,11 +78,15 @@ These rules hold regardless of which constraint set is active.
   arbitrary stylesheet rules. Arbitrary-*value* utilities (`bg-[#1A1614]`, `mt-[3px]`)
   *are* standard Tailwind and allowed — so an exact hex from a persona's color DNA is
   reproduced as `bg-[#hex]`, or mapped to the nearest theme class, never as a custom rule.
-- **Icons:** Lucide icon library. Initialize icons once at the end of the document body.
+- **Icons:** Phosphor icon library through the official package for the target runtime. Use one
+  deliberate weight and real icon components—never Unicode arrows, emoji, or text glyphs as
+  interface icons. An established brownfield icon system may override this only with project
+  evidence.
 - **Charts:** Chart.js. Always wrap a `<canvas>` in a `position: relative; width: 100%`
   container to prevent infinite resize loops.
-- **Images:** Use `picsum.photos/seed/{seed}/{w}/{h}` or `images.unsplash.com/photo-{id}`.
-  Never use `source.unsplash.com`.
+- **Images:** Reuse project assets first. When original imagery is necessary and no suitable
+  project/licensed asset exists, use the host's Codex image-generation capability backed by GPT
+  Image 2. Use remote stock placeholders only for explicitly disposable prototypes.
 - **Image fallback (critical):** Every `<img>` must carry an `onerror` handler that clears
   itself and swaps to a fallback placeholder, so a broken source never leaves an empty box:
   ```html

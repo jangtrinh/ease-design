@@ -1,0 +1,74 @@
+{
+  "kind": "qualification-record",
+  "version": 2,
+  "contractRef": "generation-contract-v2-valid.json",
+  "attempt": 1,
+  "status": "QUALIFIED",
+  "machineGates": [
+    { "name": "validate-layout", "passed": true },
+    { "name": "a11y-lint", "passed": true },
+    { "name": "taste-lint", "passed": true },
+    { "name": "content-lint", "passed": true },
+    { "name": "ds-usage-lint", "passed": true },
+    { "name": "ds-a11y", "passed": true }
+  ],
+  "renderedViewports": [1440, 768, 390],
+  "mustCriteria": [{ "id": "must-cta", "covered": true }],
+  "unsupportedClaimCount": 0,
+  "unresolvedFindings": [],
+  "assetEvidence": [
+    {
+      "role": "hero-art",
+      "sourceRef": "asset-map:wrong-hero",
+      "verified": true
+    }
+  ],
+  "responsiveEvidence": [
+    {
+      "viewport": 1440,
+      "renderRef": "evidence/1440.png",
+      "passed": true,
+      "overflowFree": true
+    },
+    {
+      "viewport": 768,
+      "renderRef": "evidence/768.png",
+      "passed": true,
+      "overflowFree": true
+    },
+    {
+      "viewport": 390,
+      "renderRef": "evidence/390.png",
+      "passed": false,
+      "overflowFree": false
+    }
+  ],
+  "motionEvidence": {
+    "defaultCapture": "evidence/motion-default.webm",
+    "reducedMotionCapture": "evidence/motion-reduced.webm",
+    "jsFailureChecked": true,
+    "contentVisibleWithoutJs": false,
+    "loadingLayoutStable": false
+  },
+  "controlEvidence": [
+    {
+      "id": "campaign-filter",
+      "keyboardPassed": false,
+      "pointerPassed": true,
+      "statesCaptured": ["default", "open"]
+    }
+  ],
+  "compositionReview": {
+    "thesisObserved": true,
+    "signatureMoveObserved": false,
+    "whitespaceSupportsHierarchy": false,
+    "finding": "Composition collapses to a centered template"
+  },
+  "sectionReview": [
+    { "sectionId": "Hero", "renderedRef": "evidence/hero.png", "topicFitObserved": true, "distinctCompositionObserved": true, "contentLayoutCoupled": true, "finding": null, "decisionRefs": ["decision:hero:layout"], "cause": null },
+    { "sectionId": "System", "renderedRef": "evidence/system.png", "topicFitObserved": false, "distinctCompositionObserved": false, "contentLayoutCoupled": false, "finding": "Generic cards could belong to any product", "decisionRefs": ["decision:system:layout"], "cause": "weak-decision" },
+    { "sectionId": "Method", "renderedRef": "evidence/method.png", "topicFitObserved": false, "distinctCompositionObserved": false, "contentLayoutCoupled": false, "finding": "Decorative line does not communicate the method", "decisionRefs": ["decision:method:layout"], "cause": "implementation-drift" },
+    { "sectionId": "Reporting", "renderedRef": "evidence/reporting.png", "topicFitObserved": false, "distinctCompositionObserved": false, "contentLayoutCoupled": false, "finding": "Repeats the same card composition", "decisionRefs": ["decision:reporting:layout"], "cause": "weak-decision" },
+    { "sectionId": "CTA", "renderedRef": "evidence/cta.png", "topicFitObserved": true, "distinctCompositionObserved": true, "contentLayoutCoupled": true, "finding": null, "decisionRefs": ["decision:cta:layout"], "cause": null }
+  ]
+}

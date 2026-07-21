@@ -1,0 +1,153 @@
+{
+  "kind": "generation-contract",
+  "version": 2,
+  "briefRef": "design-brief-valid.json",
+  "direction": {
+    "thesis": "Editorial stage around one conversion action",
+    "structure": "Asymmetric narrative landing page",
+    "focalMechanism": "Creator campaign canvas",
+    "signatureDevice": "Off-grid evidence orbit",
+    "risk": "Layered evidence may crowd mobile"
+  },
+  "sections": ["Hero", "System", "Method", "Reporting", "CTA"],
+  "viewports": [1440, 768, 390],
+  "requiredGates": ["validate-layout", "a11y-lint", "taste-lint", "content-lint", "ds-usage-lint", "ds-a11y"],
+  "output": "html",
+  "assetPolicy": {
+    "iconSource": {
+      "provider": "phosphor",
+      "package": "@phosphor-icons/react",
+      "weight": "regular",
+      "exception": null
+    },
+    "logos": [
+      {
+        "role": "integration-logo",
+        "brand": "Slack",
+        "provider": "svgl",
+        "sourceUrl": "https://svgl.app/library/slack.svg",
+        "localPath": "public/assets/slack.svg",
+        "theme": "single"
+      }
+    ],
+    "images": [
+      {
+        "role": "hero-art",
+        "provider": "gpt-image-2",
+        "sourceRef": "asset-map:hero-art",
+        "aspectRatio": "16:10",
+        "focalSafeArea": "center-right",
+        "containsEssentialText": false
+      }
+    ]
+  },
+  "responsive": {
+    "viewports": [1440, 768, 390],
+    "adaptations": [
+      {
+        "region": "hero",
+        "mobile": "stack copy before art",
+        "tablet": "balanced split",
+        "desktop": "asymmetric overlap"
+      }
+    ],
+    "overflowPolicy": "no-accidental-horizontal-overflow"
+  },
+  "motion": {
+    "tier": "T1",
+    "heroAmbient": {
+      "applicable": true,
+      "description": "slow gradient drift behind the focal canvas"
+    },
+    "scroll": {
+      "applicable": true,
+      "description": "section reveals follow reading order"
+    },
+    "loading": {
+      "strategy": "skeleton-to-content",
+      "layoutStable": true
+    },
+    "interaction": {
+      "description": "buttons and selection controls respond with restrained feedback"
+    },
+    "reducedMotion": {
+      "strategy": "static-complete"
+    },
+    "jsFailure": {
+      "contentVisible": true
+    }
+  },
+  "controls": [
+    {
+      "id": "campaign-filter",
+      "kind": "combobox",
+      "semanticBase": "aria-combobox",
+      "customVisual": true,
+      "customBehavior": true,
+      "states": ["default", "hover", "focus-visible", "disabled", "error"],
+      "keyboard": ["open", "navigate", "select", "escape"],
+      "touch": true
+    }
+  ],
+  "composition": {
+    "thesis": "Editorial stage around one conversion action",
+    "signatureMove": "Off-grid product canvas crosses the hero boundary",
+    "whitespaceStrategy": "Quiet bands isolate proof from action",
+    "templateAvoidance": "Avoid centered hero followed by uniform card grid"
+  },
+  "sectionArchitecture": {
+    "pageNarrative": "Move from promise through mechanism and proof into an informed action.",
+    "sections": [
+      {
+        "sectionId": "Hero",
+        "purpose": "Establish the conversion promise",
+        "narrativeRole": "orientation",
+        "layoutModel": "editorial-stage",
+        "compositionAnchor": "off-grid campaign canvas",
+        "contentDependency": "creator campaign imagery and primary action",
+        "responsiveTransformation": "canvas moves below the promise on mobile",
+        "repetitionRationale": null
+      },
+      {
+        "sectionId": "System",
+        "purpose": "Explain how campaign work moves",
+        "narrativeRole": "mechanism",
+        "layoutModel": "connected-workflow",
+        "compositionAnchor": "linked decision nodes",
+        "contentDependency": "workflow stages and ownership",
+        "responsiveTransformation": "network becomes a vertical decision path",
+        "repetitionRationale": null
+      },
+      {
+        "sectionId": "Method",
+        "purpose": "Make the operating sequence legible",
+        "narrativeRole": "process",
+        "layoutModel": "numbered-sequence",
+        "compositionAnchor": "progress spine",
+        "contentDependency": "ordered method steps",
+        "responsiveTransformation": "horizontal sequence becomes vertical",
+        "repetitionRationale": null
+      },
+      {
+        "sectionId": "Reporting",
+        "purpose": "Show the evidence produced",
+        "narrativeRole": "proof",
+        "layoutModel": "evidence-orbit",
+        "compositionAnchor": "live result surrounded by metrics",
+        "contentDependency": "reporting metrics and verified proof",
+        "responsiveTransformation": "orbit resolves into ranked evidence",
+        "repetitionRationale": null
+      },
+      {
+        "sectionId": "CTA",
+        "purpose": "Resolve the next action",
+        "narrativeRole": "conversion",
+        "layoutModel": "quiet-action-band",
+        "compositionAnchor": "single isolated action",
+        "contentDependency": "primary conversion choice",
+        "responsiveTransformation": "action remains full-width and reachable",
+        "repetitionRationale": null
+      }
+    ]
+  }
+}

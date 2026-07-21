@@ -7,10 +7,12 @@
   "additionalProperties": false,
   "properties": {
     "kind": { "const": "generation-contract" },
-    "version": { "const": 1 },
+    "version": { "enum": [1, 2] },
     "briefRef": { "type": "string", "minLength": 1 },
     "direction": {
-      "type": "object", "required": ["thesis", "structure", "focalMechanism", "signatureDevice", "risk"], "additionalProperties": false,
+      "type": "object",
+      "required": ["thesis", "structure", "focalMechanism", "signatureDevice", "risk"],
+      "additionalProperties": false,
       "properties": {
         "thesis": { "type": "string", "minLength": 1 },
         "structure": { "type": "string", "minLength": 1 },
@@ -21,7 +23,198 @@
     },
     "sections": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
     "viewports": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
-    "requiredGates": { "type": "array", "items": { "type": "string" } },
-    "output": { "enum": ["html"] }
+    "requiredGates": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "output": { "enum": ["html"] },
+    "assetPolicy": { "$ref": "#/definitions/assetPolicy" },
+    "responsive": { "$ref": "#/definitions/responsive" },
+    "motion": { "$ref": "#/definitions/motion" },
+    "controls": { "type": "array", "items": { "$ref": "#/definitions/control" } },
+    "composition": { "$ref": "#/definitions/composition" },
+    "sectionArchitecture": { "$ref": "#/definitions/sectionArchitecture" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "version": { "const": 2 } } },
+      "then": { "required": ["assetPolicy", "responsive", "motion", "controls", "composition", "sectionArchitecture"] }
+    }
+  ],
+  "definitions": {
+    "exception": {
+      "type": "object",
+      "required": ["reason", "evidenceRef"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "evidenceRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "iconSource": {
+      "type": "object",
+      "required": ["provider", "package", "weight"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "package": { "type": "string", "minLength": 1 },
+        "weight": { "type": "string", "minLength": 1 },
+        "exception": { "anyOf": [{ "$ref": "#/definitions/exception" }, { "type": "null" }] }
+      }
+    },
+    "logo": {
+      "type": "object",
+      "required": ["role", "brand", "provider", "sourceUrl", "localPath", "theme"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "brand": { "type": "string", "minLength": 1 },
+        "provider": { "enum": ["svgl", "project"] },
+        "sourceUrl": { "type": "string", "minLength": 1 },
+        "localPath": { "type": "string", "minLength": 1 },
+        "theme": { "enum": ["single", "light-dark"] }
+      }
+    },
+    "image": {
+      "type": "object",
+      "required": ["role", "provider", "sourceRef", "aspectRatio", "focalSafeArea", "containsEssentialText"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "provider": { "enum": ["project", "harvested", "gpt-image-2", "none"] },
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "aspectRatio": { "type": "string", "minLength": 1 },
+        "focalSafeArea": { "type": "string", "minLength": 1 },
+        "containsEssentialText": { "type": "boolean" }
+      }
+    },
+    "assetPolicy": {
+      "type": "object",
+      "required": ["iconSource", "logos", "images"],
+      "additionalProperties": false,
+      "properties": {
+        "iconSource": { "$ref": "#/definitions/iconSource" },
+        "logos": { "type": "array", "items": { "$ref": "#/definitions/logo" } },
+        "images": { "type": "array", "items": { "$ref": "#/definitions/image" } }
+      }
+    },
+    "adaptation": {
+      "type": "object",
+      "required": ["region", "mobile", "tablet", "desktop"],
+      "additionalProperties": false,
+      "properties": {
+        "region": { "type": "string", "minLength": 1 },
+        "mobile": { "type": "string", "minLength": 1 },
+        "tablet": { "type": "string", "minLength": 1 },
+        "desktop": { "type": "string", "minLength": 1 }
+      }
+    },
+    "responsive": {
+      "type": "object",
+      "required": ["viewports", "adaptations", "overflowPolicy"],
+      "additionalProperties": false,
+      "properties": {
+        "viewports": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+        "adaptations": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/adaptation" } },
+        "overflowPolicy": { "const": "no-accidental-horizontal-overflow" }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "required": ["tier", "heroAmbient", "scroll", "loading", "interaction", "reducedMotion", "jsFailure"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "enum": ["T1", "T2", "T3", "T4", "T5", "T6"] },
+        "heroAmbient": { "$ref": "#/definitions/applicableMotion" },
+        "scroll": { "$ref": "#/definitions/applicableMotion" },
+        "loading": {
+          "type": "object",
+          "required": ["strategy", "layoutStable"],
+          "additionalProperties": false,
+          "properties": {
+            "strategy": { "type": "string", "minLength": 1 },
+            "layoutStable": { "type": "boolean" }
+          }
+        },
+        "interaction": {
+          "type": "object",
+          "required": ["description"],
+          "additionalProperties": false,
+          "properties": { "description": { "type": "string", "minLength": 1 } }
+        },
+        "reducedMotion": {
+          "type": "object",
+          "required": ["strategy"],
+          "additionalProperties": false,
+          "properties": { "strategy": { "const": "static-complete" } }
+        },
+        "jsFailure": {
+          "type": "object",
+          "required": ["contentVisible"],
+          "additionalProperties": false,
+          "properties": { "contentVisible": { "type": "boolean" } }
+        }
+      }
+    },
+    "applicableMotion": {
+      "type": "object",
+      "required": ["applicable", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "applicable": { "type": "boolean" },
+        "description": { "type": "string" },
+        "exception": { "$ref": "#/definitions/exception" }
+      }
+    },
+    "control": {
+      "type": "object",
+      "required": ["id", "kind", "semanticBase", "customVisual", "customBehavior", "states", "keyboard", "touch"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["select", "combobox", "listbox", "menu", "segmented-control"] },
+        "semanticBase": { "enum": ["native-select", "button-menu", "aria-combobox", "radiogroup"] },
+        "customVisual": { "type": "boolean" },
+        "customBehavior": { "type": "boolean" },
+        "states": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "keyboard": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "touch": { "type": "boolean" }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "required": ["thesis", "signatureMove", "whitespaceStrategy", "templateAvoidance"],
+      "additionalProperties": false,
+      "properties": {
+        "thesis": { "type": "string", "minLength": 1 },
+        "signatureMove": { "type": "string", "minLength": 1 },
+        "whitespaceStrategy": { "type": "string", "minLength": 1 },
+        "templateAvoidance": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sectionArchitecture": {
+      "type": "object",
+      "required": ["pageNarrative", "sections"],
+      "additionalProperties": false,
+      "properties": {
+        "pageNarrative": { "type": "string", "minLength": 1 },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["sectionId", "purpose", "narrativeRole", "layoutModel", "compositionAnchor", "contentDependency", "responsiveTransformation"],
+            "additionalProperties": false,
+            "properties": {
+              "sectionId": { "type": "string", "minLength": 1 },
+              "purpose": { "type": "string", "minLength": 1 },
+              "narrativeRole": { "type": "string", "minLength": 1 },
+              "layoutModel": { "type": "string", "minLength": 1 },
+              "compositionAnchor": { "type": "string", "minLength": 1 },
+              "contentDependency": { "type": "string", "minLength": 1 },
+              "responsiveTransformation": { "type": "string", "minLength": 1 },
+              "repetitionRationale": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
   }
 }

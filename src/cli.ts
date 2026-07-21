@@ -51,6 +51,7 @@ import { tasteCommand } from "./commands/taste.js";
 import { agentsCommand } from "./commands/agents.js";
 import { knowledgeCommand } from "./commands/knowledge.js";
 import { deliveryCommand } from "./commands/delivery.js";
+import { promptPlanCommand } from "./commands/prompt-plan.js";
 
 // Keep in sync with package.json "version". A test (tests/cli-version.test.ts)
 // asserts these match, so drift fails CI rather than shipping silently.
@@ -103,6 +104,7 @@ COMMANDS[tasteCommand.name] = tasteCommand;
 COMMANDS[agentsCommand.name] = agentsCommand;
 COMMANDS[knowledgeCommand.name] = knowledgeCommand;
 COMMANDS[deliveryCommand.name] = deliveryCommand;
+COMMANDS[promptPlanCommand.name] = promptPlanCommand;
 
 // ─── Root help ────────────────────────────────────────────────────────────────
 

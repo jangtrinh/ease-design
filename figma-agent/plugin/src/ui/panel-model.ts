@@ -91,9 +91,9 @@ export function togglePanelMode(mode: PanelMode): PanelMode {
   return mode === 'expanded' ? 'compact' : 'expanded';
 }
 
-/** Footer toggle label — ▾ invites expansion, ▴ collapse. (CSS uppercases it.) */
-export function detailsLabel(mode: PanelMode): string {
-  return mode === 'expanded' ? 'Details ▴' : 'Details ▾';
+/** Footer toggle label. The Phosphor caret rotates from aria-expanded in CSS. */
+export function detailsLabel(_mode: PanelMode): string {
+  return 'Details';
 }
 
 // ─── Idle-commit sync prompt (spec 004 P4) ────────────────────────────────────

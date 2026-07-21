@@ -1,0 +1,403 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ease-design/schemas/learning-record.schema.json",
+  "title": "ease-design world-class learning record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "benchmarkId",
+    "rubricVersion",
+    "trials",
+    "learnings"
+  ],
+  "properties": {
+    "kind": { "const": "learning-record" },
+    "version": { "const": 1 },
+    "benchmarkId": { "type": "string", "minLength": 1 },
+    "rubricVersion": { "type": "string", "minLength": 1 },
+    "trials": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "caseId",
+          "category",
+          "blindEvaluation",
+          "controlledInputs",
+          "evaluatorRefs",
+          "convergenceAnalysis",
+          "variants"
+        ],
+        "properties": {
+          "caseId": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "blindEvaluation": { "const": true },
+          "controlledInputs": { "const": true },
+          "evaluatorRefs": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "convergenceAnalysis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "recentCaseRefs",
+              "repeatedAxes",
+              "justifiedAxes",
+              "verdict"
+            ],
+            "properties": {
+              "recentCaseRefs": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "repeatedAxes": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "paletteFamily",
+                    "typePairing",
+                    "heroArchitecture",
+                    "signatureTechnique",
+                    "ctaGarment",
+                    "shapeLanguage"
+                  ]
+                }
+              },
+              "justifiedAxes": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "paletteFamily",
+                    "typePairing",
+                    "heroArchitecture",
+                    "signatureTechnique",
+                    "ctaGarment",
+                    "shapeLanguage"
+                  ]
+                }
+              },
+              "verdict": {
+                "enum": [
+                  "distinct",
+                  "evidence-justified-repeat",
+                  "default-convergence"
+                ]
+              }
+            }
+          },
+          "variants": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "workflow",
+                "artifactRef",
+                "evidenceRefs",
+                "criticalFailures",
+                "ceilingScores",
+                "identitySignature"
+              ],
+              "properties": {
+                "workflow": {
+                  "enum": ["raw", "enhanced", "qualified", "art-directed"]
+                },
+                "artifactRef": { "type": "string", "minLength": 1 },
+                "evidenceRefs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "criticalFailures": { "type": "integer", "minimum": 0 },
+                "boardRefs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "artDirection": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "designRead",
+                    "dials",
+                    "majorSections",
+                    "boards",
+                    "fidelity",
+                    "assetManifest"
+                  ],
+                  "properties": {
+                    "designRead": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "pageKind",
+                        "audience",
+                        "vibe",
+                        "systemFamily"
+                      ],
+                      "properties": {
+                        "pageKind": { "type": "string", "minLength": 1 },
+                        "audience": { "type": "string", "minLength": 1 },
+                        "vibe": { "type": "string", "minLength": 1 },
+                        "systemFamily": { "type": "string", "minLength": 1 }
+                      }
+                    },
+                    "dials": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "designVariance",
+                        "motionIntensity",
+                        "visualDensity"
+                      ],
+                      "properties": {
+                        "designVariance": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10
+                        },
+                        "motionIntensity": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10
+                        },
+                        "visualDensity": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10
+                        }
+                      }
+                    },
+                    "majorSections": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": { "type": "string", "minLength": 1 }
+                    },
+                    "boards": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "sectionId",
+                          "boardRef",
+                          "selectionRationale",
+                          "rerollDecision",
+                          "compositionAnchor"
+                        ],
+                        "properties": {
+                          "sectionId": { "type": "string", "minLength": 1 },
+                          "boardRef": { "type": "string", "minLength": 1 },
+                          "selectionRationale": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "rerollDecision": {
+                            "enum": ["accepted", "rerolled"]
+                          },
+                          "compositionAnchor": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    },
+                    "fidelity": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "typographyRef",
+                        "spacingRef",
+                        "paletteRef",
+                        "componentRef",
+                        "motifRef",
+                        "renderedOutputRef"
+                      ],
+                      "properties": {
+                        "typographyRef": { "type": "string", "minLength": 1 },
+                        "spacingRef": { "type": "string", "minLength": 1 },
+                        "paletteRef": { "type": "string", "minLength": 1 },
+                        "componentRef": { "type": "string", "minLength": 1 },
+                        "motifRef": { "type": "string", "minLength": 1 },
+                        "renderedOutputRef": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "assetManifest": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "role",
+                          "sourceType",
+                          "sourceRef",
+                          "localRef",
+                          "status",
+                          "paletteGradeFamily",
+                          "usedIn"
+                        ],
+                        "properties": {
+                          "id": { "type": "string", "minLength": 1 },
+                          "role": { "type": "string", "minLength": 1 },
+                          "sourceType": {
+                            "enum": [
+                              "user",
+                              "project",
+                              "generated",
+                              "stock",
+                              "none"
+                            ]
+                          },
+                          "sourceRef": { "type": "string", "minLength": 1 },
+                          "localRef": { "type": ["string", "null"] },
+                          "status": { "enum": ["production", "rejected"] },
+                          "paletteGradeFamily": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "usedIn": {
+                            "type": "array",
+                            "items": { "type": "string", "minLength": 1 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "identitySignature": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "paletteFamily",
+                    "typePairing",
+                    "heroArchitecture",
+                    "signatureTechnique",
+                    "ctaGarment",
+                    "shapeLanguage"
+                  ],
+                  "properties": {
+                    "paletteFamily": { "type": "string", "minLength": 1 },
+                    "typePairing": { "type": "string", "minLength": 1 },
+                    "heroArchitecture": { "type": "string", "minLength": 1 },
+                    "signatureTechnique": { "type": "string", "minLength": 1 },
+                    "ctaGarment": { "type": "string", "minLength": 1 },
+                    "shapeLanguage": { "type": "string", "minLength": 1 }
+                  }
+                },
+                "ceilingScores": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "originality",
+                    "hierarchy",
+                    "composition",
+                    "emotionalImpact",
+                    "motionCraft",
+                    "responsiveArtDirection",
+                    "referenceFidelity"
+                  ],
+                  "properties": {
+                    "originality": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    "hierarchy": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    "composition": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    "emotionalImpact": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    "motionCraft": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    "responsiveArtDirection": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10
+                    },
+                    "referenceFidelity": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10
+                    }
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": { "workflow": { "const": "art-directed" } },
+                    "required": ["workflow"]
+                  },
+                  "then": {
+                    "required": ["boardRefs", "artDirection"]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "learnings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "class", "statement", "status", "evidenceCaseIds"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "class": {
+            "enum": ["hard-rule", "taste-pattern", "contextual-recipe"]
+          },
+          "statement": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["hypothesis", "candidate", "promoted", "rejected"]
+          },
+          "evidenceCaseIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "expertApproval": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["approved", "ref"],
+            "properties": {
+              "approved": { "type": "boolean" },
+              "ref": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

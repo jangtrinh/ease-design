@@ -185,6 +185,17 @@ the host supplies; the model must not invent or omit it.
 > to the active mode; a host that does not still obeys the mode's *intent* through the
 > constraint wording.
 
+### Prompt-plan boundary
+
+Replicate, Enhance, and Adapt modify evidence fidelity inside the prompt plan. They do not bypass
+product truth, structural direction divergence, region production briefs, proportion comparison,
+or preflight. ALLOWED: Replicate pins reference-observable structure more tightly than Adapt.
+NOT ALLOWED: treating Enhance as prose beautification only, because eloquent ambiguity still
+leaves the builder to invent product and layout decisions.
+
+Compile and validate the prompt plan before emitting the seven-layer builder frame. The frame is
+the compact execution packet; the prompt plan is the inspectable source of its decisions.
+
 ### Failure Modes
 
 Where this contract goes wrong:

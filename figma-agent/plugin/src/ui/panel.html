@@ -557,7 +557,7 @@ code {
 }
 .detail-grid dd { margin: 0; color: var(--color-foreground); font-variant-numeric: tabular-nums; }
 
-/* Footer band — three mono cells split by 2px ink rules: DETAILS ▾ · DOCS ↗ ·
+/* Footer band — three mono cells split by 2px ink rules: DETAILS · DOCS ·
    COPY. Ink-on-paper flips to paper-on-ink on hover (the inversion principle). */
 .footer-row {
   display: flex;
@@ -566,7 +566,10 @@ code {
 }
 .footer-cell {
   flex: 1 1 auto;
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   margin: 0;
   padding: var(--space-1) 4px;
   font-family: var(--font-mono);
@@ -585,6 +588,13 @@ code {
   cursor: pointer;
   transition: background-color 0.1s ease-out, color 0.1s ease-out;
 }
+.footer-icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  transition: transform 0.1s ease-out;
+}
+.footer-cell[aria-expanded="true"] .footer-icon { transform: rotate(180deg); }
 .footer-cell:last-child { border-right: none; }
 .footer-cell:hover { background: var(--color-foreground); color: var(--color-background); }
 .footer-cell:focus-visible { outline: 2px solid var(--color-ring); outline-offset: -2px; }
@@ -606,7 +616,7 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .status-dot.is-pulsing::after { animation: none; }
   .log-dot[data-pending="true"] { animation: none; }
-  .footer-cell { transition: none; }
+  .footer-cell, .footer-icon { transition: none; }
 }
 </style>
 </head>
@@ -669,9 +679,21 @@ code {
 
   <footer class="footer-row">
     <button class="footer-cell" id="fga-toggle" type="button"
-            aria-expanded="false" aria-controls="fga-expanded">Details ▾</button>
+            aria-expanded="false" aria-controls="fga-expanded">
+      <span id="fga-toggle-label">Details</span>
+      <!-- Phosphor Icons: CaretDown, regular -->
+      <svg class="footer-icon" aria-hidden="true" viewBox="0 0 256 256" fill="currentColor">
+        <path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/>
+      </svg>
+    </button>
     <a class="footer-cell" id="fga-docs" href="https://github.com/jangtrinh/ease-design/blob/main/figma-agent/README.md"
-       target="_blank" rel="noopener" aria-label="Open the figma-agent documentation in a new tab">Docs&nbsp;↗</a>
+       target="_blank" rel="noopener" aria-label="Open the figma-agent documentation in a new tab">
+      <span>Docs</span>
+      <!-- Phosphor Icons: ArrowSquareOut, regular -->
+      <svg class="footer-icon" aria-hidden="true" viewBox="0 0 256 256" fill="currentColor">
+        <path d="M224,104a8,8,0,0,1-16,0V59.32l-66.33,66.34a8,8,0,0,1-11.32-11.32L196.68,48H152a8,8,0,0,1,0-16h64a8,8,0,0,1,8,8Zm-40,24a8,8,0,0,0-8,8v72H48V80h72a8,8,0,0,0,0-16H48A16,16,0,0,0,32,80V208a16,16,0,0,0,16,16H176a16,16,0,0,0,16-16V136A8,8,0,0,0,184,128Z"/>
+      </svg>
+    </a>
     <button class="footer-cell" id="fga-copy" type="button">Copy</button>
   </footer>
 </main>

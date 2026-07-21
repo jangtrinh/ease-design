@@ -8,7 +8,7 @@ User-facing entry points (`/ui:<verb>` on Claude Code; analogous shapes elsewher
 
 | File | Verb | What it does |
 |---|---|---|
-| `generate.md` | `/ui:generate` | Central design-generation flow: classify intent → select 3 personas → compile DS if absent → produce 3 variants → critique → autofix → user picks. |
+| `generate.md` | `/ui:generate` | Central generation flow: compile prompt plan → compare content-led and golden proportions → validate compact builder packet → generate → qualify → bounded repair. |
 | `iterate.md` | `/ui:iterate` | Surgical edit to an existing variant via `ui edit-strategy` (deterministic / ln-diff / full-regen). |
 | `refine.md` | `/ui:refine` | Self-correction pass: critique → identify failing axes → refine those → re-critique. ≤2 passes. |
 | `redesign.md` | `/ui:redesign` | Radical contra-persona redesign preserving the source's information architecture. |

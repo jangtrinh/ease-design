@@ -40,6 +40,7 @@ const hint = el('fga-hint');
 const activityList = el('fga-activity');
 const expandedZone = el('fga-expanded');
 const toggleBtn = el('fga-toggle');
+const toggleLabel = el('fga-toggle-label');
 const dPort = el('fga-d-port');
 const dProto = el('fga-d-proto');
 const dHeartbeat = el('fga-d-heartbeat');
@@ -296,7 +297,7 @@ copyBtn.addEventListener('click', () => {
 function applyMode(): void {
   panelRoot.dataset.mode = mode;
   expandedZone.hidden = mode !== 'expanded';
-  toggleBtn.textContent = detailsLabel(mode);
+  toggleLabel.textContent = detailsLabel(mode);
   toggleBtn.setAttribute('aria-expanded', String(mode === 'expanded'));
 }
 

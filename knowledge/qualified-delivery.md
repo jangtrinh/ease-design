@@ -9,6 +9,12 @@ The host model reasons, compiles intent, creates directions, generates, renders,
 The deterministic `ui` binary validates artifact shapes and false-green invariants. It never calls
 a model or the network. Spec 013 remains the downstream intake for integrated TSX/JSX/Vue/CSS.
 
+For current generated-code craft requirements, also read `generation-craft-defaults.md`.
+Version 1 artifacts remain historical Qualified Delivery evidence. Version 2 adds enforceable
+asset, responsive, motion, control, and composition contracts.
+After qualification, `world-class-learning-loop.md` defines the controlled art-direction and
+lesson-promotion layer. Qualification is the floor; that loop raises and studies the ceiling.
+
 ## Three typed boundaries
 
 ### 1. Design brief

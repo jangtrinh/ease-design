@@ -18,7 +18,14 @@ function capture(args: string[]): { code: number; out: string; err: string } {
 const fixture = (name: string): string => join(process.cwd(), "tests", "fixtures", "delivery", name);
 
 describe("ui delivery validate", () => {
-  for (const name of ["design-brief-valid.json", "generation-contract-valid.json", "qualification-valid.json"]) {
+  for (const name of [
+    "design-brief-valid.json",
+    "generation-contract-valid.json",
+    "qualification-valid.json",
+    "generation-contract-v2-valid.json",
+    "qualification-v2-valid.json",
+    "learning-record-valid.json",
+  ]) {
     it(`accepts ${name}`, () => {
       const r = capture(["delivery", "validate", fixture(name), "--json"]);
       expect(r.code).toBe(0);
@@ -30,6 +37,13 @@ describe("ui delivery validate", () => {
     expect(r.code).toBe(1);
     const data = JSON.parse(r.out).data as { findings: Array<{ checkId: string }> };
     expect(data.findings.filter((f) => f.checkId === "false-qualified").length).toBeGreaterThanOrEqual(4);
+  });
+  it("resolves a v2 contract and blocks missing craft evidence", () => {
+    const r = capture(["delivery", "validate", fixture("qualification-v2-false-green.json"), "--json"]);
+    expect(r.code).toBe(1);
+    const ids = JSON.parse(r.out).data.findings.map((f: { checkId: string }) => f.checkId);
+    expect(ids).toContain("false-qualified-v2");
+    expect(ids).toContain("missing-control-evidence");
   });
   it("requires all canonical marketing viewports and gates", () => {
     const dir = mkdtempSync(join(tmpdir(), "delivery-"));

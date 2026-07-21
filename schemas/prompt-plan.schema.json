@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ease.design/schemas/prompt-plan.schema.json",
+  "title": "ease-design prompt-plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind", "version", "id", "rawRequest", "surface", "promptMode",
+    "facetBindings", "productTruth", "pageNarrative", "directions",
+    "selectedDirectionId", "visualSystem", "regions", "proportionCandidates",
+    "deliveryPlan", "preflight", "builderPacket"
+  ],
+  "properties": {
+    "kind": { "const": "prompt-plan" },
+    "version": { "const": 1 },
+    "id": { "$ref": "#/$defs/nonEmpty" },
+    "rawRequest": { "$ref": "#/$defs/nonEmpty" },
+    "surface": {
+      "enum": [
+        "marketing-landing", "portfolio", "editorial", "redesign-preserve",
+        "redesign-overhaul", "product-app", "dashboard", "admin"
+      ]
+    },
+    "promptMode": { "enum": ["replicate", "enhance", "adapt", "generate"] },
+    "facetBindings": {
+      "type": "array", "minItems": 12, "maxItems": 12,
+      "items": { "$ref": "#/$defs/facetBinding" }
+    },
+    "productTruth": { "type": "object" },
+    "pageNarrative": { "type": "object" },
+    "directions": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": { "type": "object" }
+    },
+    "selectedDirectionId": { "$ref": "#/$defs/nonEmpty" },
+    "visualSystem": { "type": "object" },
+    "regions": {
+      "type": "array", "minItems": 2,
+      "items": { "type": "object" }
+    },
+    "proportionCandidates": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": { "type": "object" }
+    },
+    "deliveryPlan": { "type": "object" },
+    "preflight": { "type": "object" },
+    "builderPacket": { "type": "object" }
+  },
+  "$defs": {
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "decision": {
+      "type": "object",
+      "required": ["id", "value", "sourceType", "sourceRef", "confidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmpty" },
+        "value": { "$ref": "#/$defs/nonEmpty" },
+        "sourceType": { "enum": ["user", "reference", "project", "knowledge", "assumption"] },
+        "sourceRef": { "$ref": "#/$defs/nonEmpty" },
+        "confidence": { "enum": ["high", "medium", "low"] }
+      }
+    },
+    "facetBinding": {
+      "type": "object",
+      "required": ["facet", "decision", "decisionChanging"],
+      "properties": {
+        "facet": { "$ref": "#/$defs/nonEmpty" },
+        "decision": { "$ref": "#/$defs/decision" },
+        "decisionChanging": { "type": "boolean" }
+      }
+    }
+  }
+}

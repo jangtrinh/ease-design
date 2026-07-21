@@ -1,6 +1,8 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
 import type { ParsedArgs } from "../core/cli-args.js";
 import { DeliveryError, validateDelivery } from "../core/delivery-model.js";
+import type { DeliveryValidationContext } from "../core/delivery-model.js";
 import { errJson, errText, okJsonWithExit } from "../core/output.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -12,10 +14,12 @@ Usage:
 
 Kinds:
   design-brief          Provenance-tagged intent and evaluable criteria
-  generation-contract  Direction, sections, canonical viewports, required gates
-  qualification-record Gate evidence and honest delivery status
+  generation-contract  v1 direction/evidence; v2 adds implementation craft defaults
+  qualification-record v1 historical verdict; v2 validates referenced craft evidence
+  learning-record      Four-way trials and anti-overfitting lesson promotion
 
 validate is deterministic: it checks shape and false-green invariants only.
+For v2 qualification records it reads contractRef relative to the record.
 The host model owns inference and qualitative judgment.
 
 Options:
@@ -46,7 +50,9 @@ function validate(parsed: ParsedArgs): CommandResult {
     return parsed.json ? errJson(sub, code, msg) : errText(`ui: ${msg}\n`);
   }
   try {
-    const result = validateDelivery(JSON.parse(raw));
+    const json = JSON.parse(raw) as unknown;
+    const context = qualificationContext(json, file);
+    const result = validateDelivery(json, context);
     const exitCode = result.errorCount > 0 ? 1 : 0;
     if (parsed.json) return okJsonWithExit(sub, { file, ...result }, exitCode);
     const lines = result.findings.length === 0
@@ -58,6 +64,26 @@ function validate(parsed: ParsedArgs): CommandResult {
     const msg = e instanceof Error ? e.message : String(e);
     const code = e instanceof DeliveryError ? e.code : "BAD_DELIVERY";
     return parsed.json ? errJson(sub, code, msg) : errText(`ui: ${msg}\n`);
+  }
+}
+
+function qualificationContext(json: unknown, file: string): DeliveryValidationContext {
+  if (json === null || typeof json !== "object" || Array.isArray(json)) return {};
+  const record = json as Record<string, unknown>;
+  if (record["kind"] !== "qualification-record" || record["version"] !== 2 ||
+      typeof record["contractRef"] !== "string" || record["contractRef"].length === 0) return {};
+  try {
+    if (isAbsolute(record["contractRef"])) return {};
+    const recordDirectory = realpathSync(resolve(dirname(file)));
+    const contractPath = resolve(recordDirectory, record["contractRef"]);
+    if (!contractPath.startsWith(`${recordDirectory}${sep}`)) return {};
+    const realContractPath = realpathSync(contractPath);
+    if (!realContractPath.startsWith(`${recordDirectory}${sep}`)) return {};
+    const contract = JSON.parse(readFileSync(realContractPath, "utf8")) as unknown;
+    return contract !== null && typeof contract === "object" && !Array.isArray(contract)
+      ? { contract: contract as Record<string, unknown> } : {};
+  } catch {
+    return {};
   }
 }
 export const deliveryCommand = {
