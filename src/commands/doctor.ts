@@ -23,6 +23,7 @@ import { okJsonWithExit } from "../core/output.js";
 import { resolvePackageRoots, RUNTIMES, manifestTargetPath } from "../core/init-stub.js";
 import type { Runtime } from "../core/init-stub.js";
 import { lintProjectAdapters } from "../core/adapter-lint.js";
+import { ruleHeader, checkItem } from "../core/report-style.js";
 
 const CMD = "doctor";
 
@@ -169,10 +170,10 @@ function checkProjectManifest(cwd: string): ProjectManifestChecks {
 
 function formatReport(checks: Check[], failCount: number): string {
   const warnCount = checks.filter((c) => c.status === "warn").length;
-  const lines: string[] = ["ui doctor — ease-design health check", ""];
+  const lines: string[] = [ruleHeader("doctor", failCount > 0 ? "CHECK" : "READY"), ""];
   for (const c of checks) {
-    const mark = c.status === "pass" ? "✓" : c.status === "warn" ? "!" : "✗";
-    lines.push(`  ${mark} ${c.id}: ${c.detail}`);
+    const state = c.status === "pass" ? "done" : c.status === "warn" ? "warn" : "fail";
+    lines.push(checkItem(state, `${c.id}: ${c.detail}`));
   }
   lines.push("");
   if (failCount > 0) {

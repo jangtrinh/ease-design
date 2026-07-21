@@ -20,6 +20,8 @@ import {
 import type { DesignSystem } from "../core/design-system.js";
 import { DSManifestError } from "../core/ds-manifest.js";
 import { buildSpecimenPage, buildComponentPages } from "../core/ds-preview.js";
+import { ruleHeader, kv } from "../core/report-style.js";
+import { previewLink } from "../core/preview-link.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -79,8 +81,15 @@ export function runPreview(parsed: ParsedArgs): CommandResult {
     return okJson(CMD, { out, components: model.components, pairs: model.pairs, bytes: model.bytes });
   }
   return ok(
-    `ds preview: ${model.components} component(s), ${model.pairs} pair(s), ${model.bytes} bytes\n` +
-      `wrote ${out}\n`,
+    [
+      ruleHeader("ds preview", "DONE"),
+      "",
+      kv("components", String(model.components)),
+      kv("pairs", String(model.pairs)),
+      kv("bytes", String(model.bytes)),
+      previewLink(resolve(out)),
+      "",
+    ].join("\n"),
   );
 }
 

@@ -57,10 +57,13 @@ def test_doctor_missing_ui_exits_1(runner: CliRunner, fake_bin) -> None:
 
 
 def test_doctor_text_mode_mentions_ui(runner: CliRunner, fake_bin) -> None:
+    # Phase 2 (spec 019): _render_text now goes through report_style's rule_header +
+    # check_item — the literal "OK" token is replaced by the house-style "[✓]" bracket
+    # glyph (parity with `ui doctor`/`ui onboard`'s checklist convention).
     res = runner.invoke(app, ["doctor"])
     assert res.exit_code == 0
     assert "ui" in res.stdout
-    assert "OK" in res.stdout
+    assert "[✓]" in res.stdout
 
 
 def test_doctor_optional_hand_reports_present(runner: CliRunner, fake_bin) -> None:

@@ -712,6 +712,7 @@ The recent wave, newest first — full history in [CHANGELOG.md](CHANGELOG.md).
 
 | Date | Change | Commit |
 |---|---|---|
+| 2026-07-21 | **Report renderer + preview links (Spec 019 P2)** — style-A (`ruleHeader`/`checkItem`/`kv`) adopted in `ui doctor`, `ui ds preview`, `ui designmd audit`, `design-os doctor`, `design-os evolution`; new OSC-8-safe `previewLink`/`figmaNote` convention (bare `file://` paths, never markdown links); Python mirror `report_style.py`. `--json`/exit codes unchanged | *(uncommitted)* |
 | 2026-07-21 | **Onboarding first-run (Spec 019 P1)** — `ui onboard` readiness checklist (adapters, git, DS, soul, learning loop + optional agents/Figma), a shared style-A report renderer, `ui init` chaining to `onboard`/`guide`, and host-approval-before-install discipline wired into the `/ui:init` wrapper + onboard journey | *(uncommitted)* |
 | 2026-07-21 | **Suite-level IMPROVING gate** — the living-agent proof graduates only from a preregistered suite (≥3 holdouts across ≥2 categories, mean +10, aggregate repair/recurrence reductions, every case wins); a single comparison can no longer graduate and a 0→0 metric no longer reads as 100%. Verdict stays `APPLIED` | `591016c` |
 | 2026-07-21 | **Interaction boundary benchmark** — animated DESIGN:OS, native-mobile Nutrition, and premium Architecture treatments with desktop/mobile renders and honest claim boundaries | `b706b8e`…`f1ee62f` |

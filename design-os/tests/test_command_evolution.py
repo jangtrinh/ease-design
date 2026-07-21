@@ -14,6 +14,7 @@ import pytest
 from typer.testing import CliRunner
 
 from design_os.cli import app
+from design_os.report_style import rule_header
 
 _DANA = Path("/Users/jang/Products/dana-desktop")
 _VSF = Path("/Users/jang/Products/VSF-PCP")
@@ -42,7 +43,9 @@ def test_dead_loop_text_and_exit_zero(runner: CliRunner, tmp_path: Path) -> None
     res = runner.invoke(app, ["evolution", "--dir", str(tmp_path)])
 
     assert res.exit_code == 0  # a health report, not a gate — always exits 0
-    assert "evolution: DEAD-LOOP" in res.stdout
+    # Phase 2 (spec 019): the verdict line now wraps in report_style.rule_header
+    # ("evolution ──…── DEAD-LOOP") instead of the plain "evolution: DEAD-LOOP".
+    assert rule_header("evolution", "DEAD-LOOP") in res.stdout
 
 
 def test_wired_project_json_and_text(runner: CliRunner, tmp_path: Path) -> None:
@@ -71,7 +74,9 @@ def test_wired_project_json_and_text(runner: CliRunner, tmp_path: Path) -> None:
 
     res_text = runner.invoke(app, ["evolution", "--dir", str(tmp_path)])
     assert res_text.exit_code == 0
-    assert "evolution: WIRED" in res_text.stdout
+    # Phase 2 (spec 019): verdict line now wraps in report_style.rule_header; every
+    # other dimension line (Art VIII) is untouched, including this heartbeat line.
+    assert rule_header("evolution", "WIRED") in res_text.stdout
     assert "heartbeat: wired (4 task(s)), wired but never fired" in res_text.stdout
 
 

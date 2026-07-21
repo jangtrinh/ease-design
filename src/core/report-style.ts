@@ -54,16 +54,18 @@ export function ruleHeader(title: string, verdict = "", width = 64): string {
 }
 
 /**
- * A static checklist row: `  [✓] label`, `  [ ] label`, or `  [!] label`.
+ * A static checklist row: `  [✓] label`, `  [ ] label`, `  [!] label`, or
+ * `  [✗] label` (a hard failure — e.g. `ui doctor`'s required-check misses).
  * When `hint` is given and the state isn't done, a follow-up arrow line is
  * appended below it.
  */
 export function checkItem(
-  state: "done" | "pending" | "warn",
+  state: "done" | "pending" | "warn" | "fail",
   label: string,
   hint?: string,
 ): string {
-  const bracket = state === "done" ? GLYPH.done : state === "warn" ? GLYPH.warn : " ";
+  const bracket =
+    state === "done" ? GLYPH.done : state === "warn" ? GLYPH.warn : state === "fail" ? GLYPH.fail : " ";
   let line = `  [${bracket}] ${label}`;
   if (hint !== undefined && state !== "done") {
     line += `\n        → ${hint}`;

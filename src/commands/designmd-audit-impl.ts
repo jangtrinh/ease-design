@@ -21,6 +21,8 @@ import { auditAccessibility } from "../core/designmd-audit-accessibility.js";
 import { auditDiscipline } from "../core/designmd-audit-discipline.js";
 import { assembleAuditResult, renderAuditMarkdown, renderAuditJson } from "../core/designmd-audit-report.js";
 import type { AuditFamily, AuditRow } from "../core/designmd-audit-types.js";
+import { ruleHeader, kv } from "../core/report-style.js";
+import { previewLink } from "../core/preview-link.js";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 
@@ -127,8 +129,16 @@ export function runAudit(parsed: ParsedArgs): CommandResult {
     }, exitCode);
   }
 
-  // Human-readable single-line summary; full report on disk
-  const summary = `audit ${result.worstStatus} — PASS:${result.counts.PASS} WARN:${result.counts.WARN} FAIL:${result.counts.FAIL} (report: ${auditMdPath})\n`;
+  // Human-readable style-A block; full report on disk
+  const summary = [
+    ruleHeader("designmd audit", result.worstStatus),
+    "",
+    kv("PASS", String(result.counts.PASS)),
+    kv("WARN", String(result.counts.WARN)),
+    kv("FAIL", String(result.counts.FAIL)),
+    previewLink(resolve(auditMdPath), "report"),
+    "",
+  ].join("\n");
   if (exitCode === 0) return { exitCode, stdout: summary };
   return { exitCode, stdout: "", stderr: summary };
 }

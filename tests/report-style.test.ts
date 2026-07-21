@@ -57,6 +57,12 @@ describe("checkItem", () => {
     expect(checkItem("done", "x")).toContain(GLYPH.done);
     expect(checkItem("warn", "x")).toContain(GLYPH.warn);
   });
+
+  it("emits [✗] for fail, with the hint line when supplied (phase-2: ui doctor)", () => {
+    const line = checkItem("fail", "node-version", "install Node >= 20");
+    expect(line).toBe("  [✗] node-version\n        → install Node >= 20");
+    expect(line).toContain(GLYPH.fail);
+  });
 });
 
 describe("kv", () => {

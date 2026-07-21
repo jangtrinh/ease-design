@@ -16,6 +16,7 @@ import typer
 
 from design_os import evolution_core, evolution_proof
 from design_os.envelope import JsonFlag, emit, ok_env
+from design_os.report_style import rule_header
 
 _COMMAND = "evolution"
 
@@ -31,7 +32,7 @@ def _render_text(
     # that explains why the verdict isn't NO-LOOP.
     proof = proof or {"level": "ALIVE", "counts": {}, "findings": []}
     diagnostics = diagnostics or []
-    lines: list[str] = [f"evolution: {signals['verdict']}"]
+    lines: list[str] = [rule_header("evolution", signals["verdict"])]
     lines.append(
         f"  living-agent proof: {proof['level']} "
         f"(sources={proof.get('counts', {}).get('sources', 0)}, "

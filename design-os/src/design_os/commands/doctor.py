@@ -17,6 +17,7 @@ import typer
 
 from design_os.envelope import JsonFlag, emit, ok_env
 from design_os.kernel import resolve_ui, run_ui
+from design_os.report_style import check_item, rule_header
 
 _COMMAND = "doctor"
 
@@ -79,16 +80,20 @@ def _check_optional(name: str, probe: bool) -> dict[str, Any]:
 
 
 def _render_text(checks: list[dict[str, Any]], ok: bool) -> str:
-    lines: list[str] = []
+    present = sum(1 for c in checks if c["found"])
+    lines: list[str] = [rule_header("doctor", "READY" if ok else "CHECK"), ""]
     for c in checks:
         if c["found"]:
             ver = f" {c['version']}" if c["version"] else ""
             loc = f" ({c['path']})" if c["path"] else ""
-            lines.append(f"OK  {c['name']}{ver}{loc}")
+            lines.append(check_item("done", f"{c['name']}{ver}{loc}"))
         else:
+            # OK/MISS semantics preserved: a missing REQUIRED dep is a hard `fail`
+            # (drives exit 1); a missing OPTIONAL hand is `pending` (health-neutral).
+            state = "fail" if c["required"] else "pending"
             tag = "required" if c["required"] else "optional"
-            lines.append(f"MISS {c['name']} — {tag}")
-    present = sum(1 for c in checks if c["found"])
+            lines.append(check_item(state, f"{c['name']} — {tag}"))
+    lines.append("")
     lines.append(f"{'ok' if ok else 'FAIL'} — {present}/{len(checks)} present")
     return "\n".join(lines) + "\n"
 

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-21 - Report renderer + preview links (Spec 019 P2)
+
+- Adopted the shared style-A renderer (`ruleHeader` + `checkItem` + `kv`) in `ui doctor`,
+  `ui ds preview`, and `ui designmd audit` — consistent rule-line headers and glyph
+  checklists across the tool's highest-traffic reports. `--json` output is unchanged on
+  every command; only the human text render changed.
+- Added `src/core/preview-link.ts` (`previewLink` / `figmaNote`) — the OSC-8-safe
+  convention: a bare `file://<abs>` path on its own labelled line (never `[label](url)`,
+  never an inline image), so a host terminal can wrap it in a clickable link. `ui ds
+  preview` and `ui designmd audit` now close with a `preview`/`report` link line.
+- Extended `checkItem` to a `fail` state (`[✗]`) — the `GLYPH.fail` glyph existed
+  unused since Phase 1; `ui doctor`'s hard-fail checks needed it.
+- Added the Python mirror `design-os/src/design_os/report_style.py` (`rule_header`,
+  `check_item`, `kv`) and adopted it in `design-os doctor` and `design-os evolution`'s
+  text renders — same house style, plain-print only (no Rich), every check/signal line
+  preserved (Art VIII). Exit codes and envelopes unchanged.
+- Deferred: ~24 other ad-hoc glyph sites (a11y-checks, flow, ds-usage-lint, content-lint,
+  vr-support, agents, ds-soul, ds-specimen, figma-ds-registry, Python heartbeat/audit
+  renderers) are left for a future migration pass — not swept in this phase.
+
 ## 2026-07-21 - Onboarding first-run (Spec 019 P1)
 
 - Added `ui onboard` — a deterministic, read-only readiness checklist over a project:
