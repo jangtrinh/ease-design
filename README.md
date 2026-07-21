@@ -304,8 +304,8 @@ These are the six common moves. The full adapter exposes 16 workflows when the t
 ## Quick start
 
 ```sh
-git clone https://github.com/jangtrinh/design-os.git
-cd design-os && npm install && npm run build && npm link
+git clone https://github.com/jangtrinh/ease-design.git
+cd ease-design && npm install && npm run build && npm link
 ui doctor                      # verify the install is healthy
 ```
 

@@ -16,7 +16,7 @@ from typing import Annotated, Any
 import typer
 
 from design_os.envelope import JsonFlag, emit, ok_env
-from design_os.kernel import resolve_ui, run_ui
+from design_os.kernel import MIN_UI_VERSION, meets_min_ui_version, resolve_ui, ui_below_floor, ui_version
 from design_os.report_style import check_item, rule_header
 
 _COMMAND = "doctor"
@@ -42,14 +42,25 @@ def _probe_version(cmd: list[str], *, timeout: float = 10.0) -> str | None:
 def _check_ui() -> dict[str, Any]:
     path = resolve_ui()
     if path is None:
-        return {"name": "ui", "required": True, "found": False, "version": None, "path": None}
-    version: str | None = None
-    try:
-        version = run_ui(["--version"], timeout=10.0).stdout.strip() or None
-    except (OSError, subprocess.SubprocessError):
-        # Kernel present but the version probe failed — still counts as "found".
-        version = None
-    return {"name": "ui", "required": True, "found": True, "version": version, "path": path}
+        return {
+            "name": "ui",
+            "required": True,
+            "found": False,
+            "version": None,
+            "path": None,
+            "meets_min_version": None,
+        }
+    # Kernel present but the version probe failing degrades to version=None (still "found")
+    # — see kernel.ui_version()'s own degrade-don't-crash discipline.
+    version = ui_version()
+    return {
+        "name": "ui",
+        "required": True,
+        "found": True,
+        "version": version,
+        "path": path,
+        "meets_min_version": meets_min_ui_version(version),
+    }
 
 
 def _check_node() -> dict[str, Any]:
@@ -86,7 +97,15 @@ def _render_text(checks: list[dict[str, Any]], ok: bool) -> str:
         if c["found"]:
             ver = f" {c['version']}" if c["version"] else ""
             loc = f" ({c['path']})" if c["path"] else ""
-            lines.append(check_item("done", f"{c['name']}{ver}{loc}"))
+            # Version-gate (spec 019 phase 3): a resolved `ui` whose version parses as a
+            # genuine semver BELOW the floor is a SOFT warn, not a fail — health (ok/exit
+            # code) never keys off this, only the glyph. An unknown/unparseable version is
+            # NOT warned (it is not actionably "old"), so it renders as a plain `done`.
+            if c["name"] == "ui" and ui_below_floor(c["version"]):
+                hint = f"below floor {MIN_UI_VERSION}, run `design-os update`"
+                lines.append(check_item("warn", f"{c['name']}{ver}{loc}", hint))
+            else:
+                lines.append(check_item("done", f"{c['name']}{ver}{loc}"))
         else:
             # OK/MISS semantics preserved: a missing REQUIRED dep is a hard `fail`
             # (drives exit 1); a missing OPTIONAL hand is `pending` (health-neutral).

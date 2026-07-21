@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-22 - Distribution prep (Spec 019 P3)
+
+- distribution: version-gate + PyPI metadata + publish runbook; no publish executed.
+- Added a `ui`↔`design-os` version-gate closing the two-CLI coupling blind spot:
+  `design_os.kernel.MIN_UI_VERSION` (`"0.1.0"`) + `kernel.ui_version()` (a deterministic
+  local-subprocess probe, no network). `design-os doctor` now shows the resolved `ui`
+  version and warns (soft — never fails health or the exit code) when it is below the
+  floor, with the fix command (`design-os update`) inline.
+- Fixed the README quick-start clone command: `design-os.git` → `ease-design.git` (the
+  actual repo name), so a fresh clone works.
+- `design-os/pyproject.toml` now carries full PyPI-ready metadata (`license`, `readme`,
+  `authors`, `classifiers`, `[project.urls]`) — resolves the "bare listing / missing
+  license" warnings a future `twine upload` would raise. `name`/`version`/`scripts`/
+  `dependencies` unchanged; the `design-os-figma` workspace dependency (the remaining
+  PyPI blocker) is untouched, by design.
+- Added `specs/019-onboarding-first-run/npm-publish-runbook.md` — the single owner action
+  (add `NPM_TOKEN`, push a version tag) needed to publish `ui` to npm, plus current
+  publish scope, the version-gate note, and the remaining PyPI blocker.
+
 ## 2026-07-21 - Report renderer + preview links (Spec 019 P2)
 
 - Adopted the shared style-A renderer (`ruleHeader` + `checkItem` + `kv`) in `ui doctor`,
