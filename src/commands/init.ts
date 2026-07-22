@@ -23,7 +23,7 @@ import {
 } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cwd as processCwd } from "node:process";
+import { cwd as processCwd, env as processEnv } from "node:process";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { errJson, errText, okJson } from "../core/output.js";
@@ -37,6 +37,7 @@ import {
   resolvePackageRoots,
 } from "../core/init-stub.js";
 import type { Runtime } from "../core/init-stub.js";
+import { detectRuntimes, UNIVERSAL_RUNTIME_ID } from "../core/runtime-registry.js";
 import { generateAdapter } from "../adapters/index.js";
 import type { GenerateAdapterInput } from "../adapters/index.js";
 import { renderBanner } from "../core/report-style.js";
@@ -62,13 +63,23 @@ const CMD = "init";
 export const INIT_HELP = `ui init — write the ease-design manifest and per-runtime adapter tree
 
 Usage:
+  ui init [--cwd <path>] [--force] [--json]
   ui init --runtime <claude|antigravity|codex|agents-md> [--cwd <path>] [--force] [--json]
   ui init --all [--cwd <path>] [--force] [--json]
 
+With no --runtime/--all, init AUTO-DETECTS the host from the target directory
+and env (no network, no model): claude (.claude/ or CLAUDE_CODE_ENTRYPOINT),
+antigravity (.agent/), codex (AGENTS.md). Multiple signals wire multiple
+runtimes; no signal falls back to the universal agents-md AGENTS.md adapter —
+init is never unusable on an unrecognized host. Explicit --runtime/--all
+bypass detection entirely (deterministic — use in CI/scripts).
+
 Options:
   --runtime <r>  Target runtime: claude | antigravity | codex | agents-md
+                 (bypasses auto-detection)
   --all          Write manifests and adapter trees for all three NATIVE runtimes
                  (claude, antigravity, codex — excludes the agents-md fallback)
+                 (bypasses auto-detection)
   --cwd <path>   Target directory (default: current working directory)
   --force        Overwrite existing manifest and adapter files
   --json         Emit a JSON envelope instead of writing to stderr
@@ -100,7 +111,7 @@ Notes:
   - On any write failure all files written this invocation are removed or restored.
 
 Error codes:
-  BAD_ARG         Missing --runtime, unknown runtime, or --runtime + --all together
+  BAD_ARG         Unknown --runtime value, or --runtime + --all together
   UNKNOWN_FLAG    Unrecognised --flag (rejected, with a did-you-mean hint)
   MANIFEST_EXISTS Target file already exists (use --force to overwrite)
   WRITE_ERROR     File could not be written
@@ -148,35 +159,73 @@ export const initCommand = {
     const force = parsed.flags["force"] === true;
     const useAll = parsed.flags["all"] === true;
     const runtimeFlag = parsed.flags["runtime"];
+    const runtimePresent = runtimeFlag !== undefined;
 
     // ── Validate flag combination ──────────────────────────────────────────
-    if (useAll && typeof runtimeFlag === "string") {
+    if (useAll && runtimePresent) {
       const msg = "--runtime and --all are mutually exclusive";
       return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
     }
-    if (!useAll && typeof runtimeFlag !== "string") {
-      const msg = "ui init requires --runtime <claude|antigravity|codex|agents-md> or --all";
+    // A bare `--runtime` (passed with no value) is a fumble, not a request for AUTO —
+    // fail loudly rather than silently auto-detecting a host the user didn't intend.
+    if (runtimePresent && typeof runtimeFlag !== "string") {
+      const msg = "--runtime needs a value: claude | antigravity | codex | agents-md";
       return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
     }
 
-    // ── Validate runtime value ─────────────────────────────────────────────
-    // --all stays native-only (RUNTIMES); an explicit --runtime may also
-    // target the universal agents-md fallback (ALL_RUNTIME_IDS, spec 021 P2).
-    const runtimes: Runtime[] = useAll
-      ? [...RUNTIMES]
-      : [runtimeFlag as string].map((r) => {
-          if (!ALL_RUNTIME_IDS.includes(r as Runtime)) return null;
-          return r as Runtime;
-        }).filter((r): r is Runtime => r !== null);
-
-    if (!useAll && runtimes.length === 0) {
-      const msg = `unknown runtime '${String(runtimeFlag)}'; must be one of: ${ALL_RUNTIME_IDS.join(", ")}`;
-      return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
-    }
-
-    // ── Resolve target directory ───────────────────────────────────────────
+    // ── Resolve target directory ────────────────────────────────────────────
+    // Moved above runtime selection (spec 021 P3) — AUTO detection stats
+    // targetCwd, not an unconditional process.cwd().
     const cwdFlag = parsed.flags["cwd"];
     const targetCwd = typeof cwdFlag === "string" ? resolve(cwdFlag) : processCwd();
+
+    // ── Resolve runtime selection (spec 021 P3: explicit > --all > AUTO) ───
+    // 1. Explicit --runtime <id> (incl. agents-md) → that one entry. Bypasses
+    //    detection entirely — deterministic, safe for CI.
+    // 2. --all → all NATIVE entries (unchanged RUNTIMES semantics). Bypasses
+    //    detection entirely.
+    // 3. No flag → AUTO: detectRuntimes(targetCwd, env); empty → the single
+    //    universal agents-md fallback (init is never unusable on an
+    //    unrecognized host).
+    let runtimes: Runtime[];
+    let autoDetectLine: string | null = null; // set only when AUTO (no flag) was used
+
+    if (typeof runtimeFlag === "string") {
+      if (!ALL_RUNTIME_IDS.includes(runtimeFlag as Runtime)) {
+        const msg = `unknown runtime '${runtimeFlag}'; must be one of: ${ALL_RUNTIME_IDS.join(", ")}`;
+        return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
+      }
+      runtimes = [runtimeFlag as Runtime];
+    } else if (useAll) {
+      runtimes = [...RUNTIMES];
+    } else {
+      const detected = detectRuntimes(targetCwd, processEnv);
+      if (detected.length === 0) {
+        runtimes = [UNIVERSAL_RUNTIME_ID];
+        autoDetectLine =
+          "auto-detected: no host detected → universal AGENTS.md (works with any AGENTS.md agent)";
+      } else {
+        runtimes = detected.map((r) => r.id);
+        // The reason string comes from each entry's own `detectSignal` (registry
+        // is the single source) — a new runtime needs no edit here, and the label
+        // honestly lists every signal that could have fired (env OR dir).
+        const reasons = detected.map((r) => `${r.id} (${r.detectSignal})`).join(", ");
+        autoDetectLine = `auto-detected: ${reasons}`;
+      }
+    }
+
+    // Dedup by manifest target path — a Set keyed by manifestTargetPath so no
+    // two selected entries can ever write the same file+sentinel in one run
+    // (safety invariant; native selection never actually collides today —
+    // only codex and the fallback agents-md share a manifest path, and AUTO
+    // only ever picks one or the other, never both).
+    const seenManifestPaths = new Set<string>();
+    runtimes = runtimes.filter((r) => {
+      const p = manifestTargetPath(targetCwd, r);
+      if (seenManifestPaths.has(p)) return false;
+      seenManifestPaths.add(p);
+      return true;
+    });
 
     // ── Resolve package roots (templates/ + knowledge/) ────────────────────
     // Shared with `ui doctor` via resolvePackageRoots (init-stub.ts). Walks up
@@ -419,6 +468,7 @@ export const initCommand = {
     if (useJson) {
       const data: Record<string, unknown> = { manifests, adapters: adapterResults };
       if (hint !== null) data.nextStep = hint.nextStep;
+      if (autoDetectLine !== null) data.autoDetect = autoDetectLine;
       return okJson(CMD, data);
     }
 
@@ -445,6 +495,12 @@ export const initCommand = {
       "next: run `ui onboard` — your setup checklist and what to do next\n" +
       "      run `ui guide`   — see what DESIGN:OS can do";
     let body = hint !== null ? `${lines}\n${hint.hintLine}\n${nextBlock}` : `${lines}\n${nextBlock}`;
+    // AUTO (no --runtime/--all) states what it selected and why — silent
+    // auto-selection is a footgun (spec 021 P3). Only set when AUTO ran;
+    // explicit --runtime/--all never show this line.
+    if (autoDetectLine !== null) {
+      body = `${autoDetectLine}\n${body}`;
+    }
     // Agents are opt-in (never auto-generated) — Claude Code installs get one hint line.
     if (runtimes.includes("claude")) {
       body += "\noptional: `ui agents init` gives this project soul-bound task agents";

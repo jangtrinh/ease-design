@@ -17,6 +17,7 @@
  * (see below); `RUNTIMES` (native-only) is unaffected — it still governs
  * `--all`.
  */
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { generateClaudeAdapter } from "../adapters/claude.js";
 import { generateAntigravityAdapter } from "../adapters/antigravity.js";
@@ -50,6 +51,13 @@ export interface RuntimeEntry {
    * calls this — every entry's implementation is a placeholder for now.
    */
   detect(cwd: string, env: NodeJS.ProcessEnv): boolean;
+  /**
+   * Human-readable description of this runtime's detection signal(s), shown in the
+   * AUTO success line ("auto-detected: claude (CLAUDE_CODE_ENTRYPOINT or .claude/)").
+   * Lives on the entry — not a separate map in init.ts — so a new runtime brings its
+   * own reason string with it (acceptance: a new agent is one registry entry, no init edit).
+   */
+  detectSignal: string;
   /** ← was init-stub.ts:190-195's manifestTargetPath switch */
   manifestPath(cwd: string): string;
   /** ← was adapters/index.ts:56-66's dispatch switch */
@@ -63,7 +71,11 @@ export interface RuntimeEntry {
 const claude: RuntimeEntry = {
   id: "claude",
   native: true,
-  detect: () => false, // P3 fills this in
+  // Live env fact (spec 021 research): Claude Code sets CLAUDE_CODE_ENTRYPOINT
+  // in every session — definitive. `.claude/` in cwd is the project-level
+  // fallback signal (env var absent e.g. when probing another project's dir).
+  detect: (cwd, env) => Boolean(env.CLAUDE_CODE_ENTRYPOINT) || existsSync(join(cwd, ".claude")),
+  detectSignal: "CLAUDE_CODE_ENTRYPOINT or .claude/",
   manifestPath: (cwd) => join(cwd, ".claude", "ease-design.json"),
   adapterFn: generateClaudeAdapter,
   modelAdapter: { argv: ["claude", "-p"], mode: "stdin" },
@@ -73,7 +85,10 @@ const claude: RuntimeEntry = {
 const antigravity: RuntimeEntry = {
   id: "antigravity",
   native: true,
-  detect: () => false, // P3 fills this in
+  // Project-level `.agent/` dir is the only stable signal (spec 021 research
+  // found no verified antigravity env var).
+  detect: (cwd) => existsSync(join(cwd, ".agent")),
+  detectSignal: ".agent/",
   manifestPath: (cwd) => join(cwd, ".agent", "ease-design.json"),
   adapterFn: generateAntigravityAdapter,
   modelAdapter: {
@@ -86,7 +101,11 @@ const antigravity: RuntimeEntry = {
 const codex: RuntimeEntry = {
   id: "codex",
   native: true,
-  detect: () => false, // P3 fills this in
+  // AGENTS.md file present in cwd. Do NOT use CODEX_HOME — the live env check
+  // (spec 021 research) found it set even inside a Claude Code session, so it
+  // cannot distinguish "codex is the host" from "codex is merely installed".
+  detect: (cwd) => existsSync(join(cwd, "AGENTS.md")),
+  detectSignal: "AGENTS.md",
   manifestPath: (cwd) => join(cwd, "AGENTS.ease-design.json"),
   adapterFn: generateCodexAdapter,
   modelAdapter: { argv: ["codex", "exec"], mode: "stdin" },
@@ -104,7 +123,10 @@ const codex: RuntimeEntry = {
 const agentsMd: RuntimeEntry = {
   id: UNIVERSAL_RUNTIME_ID,
   native: false,
-  detect: () => false, // P3 fills this in
+  // Never "detected" — it is the universal fallback, selected explicitly by
+  // init's no-flag-AUTO branch when no native entry detects, not by detect().
+  detect: () => false,
+  detectSignal: "universal fallback (any AGENTS.md agent)", // never shown in the AUTO line
   manifestPath: codex.manifestPath,
   adapterFn: generateAgentsMdAdapter,
   modelAdapter: codex.modelAdapter,
@@ -130,4 +152,15 @@ export const ALL_RUNTIME_IDS: readonly Runtime[] = RUNTIME_REGISTRY.map((r) => r
 /** Look up a registry entry by id. Returns undefined for an unknown id. */
 export function findRuntimeEntry(id: string): RuntimeEntry | undefined {
   return RUNTIME_REGISTRY.find((r) => r.id === id);
+}
+
+/**
+ * Auto-detect (spec 021 P3) — the native entries whose `detect()` fires for
+ * this cwd + env, in registry order. Reads cwd (existsSync) + env only: no
+ * network, no model, fully deterministic. `agents-md` is never included here
+ * (its `detect` is always `false` by design) — `init.ts`'s no-flag-AUTO
+ * branch falls back to it explicitly when this returns empty.
+ */
+export function detectRuntimes(cwd: string, env: NodeJS.ProcessEnv): RuntimeEntry[] {
+  return RUNTIME_REGISTRY.filter((r) => r.native && r.detect(cwd, env));
 }

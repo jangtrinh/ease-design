@@ -144,13 +144,6 @@ describe("ui init --force and MANIFEST_EXISTS", () => {
 });
 
 describe("ui init argument validation", () => {
-  it("missing --runtime (and no --all) → exit 1, BAD_ARG", () => {
-    const { code, out } = captureRun(["init", "--json"]);
-    expect(code).toBe(1);
-    const json = JSON.parse(out) as { error: { code: string } };
-    expect(json.error.code).toBe("BAD_ARG");
-  });
-
   it("--runtime and --all together → exit 1, BAD_ARG", () => {
     const { code, out } = captureRun(["init", "--runtime", "claude", "--all", "--json"]);
     expect(code).toBe(1);
@@ -165,10 +158,132 @@ describe("ui init argument validation", () => {
     expect(json.error.code).toBe("BAD_ARG");
   });
 
+  // These error at the validation stage (before any target-dir write), like the two
+  // cases above — so, like them, they need no --cwd and never touch the repo.
+  it("bare --runtime (no value) → exit 1, BAD_ARG (not a silent auto-detect)", () => {
+    const { code, out } = captureRun(["init", "--json", "--runtime"]);
+    expect(code).toBe(1);
+    expect((JSON.parse(out) as { error: { code: string } }).error.code).toBe("BAD_ARG");
+  });
+
+  it("bare --runtime + --all → exit 1, BAD_ARG (conflict caught even without a value)", () => {
+    const { code, out } = captureRun(["init", "--json", "--all", "--runtime"]);
+    expect(code).toBe(1);
+    expect((JSON.parse(out) as { error: { code: string } }).error.code).toBe("BAD_ARG");
+  });
+
   it("--help exits 0 and mentions init", () => {
     const { code, out } = captureRun(["init", "--help"]);
     expect(code).toBe(0);
     expect(out.toLowerCase()).toContain("init");
+  });
+});
+
+// ── Auto-detect (spec 021 P3) ──────────────────────────────────────────────────
+//
+// IMPORTANT: every case here MUST pass --cwd pointing at a tmp dir. With no
+// --runtime/--all, init now auto-detects from the target directory + env —
+// running it against the real process.cwd() (this repo, which itself has
+// .claude/, .agent/, and AGENTS.md) would write real adapter files into this
+// checkout. Never call `captureRun(["init", ...])` without --cwd in this file.
+
+// This test suite may itself run inside a Claude Code session (CLAUDE_CODE_ENTRYPOINT
+// set in the real process env) — claude's detect() checks that var, so any test
+// asserting "claude was NOT auto-detected" must run with it unset, restored after.
+function withoutClaudeEntrypointEnv(fn: () => void): void {
+  const saved = process.env["CLAUDE_CODE_ENTRYPOINT"];
+  delete process.env["CLAUDE_CODE_ENTRYPOINT"];
+  try {
+    fn();
+  } finally {
+    if (saved !== undefined) process.env["CLAUDE_CODE_ENTRYPOINT"] = saved;
+  }
+}
+
+describe("ui init no-flag AUTO-detect", () => {
+  it("bare tmp dir (no signals) → falls back to the universal agents-md runtime", () => {
+    withoutClaudeEntrypointEnv(() => {
+      const cwd = makeTmpDir();
+      const { code, out } = captureRun(["init", "--cwd", cwd, "--json"]);
+      expect(code).toBe(0);
+      const json = JSON.parse(out) as {
+        data: { manifests: { runtime: string }[]; autoDetect?: string };
+      };
+      expect(json.data.manifests).toHaveLength(1);
+      expect(json.data.manifests[0]?.runtime).toBe("agents-md");
+      expect(existsSync(join(cwd, "AGENTS.ease-design.json"))).toBe(true);
+      expect(json.data.autoDetect).toContain("no host detected");
+    });
+  });
+
+  it("tmp dir with .claude/ → auto-selects claude only", () => {
+    const cwd = makeTmpDir();
+    mkdirSync(join(cwd, ".claude"), { recursive: true });
+    const { code, out } = captureRun(["init", "--cwd", cwd, "--json"]);
+    expect(code).toBe(0);
+    const json = JSON.parse(out) as {
+      data: { manifests: { runtime: string }[]; autoDetect?: string };
+    };
+    expect(json.data.manifests).toHaveLength(1);
+    expect(json.data.manifests[0]?.runtime).toBe("claude");
+    expect(existsSync(join(cwd, ".claude", "ease-design.json"))).toBe(true);
+    expect(json.data.autoDetect).toContain("claude");
+  });
+
+  it("tmp dir with .claude/ AND AGENTS.md → auto-selects both claude and codex, no double-write", () => {
+    const cwd = makeTmpDir();
+    mkdirSync(join(cwd, ".claude"), { recursive: true });
+    writeFileSync(join(cwd, "AGENTS.md"), "# project\n", "utf8");
+    const { code, out } = captureRun(["init", "--cwd", cwd, "--json"]);
+    expect(code).toBe(0);
+    const json = JSON.parse(out) as {
+      data: { manifests: { runtime: string }[]; autoDetect?: string };
+    };
+    const runtimes = json.data.manifests.map((m) => m.runtime).sort();
+    expect(runtimes).toEqual(["claude", "codex"]);
+    expect(existsSync(join(cwd, ".claude", "ease-design.json"))).toBe(true);
+    expect(existsSync(join(cwd, "AGENTS.ease-design.json"))).toBe(true);
+    expect(json.data.autoDetect).toContain("claude");
+    expect(json.data.autoDetect).toContain("codex");
+  });
+
+  it("text mode prints the auto-detected line", () => {
+    withoutClaudeEntrypointEnv(() => {
+      const cwd = makeTmpDir();
+      mkdirSync(join(cwd, ".agent"), { recursive: true });
+      const { code, err } = captureRun(["init", "--cwd", cwd]);
+      expect(code).toBe(0);
+      expect(err).toContain("auto-detected: antigravity (.agent/)");
+    });
+  });
+
+  it("explicit --runtime bypasses detection even with signals present (deterministic for CI)", () => {
+    const cwd = makeTmpDir();
+    mkdirSync(join(cwd, ".claude"), { recursive: true }); // would auto-detect claude
+    writeFileSync(join(cwd, "AGENTS.md"), "# project\n", "utf8"); // would also auto-detect codex
+    const { code, out } = captureRun(["init", "--runtime", "antigravity", "--cwd", cwd, "--json"]);
+    expect(code).toBe(0);
+    const json = JSON.parse(out) as {
+      data: { manifests: { runtime: string }[]; autoDetect?: string };
+    };
+    expect(json.data.manifests).toHaveLength(1);
+    expect(json.data.manifests[0]?.runtime).toBe("antigravity");
+    expect(json.data.autoDetect).toBeUndefined();
+  });
+
+  it("--all bypasses detection: writes all three natives regardless of which signals are present", () => {
+    const cwd = makeTmpDir(); // no signals at all
+    const { code, out } = captureRun(["init", "--all", "--cwd", cwd, "--json"]);
+    expect(code).toBe(0);
+    const json = JSON.parse(out) as {
+      data: { manifests: { runtime: string }[]; autoDetect?: string };
+    };
+    expect(json.data.manifests.map((m) => m.runtime).sort()).toEqual([
+      "antigravity",
+      "claude",
+      "codex",
+    ]);
+    expect(json.data.autoDetect).toBeUndefined();
   });
 });
 
