@@ -59,9 +59,16 @@ agents as they want; a project with zero agents is a fully supported state
 
 ## §5 Runtime scope
 
-Claude Code only for now (`.claude/agents/`). codex and antigravity have no stable
-subagent format yet; when they do, the same templates + genealogy naming will emit
-their trees. Until then nothing is written for them.
+**This scope is about SUBAGENTS only** (`ui agents` → `.claude/agents/`) — NOT the
+`ui init` runtime adapters. Subagents are Claude Code only for now: codex and
+antigravity have no stable subagent format yet; when they do, the same templates +
+genealogy naming will emit their trees. Until then no *subagent tree* is written for them.
+
+This is NOT the same as runtime support. `ui init` DOES emit design:os skills +
+workflows for antigravity (`.agent/skills/design-os-*/`, `.agent/workflows/ui-*.md`) and
+codex/agents-md (`AGENTS.md` sentinel) — that is a separate mechanism, see the adapters
+under `src/adapters/`, not this file. "Nothing is written" here means *no subagent
+roster*, never "design:os is unavailable on that runtime."
 
 ## §6 Drift check — the emitter/linter pair
 
