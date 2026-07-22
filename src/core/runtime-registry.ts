@@ -11,22 +11,35 @@
  * `detect` is part of the P3 (auto-detect) contract; P1 does not call it —
  * every entry here always returns `false` as a placeholder until P3 fills it in.
  *
- * Coverage v1 (this file): the 3 native runtimes only. The universal
- * `agents-md` fallback entry is added in P2.
+ * Spec 021 P2 adds the universal `agents-md` fallback entry (`native: false`)
+ * — the same AGENTS.md sentinel block as codex, for any AGENTS.md-reading
+ * host agent that isn't one of the 3 natives. `Runtime` widens accordingly
+ * (see below); `RUNTIMES` (native-only) is unaffected — it still governs
+ * `--all`.
  */
 import { join } from "node:path";
 import { generateClaudeAdapter } from "../adapters/claude.js";
 import { generateAntigravityAdapter } from "../adapters/antigravity.js";
 import { generateCodexAdapter } from "../adapters/codex.js";
+import { generateAgentsMdAdapter } from "../adapters/agents-md.js";
 import type { AdapterArtifact, AdapterInput } from "../adapters/index.js";
 
 export type ModelAdapterMode = "stdin" | "arg";
 
-/** Native runtime ids, in canonical order. `Runtime` is derived from this, not hand-written. */
+/** Native runtime ids, in canonical order. The native slice of `Runtime` is derived from this, not hand-written. */
 export const NATIVE_RUNTIME_IDS = ["claude", "antigravity", "codex"] as const satisfies readonly string[];
 
-/** Back-compat alias — `src/core/init-stub.ts` re-exports this for existing consumers. */
-export type Runtime = (typeof NATIVE_RUNTIME_IDS)[number];
+/** The universal AGENTS.md fallback id (spec 021 P2) — not native, no `detect()` wiring yet (P3 fills it in). */
+export const UNIVERSAL_RUNTIME_ID = "agents-md" as const;
+
+/**
+ * Back-compat alias — `src/core/init-stub.ts` re-exports this for existing
+ * consumers. Widened in spec 021 P2 to include the universal `agents-md`
+ * fallback: `--runtime agents-md` flows through the identical manifest /
+ * adapter-dispatch / model-wrapper code paths as a native runtime, so every
+ * consumer that types a runtime value must legitimately accept it too.
+ */
+export type Runtime = (typeof NATIVE_RUNTIME_IDS)[number] | typeof UNIVERSAL_RUNTIME_ID;
 
 export interface RuntimeEntry {
   id: Runtime;
@@ -80,13 +93,39 @@ const codex: RuntimeEntry = {
   wrapperRelPath: "design-os-model.sh",
 };
 
-/** Registration order is the canonical order every derived list (RUNTIMES, enums, …) uses. */
-export const RUNTIME_REGISTRY: readonly RuntimeEntry[] = [claude, antigravity, codex] as const;
+/**
+ * The universal `agents-md` fallback entry (spec 021 P2). Emits the identical
+ * AGENTS.md sentinel block as codex — manifestPath, modelAdapter, and
+ * wrapperRelPath are literally codex's (same target file, same host-model
+ * invocation family: an AGENTS.md-reading agent). `detect` always returns
+ * `false` here; P3's no-flag-AUTO path is what actually falls back to this
+ * entry, not `detect()` itself.
+ */
+const agentsMd: RuntimeEntry = {
+  id: UNIVERSAL_RUNTIME_ID,
+  native: false,
+  detect: () => false, // P3 fills this in
+  manifestPath: codex.manifestPath,
+  adapterFn: generateAgentsMdAdapter,
+  modelAdapter: codex.modelAdapter,
+  wrapperRelPath: codex.wrapperRelPath,
+};
 
-/** Back-compat: the native-runtime id list, in registry order. */
+/** Registration order is the canonical order every derived list (RUNTIMES, enums, …) uses. */
+export const RUNTIME_REGISTRY: readonly RuntimeEntry[] = [claude, antigravity, codex, agentsMd] as const;
+
+/** Back-compat: the native-runtime id list, in registry order. Governs `--all`. */
 export const RUNTIMES: readonly Runtime[] = RUNTIME_REGISTRY.filter((r) => r.native).map(
   (r) => r.id,
 );
+
+/**
+ * All registry ids, including the universal `agents-md` fallback — used to
+ * validate an explicit `--runtime <id>` (which may legitimately target the
+ * fallback) and to derive the `ui schema` enum. `RUNTIMES` (native-only)
+ * remains the list `--all` expands to.
+ */
+export const ALL_RUNTIME_IDS: readonly Runtime[] = RUNTIME_REGISTRY.map((r) => r.id);
 
 /** Look up a registry entry by id. Returns undefined for an unknown id. */
 export function findRuntimeEntry(id: string): RuntimeEntry | undefined {

@@ -6,10 +6,19 @@ import {
   buildClaudeSkill,
   buildAntigravityWorkflow,
   buildAntigravitySkill,
-  buildCodexBlock,
+  buildAgentsMdBlock,
   CODEX_SENTINEL_BEGIN,
   CODEX_SENTINEL_END,
 } from "../src/adapters/wrapper-shapes.js";
+import { WORKFLOW_VERBS } from "../src/adapters/templates.js";
+
+// Spec 021 P2 renamed `buildCodexBlock` → `buildAgentsMdBlock(id, ...)`. Every
+// existing "buildCodexBlock" test below now calls `buildAgentsMdBlock` with
+// id="codex" — same output, since the codex regen-hint line is `--runtime
+// codex --force` either way (see the golden test at the bottom of this file).
+function buildCodexBlock(templatesRoot: string, hashes: Record<string, string>, knowledgeRoot?: string): string {
+  return buildAgentsMdBlock("codex", templatesRoot, hashes, knowledgeRoot);
+}
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const FAKE_TEMPLATES = join(REPO_ROOT, "templates");
@@ -227,5 +236,67 @@ describe("buildCodexBlock", () => {
     // verbs the old hardcoded line omitted — /ui:learn, /ui:to-figma — appear.
     expect(out).toContain("/ui:learn");
     expect(out).toContain("/ui:to-figma");
+  });
+});
+
+// ─── Golden: buildAgentsMdBlock("codex") byte-identical to the pre-P2 buildCodexBlock ─
+//
+// Spec 021 P2 hard rule: codex's sentinel block must stay byte-for-byte
+// unchanged (existing installs upgrade in place). This test reconstructs the
+// pre-rename `buildCodexBlock` output INDEPENDENTLY — a hardcoded literal
+// mirroring the original function body, not a second call into the renamed
+// builder — and diffs it against the real `buildAgentsMdBlock("codex", ...)`
+// output. A drift in the codex shape (including the regen-hint line) fails here.
+describe("buildAgentsMdBlock('codex') — byte-identical golden", () => {
+  it("matches the pre-P2 buildCodexBlock shape exactly, including the regen-hint line", () => {
+    const hashes = { "workflows/generate.md": "abc123", "skills/pick-persona.md": "def456" };
+    const knowledgeRoot = "/fake/knowledge";
+    const fwdRoot = FAKE_TEMPLATES.replace(/\\/g, "/");
+    const fwdKnowledge = knowledgeRoot.replace(/\\/g, "/");
+    const hashLines = Object.keys(hashes)
+      .sort()
+      .map((k) => `  ${k}: ${(hashes as Record<string, string>)[k] ?? ""}`)
+      .join("\n");
+
+    // Sentinels are HARDCODED here (not the imported constants) on purpose: they are
+    // the upgrade-in-place invariant — an accidental rename would silently orphan the
+    // block in every existing install, and a golden that imports the same constant could
+    // never catch that. This literal is the contract old files were written with.
+    const golden = [
+      "<!-- BEGIN ease-design -->",
+      "## ease-design",
+      "",
+      "This project uses ease-design. Workflows, skills, and journeys live under",
+      `\`${fwdRoot}/workflows/\`, \`${fwdRoot}/skills/\`, and \`${fwdRoot}/journeys/\`.`,
+      "Invoke them by following the relevant Markdown file when the user asks for",
+      "design work (journeys cover onboarding/daily/delivery sequencing across",
+      `multiple commands). Templates reference \`knowledge/<file>\` — resolve those against \`${fwdKnowledge}\`. The \`ui\` binary handles all non-LLM`,
+      "work (autofix, layout validation, token compilation, color math). Before",
+      "forming a `ui` invocation, run `ui schema --json` for the machine-readable",
+      "signature (positionals, flags, enums, error codes) of every (sub)command.",
+      "",
+      "Available slash-commands when proxied:",
+      `${WORKFLOW_VERBS.map((v) => `/ui:${v}`).join(" ")}.`,
+      "",
+      "Template hashes (sha256, for drift detection):",
+      hashLines,
+      "",
+      "Do not edit content between the BEGIN/END markers — it is regenerated",
+      "by `ui init --runtime codex --force`.",
+      "<!-- END ease-design -->",
+    ].join("\n");
+
+    const actual = buildAgentsMdBlock("codex", FAKE_TEMPLATES, hashes, knowledgeRoot);
+    expect(actual).toBe(golden);
+  });
+
+  it("id='agents-md' differs ONLY in the regen-hint runtime name, not any other byte", () => {
+    const hashes = { "workflows/generate.md": "abc123" };
+    const codexOut = buildAgentsMdBlock("codex", FAKE_TEMPLATES, hashes);
+    const agentsMdOut = buildAgentsMdBlock("agents-md", FAKE_TEMPLATES, hashes);
+    expect(codexOut.replace("--runtime codex --force", "--runtime agents-md --force")).toBe(
+      agentsMdOut,
+    );
+    expect(agentsMdOut).toContain("`ui init --runtime agents-md --force`");
   });
 });

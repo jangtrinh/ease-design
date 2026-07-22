@@ -248,7 +248,7 @@ export function buildAntigravitySkill(
   return buildClaudeSkill(name, templatePath, knowledgeRoot, description);
 }
 
-// ─── Codex builder ────────────────────────────────────────────────────────────
+// ─── AGENTS.md builder (codex + the universal agents-md fallback) ─────────────
 
 export const CODEX_SENTINEL_BEGIN = "<!-- BEGIN ease-design -->";
 export const CODEX_SENTINEL_END   = "<!-- END ease-design -->";
@@ -256,10 +256,19 @@ export const CODEX_SENTINEL_END   = "<!-- END ease-design -->";
 /**
  * Build the sentinel-bracketed block appended/upserted into `AGENTS.md`.
  *
+ * Shared by the codex adapter and the universal `agents-md` fallback adapter
+ * (spec 021 P2) — both emit the identical block, byte-for-byte, except the
+ * regen-hint line at the end, which is parameterized by `id` so it tells the
+ * reader the exact `ui init --runtime <id> --force` invocation that
+ * regenerates it. For `id === "codex"` the output is byte-identical to the
+ * pre-P2 `buildCodexBlock` (existing installs upgrade in place).
+ *
+ * @param id            Runtime id driving the regen-hint line (e.g. "codex", "agents-md").
  * @param templatesRoot Absolute path to the templates/ directory.
  * @param hashes        sha256 per template file (key = verb, skill, or journey name).
  */
-export function buildCodexBlock(
+export function buildAgentsMdBlock(
+  id: string,
   templatesRoot: string,
   hashes: Record<string, string>,
   knowledgeRoot?: string,
@@ -296,7 +305,7 @@ export function buildCodexBlock(
     hashLines,
     "",
     "Do not edit content between the BEGIN/END markers — it is regenerated",
-    "by `ui init --runtime codex --force`.",
+    `by \`ui init --runtime ${id} --force\`.`,
     CODEX_SENTINEL_END,
   ].join("\n");
 }

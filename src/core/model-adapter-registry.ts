@@ -32,14 +32,21 @@ import type { ModelAdapterMode, Runtime } from "./runtime-registry.js";
 export type { ModelAdapterMode };
 
 /**
- * One entry per runtime design:os models today. Derived from RUNTIME_REGISTRY
- * (spec 021 P1) — the live-probed table above documents the values; the
+ * One entry per registry runtime. Derived from RUNTIME_REGISTRY (spec 021
+ * P1) — the live-probed table above documents the 3 native values; the
  * registry entries (src/core/runtime-registry.ts) are the source of truth.
- * Extend only with a fresh live probe.
+ * Extend the live-probed natives only with a fresh live probe.
+ *
+ * Spec 021 P2: every registry entry is included (not just `native` ones) —
+ * the universal `agents-md` fallback flows through the same
+ * generateAdapter → buildModelWrapperScript/modelWrapperRelPath path as a
+ * native runtime, so it needs a MODEL_ADAPTERS entry too. Its value is
+ * codex's own `modelAdapter` object (see runtime-registry.ts), not a new
+ * probe.
  */
 export const MODEL_ADAPTERS: Record<Runtime, { argv: string[]; mode: ModelAdapterMode }> =
   Object.fromEntries(
-    RUNTIME_REGISTRY.filter((r) => r.native).map((r) => [r.id, r.modelAdapter]),
+    RUNTIME_REGISTRY.map((r) => [r.id, r.modelAdapter]),
   ) as Record<Runtime, { argv: string[]; mode: ModelAdapterMode }>;
 
 /**

@@ -15,15 +15,16 @@
  */
 import { existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
-import { RUNTIMES, findRuntimeEntry } from "./runtime-registry.js";
+import { RUNTIMES, ALL_RUNTIME_IDS, findRuntimeEntry } from "./runtime-registry.js";
 import type { Runtime } from "./runtime-registry.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-// `Runtime` and `RUNTIMES` are re-exported here (spec 021 P1) for back-compat —
-// runtime-registry.ts is now the single source; init-stub.ts is a consumer.
+// `Runtime`, `RUNTIMES`, and `ALL_RUNTIME_IDS` are re-exported here (spec 021
+// P1/P2) for back-compat — runtime-registry.ts is now the single source;
+// init-stub.ts is a consumer.
 export type { Runtime };
-export { RUNTIMES };
+export { RUNTIMES, ALL_RUNTIME_IDS };
 
 // ─── Package-root resolution ────────────────────────────────────────────────────
 

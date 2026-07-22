@@ -1,9 +1,15 @@
 /**
- * Codex adapter — generates the adapter artifact list for the codex runtime.
+ * Universal agents-md adapter — generates the adapter artifact list for the
+ * `agents-md` runtime (spec 021 P2).
+ *
+ * This is the universal fallback for any AGENTS.md-reading host agent that
+ * isn't one of the three native runtimes (Cursor, Cline, Aider, Gemini-CLI,
+ * …). It emits the SAME sentinel-block artifact shape as the codex adapter
+ * (see adapters/codex.ts) via the shared `buildAgentsMdBlock` builder,
+ * parameterized with id "agents-md" so the regen-hint line reads
+ * `ui init --runtime agents-md --force` instead of `--runtime codex --force`.
  *
  * Emits a single upsert-section artifact targeting <cwd>/AGENTS.md.
- * The block is delimited by sentinel comments so it can be idempotently
- * replaced without disturbing user-authored content around it.
  */
 import { join, resolve } from "node:path";
 import type { AdapterArtifact, AdapterInput } from "./index.js"; // AdapterInput: {cwd, templatesRoot}
@@ -21,11 +27,11 @@ import {
 } from "./wrapper-shapes.js";
 
 /**
- * Generate the Codex adapter artifact for the given cwd + templatesRoot.
+ * Generate the agents-md adapter artifact for the given cwd + templatesRoot.
  * Returns a single upsert-section artifact targeting AGENTS.md.
  * Pure function — no filesystem writes.
  */
-export function generateCodexAdapter(input: AdapterInput): AdapterArtifact[] {
+export function generateAgentsMdAdapter(input: AdapterInput): AdapterArtifact[] {
   const { cwd, templatesRoot } = input;
 
   // Build hash map over all non-init workflow templates + all skill + journey templates.
@@ -54,7 +60,7 @@ export function generateCodexAdapter(input: AdapterInput): AdapterArtifact[] {
   }
 
   const knowledgeRoot = resolve(templatesRoot, "..", "knowledge");
-  const content = buildAgentsMdBlock("codex", templatesRoot, hashes, knowledgeRoot);
+  const content = buildAgentsMdBlock("agents-md", templatesRoot, hashes, knowledgeRoot);
 
   return [
     {

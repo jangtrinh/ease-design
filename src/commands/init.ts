@@ -31,6 +31,7 @@ import { findUnknownFlag, unknownFlagMessage } from "../core/flag-guard.js";
 import { scanProject } from "../core/project-scan.js";
 import {
   RUNTIMES,
+  ALL_RUNTIME_IDS,
   buildManifest,
   manifestTargetPath,
   resolvePackageRoots,
@@ -61,12 +62,13 @@ const CMD = "init";
 export const INIT_HELP = `ui init — write the ease-design manifest and per-runtime adapter tree
 
 Usage:
-  ui init --runtime <claude|antigravity|codex> [--cwd <path>] [--force] [--json]
+  ui init --runtime <claude|antigravity|codex|agents-md> [--cwd <path>] [--force] [--json]
   ui init --all [--cwd <path>] [--force] [--json]
 
 Options:
-  --runtime <r>  Target runtime: claude | antigravity | codex
-  --all          Write manifests and adapter trees for all three runtimes
+  --runtime <r>  Target runtime: claude | antigravity | codex | agents-md
+  --all          Write manifests and adapter trees for all three NATIVE runtimes
+                 (claude, antigravity, codex — excludes the agents-md fallback)
   --cwd <path>   Target directory (default: current working directory)
   --force        Overwrite existing manifest and adapter files
   --json         Emit a JSON envelope instead of writing to stderr
@@ -81,10 +83,15 @@ Output paths:
                 <cwd>/.agent/skills/design-os-*/SKILL.md  (12 skills: 9 craft + 3 journey)
   codex       → <cwd>/AGENTS.ease-design.json
                 <cwd>/AGENTS.md  (sentinel block appended/upserted)
+  agents-md   → <cwd>/AGENTS.ease-design.json
+                <cwd>/AGENTS.md  (sentinel block appended/upserted)
+                Universal fallback for any AGENTS.md-reading host agent that
+                isn't claude, antigravity, or codex (Cursor, Cline, Aider,
+                Gemini-CLI, …). Same block shape as codex.
 
 Adapter tree: .claude/{commands/ui/,skills/design-os-*/} |
               .agent/{workflows/,skills/design-os-*/} |
-              AGENTS.md (sentinel block).
+              AGENTS.md (sentinel block; codex + agents-md).
 
 Notes:
   - Without --force, writing to an already-existing path exits 1 (MANIFEST_EXISTS).
@@ -148,20 +155,22 @@ export const initCommand = {
       return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
     }
     if (!useAll && typeof runtimeFlag !== "string") {
-      const msg = "ui init requires --runtime <claude|antigravity|codex> or --all";
+      const msg = "ui init requires --runtime <claude|antigravity|codex|agents-md> or --all";
       return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
     }
 
     // ── Validate runtime value ─────────────────────────────────────────────
+    // --all stays native-only (RUNTIMES); an explicit --runtime may also
+    // target the universal agents-md fallback (ALL_RUNTIME_IDS, spec 021 P2).
     const runtimes: Runtime[] = useAll
       ? [...RUNTIMES]
       : [runtimeFlag as string].map((r) => {
-          if (!RUNTIMES.includes(r as Runtime)) return null;
+          if (!ALL_RUNTIME_IDS.includes(r as Runtime)) return null;
           return r as Runtime;
         }).filter((r): r is Runtime => r !== null);
 
     if (!useAll && runtimes.length === 0) {
-      const msg = `unknown runtime '${String(runtimeFlag)}'; must be one of: ${RUNTIMES.join(", ")}`;
+      const msg = `unknown runtime '${String(runtimeFlag)}'; must be one of: ${ALL_RUNTIME_IDS.join(", ")}`;
       return useJson ? errJson(CMD, "BAD_ARG", msg) : errText(`ui: ${msg}\n`);
     }
 
