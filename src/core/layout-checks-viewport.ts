@@ -41,10 +41,25 @@ export function checkCss100vwWidth(html: string): LayoutFinding[] {
 
 // ─── overflow-x: hidden on a root element (breaks sticky) ───────────────────────
 
-/** A root selector: `html` / `body` element (not `.body-text`), or `:root`. */
-const ROOT_SELECTOR = /(?:^|[\s,>+~(])(?:html|body)(?![\w-])|:root\b/i;
 /** `overflow` or `overflow-x` (not `-y`) set to a value containing `hidden`. */
 const OVERFLOW_X_HIDDEN = /overflow(?:-x)?\s*:\s*[^;}]*\bhidden\b/i;
+
+/**
+ * True when the SUBJECT (rightmost compound) of any comma-separated selector is a
+ * root element — `html`/`body` (with optional class/attr/pseudo, but not
+ * `.body-text`) or `:root`. The subject is what the rule actually styles, so a
+ * descendant rule like `html.js .ln { overflow: hidden }` targets `.ln`, NOT the
+ * root, and must not flag. (The old start-anchored match mis-read every
+ * `html…`/`body…`-prefixed descendant selector — e.g. `body.dark .card` — as a
+ * root rule, a very common false positive.)
+ */
+function selectorSubjectIsRoot(selector: string): boolean {
+  return selector.split(",").some((part) => {
+    const compounds = part.trim().split(/[\s>+~]+/);
+    const subject = compounds[compounds.length - 1] ?? "";
+    return /^(?:html|body)(?![\w-])/i.test(subject) || /^:root(?![\w-])/i.test(subject);
+  });
+}
 
 /**
  * root-overflow-x-hidden: `overflow-x: hidden` (or shorthand `overflow: hidden`)
@@ -58,7 +73,7 @@ export function checkRootOverflowXHidden(html: string): LayoutFinding[] {
   const css = cssRegions(html);
   const usesSticky = /position\s*:\s*sticky/i.test(css);
   for (const { selector, body } of cssRules(css)) {
-    if (!ROOT_SELECTOR.test(selector)) continue;
+    if (!selectorSubjectIsRoot(selector)) continue;
     if (!OVERFLOW_X_HIDDEN.test(body)) continue;
     let message = `overflow-x: hidden on ${selector} — hidden breaks position:sticky descendants; use overflow-x: clip (same clipping, sticky survives)`;
     if (usesSticky) message += ` (this page USES sticky — it is broken right now)`;

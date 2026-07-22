@@ -270,6 +270,18 @@ describe("lintLayout — root-overflow-x-hidden", () => {
     const { findings } = lintLayout(html);
     expect(findings.some((f) => f.checkId === "root-overflow-x-hidden")).toBe(false);
   });
+
+  it("does NOT flag a descendant rule that only STARTS with html/body (subject is a deep class)", () => {
+    const html = '<!doctype html><html class="js"><body><style>.nav{position:sticky;top:0}html.js .ln{overflow:hidden}body.dark .card{overflow:hidden}</style></body></html>';
+    const { findings } = lintLayout(html);
+    expect(findings.some((f) => f.checkId === "root-overflow-x-hidden")).toBe(false);
+  });
+
+  it("still flags when body IS the subject of a descendant selector (main body)", () => {
+    const html = '<!doctype html><html><body><style>main body{overflow-x:hidden}</style></body></html>';
+    const { findings } = lintLayout(html);
+    expect(findings.some((f) => f.checkId === "root-overflow-x-hidden")).toBe(true);
+  });
 });
 
 // ─── Delivery-asset discipline (P4) ───────────────────────────────────────────
