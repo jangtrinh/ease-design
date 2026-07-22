@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026-07-22 - Onboarding: capability-aware optional Figma track
+
+- `ui onboard` now treats the Figma Design Agent as a first-class OPTIONAL capability.
+  The figma step's hint is capability-aware: when the `figma-agent` binary is on PATH
+  (linked by `./setup.sh`) it points at the plugin + `figma-agent status`; when it is
+  absent — the norm for an `npm i -g ease-design` install, where the Figma track is a
+  studio-clone add-on deliberately excluded from the npm package (`files` omits it, the
+  workspace is `private`) — it points at cloning the repo and running `./setup.sh`,
+  instead of sending the user into a `command not found`. The step stays optional and
+  never blocks `ready`.
+- `ui onboard --json` gains a `capabilities.figmaAgent` boolean so a host router (e.g.
+  es-figma-smart) can tell "track not installed" from "installed but the plugin is
+  disconnected" — the same split the hint encodes for humans. Additive; the
+  `steps`/`ready` contract is unchanged. New pure `figmaAgentOnPath()` PATH probe
+  (fs+env only, no subprocess — the `ui` binary stays deterministic). Spec 019 phase-1
+  table updated to match.
+
+## 2026-07-22 - Figma Agent response integrity + bounded inspection
+
+- `figma-agent inspect` gains `--depth <N>` (default 1) for bounded, progressive-
+  disclosure inspection: the reverse-walker prunes past the budget and marks cut
+  branches with `childrenTruncated: true`, and BOTH async pre-passes (main-component +
+  keyed-variable resolution) are bounded by the same depth, so a shallow inspect makes
+  no plugin round-trips for descendants it will prune. `scan-node` and `mirror-verify`
+  stay fully unbounded (default depth undefined) — the mirror fixed-point is unchanged.
+  Invalid depth (negative / non-integer) fails closed with `E_INVALID_ARGS` before any
+  plugin call.
+- Response integrity is now a hard gate. New `E_RESPONSE_INTEGRITY` error code: every
+  command's stdout is serialized once and re-parsed before it is written, and the
+  process drains stdout before exit — closing the "exit 0 + truncated JSON" hole where
+  a large payload was silently cut off on a pipe. Response SIZE is telemetry only; a
+  large valid payload is always accepted. `printErrorJson` runs through the same gate.
+- `figma-agent status` gains `--timeout <ms>` (default 2000) bounding the optional live
+  plugin enrichment; on timeout it returns the broker facts with `enrichTimedOut: true`
+  instead of blocking, and disconnected-as-data behaviour is preserved.
+
 ## 2026-07-22 - Full-studio one-command setup (Spec 020)
 
 - Added `setup.sh` at the repo root — a single idempotent bootstrap that takes a fresh
