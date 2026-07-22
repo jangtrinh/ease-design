@@ -57,3 +57,28 @@ Still rebuilds a local git clone in place (`git pull` + `npm run build` + `npm l
 the ease-design repo) — it does not know how to update from a registry. A registry-based
 update path (`npm i -g ease-design@latest` for the kernel, `uv tool upgrade design-os`
 once PyPI-published) is future work, flagged here, not implemented in this phase.
+
+## GOTCHA — token type (cost a real failed run, 2026-07-22)
+
+The first real release run (tag `v0.1.0` → run 29884567691) passed every gate, signed a
+provenance statement, then **failed the registry PUT with E403**:
+
+> `Two-factor authentication or granular access token with bypass 2fa enabled is required
+> to publish packages.`
+
+The account (`jangtrinhvn`) enforces 2FA for publishes. A **granular** access token that
+does NOT have "bypass 2FA" enabled can `npm whoami` (read) but **cannot publish** — the read
+success is a false green. Nothing was published (registry stayed 404); no harm, just a wasted
+run.
+
+**Fix (owner action on npmjs.com):** generate a **Classic → Automation** token (Automation
+tokens bypass 2FA and are the standard CI path), or a Granular token with write/publish scope
+AND 2FA-bypass enabled. Then update the repo secret and re-run — no new tag needed:
+
+```bash
+printf '%s' '<NEW_TOKEN>' | gh secret set NPM_TOKEN --repo jangtrinh/design-os
+gh run rerun 29884567691 --repo jangtrinh/design-os   # re-runs the same tag with the new secret
+```
+
+Rotate/delete the burned token afterward. The tag `v0.1.0` already points at the merged
+main (`13a9444`); the code, gates, and provenance are all proven — only the token blocks.
