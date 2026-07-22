@@ -13,6 +13,7 @@
  * the documented contract. This is a data table (config-like); it is
  * exempt from the 200-line code-file guideline.
  */
+import { RUNTIMES } from "./runtime-registry.js";
 
 export interface FlagSignature {
   /** Long-flag name without leading dashes. */
@@ -461,7 +462,7 @@ export const COMMAND_SIGNATURES: Readonly<Record<string, CommandSchema>> = {
       summary: "Install adapter wrappers for one or all runtimes",
       positionals: [],
       flags: [
-        { name: "runtime", type: "string", values: ["claude", "antigravity", "codex"], summary: "Target runtime" },
+        { name: "runtime", type: "string", values: RUNTIMES, summary: "Target runtime" },
         { name: "all", type: "boolean", summary: "Write all three runtimes (mutually exclusive with --runtime)" },
         { name: "cwd", type: "string", summary: "Target directory (default: current working directory)" },
         { name: "force", type: "boolean", summary: "Overwrite existing manifest and adapter files" },

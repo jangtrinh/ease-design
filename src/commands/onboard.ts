@@ -17,6 +17,7 @@ import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { okJson } from "../core/output.js";
 import { resolvePackageRoots } from "../core/init-stub.js";
+import { RUNTIME_REGISTRY } from "../core/runtime-registry.js";
 import { renderBanner, ruleHeader, checkItem } from "../core/report-style.js";
 
 const CMD = "onboard";
@@ -98,10 +99,9 @@ function hasFigmaRef(): boolean {
 }
 
 function detectSteps(cwd: string): Step[] {
-  const hasAdapters =
-    existsSync(join(cwd, ".claude", "ease-design.json")) ||
-    existsSync(join(cwd, ".agent", "ease-design.json")) ||
-    existsSync(join(cwd, "AGENTS.ease-design.json"));
+  const hasAdapters = RUNTIME_REGISTRY.filter((r) => r.native).some((r) =>
+    existsSync(r.manifestPath(cwd)),
+  );
   const hasGit = existsSync(join(cwd, ".git"));
   const hasDs = existsSync(join(cwd, "design", "ds.manifest.json"));
   const soulStatus = readSoulStatus(join(cwd, "design", "soul.md"));

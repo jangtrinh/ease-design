@@ -20,8 +20,9 @@ import { versions } from "node:process";
 import type { ParsedArgs } from "../core/cli-args.js";
 import type { CommandResult } from "../core/output.js";
 import { okJsonWithExit } from "../core/output.js";
-import { resolvePackageRoots, RUNTIMES, manifestTargetPath } from "../core/init-stub.js";
-import type { Runtime } from "../core/init-stub.js";
+import { resolvePackageRoots } from "../core/init-stub.js";
+import { RUNTIME_REGISTRY } from "../core/runtime-registry.js";
+import type { Runtime } from "../core/runtime-registry.js";
 import { lintProjectAdapters } from "../core/adapter-lint.js";
 import { ruleHeader, checkItem } from "../core/report-style.js";
 
@@ -107,9 +108,10 @@ function checkKnowledgeRoot(knowledgeRoot: string | null): Check {
 
 /** Find the first runtime manifest present under cwd; returns its path or null. */
 function findProjectManifest(cwd: string): { runtime: Runtime; path: string } | null {
-  for (const runtime of RUNTIMES) {
-    const p = manifestTargetPath(cwd, runtime);
-    if (existsSync(p)) return { runtime, path: p };
+  for (const entry of RUNTIME_REGISTRY) {
+    if (!entry.native) continue;
+    const p = entry.manifestPath(cwd);
+    if (existsSync(p)) return { runtime: entry.id, path: p };
   }
   return null;
 }

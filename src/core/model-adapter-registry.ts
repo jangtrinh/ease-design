@@ -26,19 +26,21 @@
  * a single quoted CLI argument — never via `eval`, so no shell-injection risk
  * from the packet's contents.
  */
-import type { Runtime } from "./init-stub.js";
+import { RUNTIME_REGISTRY, findRuntimeEntry } from "./runtime-registry.js";
+import type { ModelAdapterMode, Runtime } from "./runtime-registry.js";
 
-export type ModelAdapterMode = "stdin" | "arg";
+export type { ModelAdapterMode };
 
-/** One entry per runtime design:os models today. Extend only with a fresh live probe. */
-export const MODEL_ADAPTERS: Record<Runtime, { argv: string[]; mode: ModelAdapterMode }> = {
-  claude: { argv: ["claude", "-p"], mode: "stdin" },
-  codex: { argv: ["codex", "exec"], mode: "stdin" },
-  antigravity: {
-    argv: ["agy", "--dangerously-skip-permissions", "-p"],
-    mode: "arg",
-  },
-};
+/**
+ * One entry per runtime design:os models today. Derived from RUNTIME_REGISTRY
+ * (spec 021 P1) — the live-probed table above documents the values; the
+ * registry entries (src/core/runtime-registry.ts) are the source of truth.
+ * Extend only with a fresh live probe.
+ */
+export const MODEL_ADAPTERS: Record<Runtime, { argv: string[]; mode: ModelAdapterMode }> =
+  Object.fromEntries(
+    RUNTIME_REGISTRY.filter((r) => r.native).map((r) => [r.id, r.modelAdapter]),
+  ) as Record<Runtime, { argv: string[]; mode: ModelAdapterMode }>;
 
 /**
  * Build the POSIX wrapper script content for a given runtime.
@@ -77,12 +79,10 @@ export function buildModelWrapperScript(runtime: Runtime): string {
  * its own (its manifest is a cwd-root sidecar), so the wrapper sits alongside it.
  */
 export function modelWrapperRelPath(runtime: Runtime): string {
-  switch (runtime) {
-    case "claude":
-      return ".claude/design-os-model.sh";
-    case "antigravity":
-      return ".agent/design-os-model.sh";
-    case "codex":
-      return "design-os-model.sh";
+  const entry = findRuntimeEntry(runtime);
+  if (entry === undefined) {
+    // Unreachable for any value typed as `Runtime` — the registry defines the type.
+    throw new Error(`modelWrapperRelPath: unknown runtime '${String(runtime)}'`);
   }
+  return entry.wrapperRelPath;
 }

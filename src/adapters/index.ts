@@ -8,9 +8,7 @@
  */
 import { join } from "node:path";
 import type { Runtime } from "../core/init-stub.js";
-import { generateClaudeAdapter } from "./claude.js";
-import { generateAntigravityAdapter } from "./antigravity.js";
-import { generateCodexAdapter } from "./codex.js";
+import { findRuntimeEntry } from "../core/runtime-registry.js";
 import { buildModelWrapperScript, modelWrapperRelPath } from "../core/model-adapter-registry.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,16 +52,12 @@ export interface GenerateAdapterInput extends AdapterInput {
  * expects only workflow/skill/AGENTS.md shapes, never sees it.
  */
 export function generateAdapter(input: GenerateAdapterInput): AdapterArtifact[] {
-  const artifacts: AdapterArtifact[] = (() => {
-    switch (input.runtime) {
-      case "claude":
-        return generateClaudeAdapter(input);
-      case "antigravity":
-        return generateAntigravityAdapter(input);
-      case "codex":
-        return generateCodexAdapter(input);
-    }
-  })();
+  const entry = findRuntimeEntry(input.runtime);
+  if (entry === undefined) {
+    // Unreachable for any value typed as `Runtime` — the registry defines the type.
+    throw new Error(`generateAdapter: unknown runtime '${String(input.runtime)}'`);
+  }
+  const artifacts: AdapterArtifact[] = entry.adapterFn(input);
   artifacts.push({
     mode: "write",
     absPath: join(input.cwd, modelWrapperRelPath(input.runtime)),

@@ -15,12 +15,15 @@
  */
 import { existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
+import { RUNTIMES, findRuntimeEntry } from "./runtime-registry.js";
+import type { Runtime } from "./runtime-registry.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type Runtime = "claude" | "antigravity" | "codex";
-
-export const RUNTIMES: readonly Runtime[] = ["claude", "antigravity", "codex"] as const;
+// `Runtime` and `RUNTIMES` are re-exported here (spec 021 P1) for back-compat —
+// runtime-registry.ts is now the single source; init-stub.ts is a consumer.
+export type { Runtime };
+export { RUNTIMES };
 
 // ─── Package-root resolution ────────────────────────────────────────────────────
 
@@ -188,9 +191,10 @@ export function buildManifest(input: {
  * `AGENTS.md` so the write is idempotent and machine-readable.
  */
 export function manifestTargetPath(cwd: string, runtime: Runtime): string {
-  switch (runtime) {
-    case "claude":      return join(cwd, ".claude", "ease-design.json");
-    case "antigravity": return join(cwd, ".agent",  "ease-design.json");
-    case "codex":       return join(cwd, "AGENTS.ease-design.json");
+  const entry = findRuntimeEntry(runtime);
+  if (entry === undefined) {
+    // Unreachable for any value typed as `Runtime` — the registry defines the type.
+    throw new Error(`manifestTargetPath: unknown runtime '${String(runtime)}'`);
   }
+  return entry.manifestPath(cwd);
 }
