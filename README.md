@@ -304,8 +304,7 @@ These are the six common moves. The full adapter exposes 16 workflows when the t
 ## Quick start
 
 ```sh
-git clone https://github.com/jangtrinh/design-os.git
-cd design-os && npm install && npm run build && npm link
+npm install -g ease-design     # installs the `ui` kernel (zero runtime deps)
 ui doctor                      # verify the install is healthy
 ```
 
@@ -325,7 +324,9 @@ Then open your agent CLI in that project and type:
 That's the whole loop: **describe → compile → qualify.** Have an existing app? Run
 `/ui:learn` first so the DS is compiled from your product's own evidence.
 
-> Once published to npm, a global install replaces the clone-and-link step.
+> Working on DESIGN:OS itself? Clone `jangtrinh/design-os`, then `npm install && npm run
+> build && npm link` for a repo-linked `ui`. The optional Figma/recall/a11y hands live in
+> that repo and are not part of the published kernel.
 
 ---
 
@@ -712,6 +713,7 @@ The recent wave, newest first — full history in [CHANGELOG.md](CHANGELOG.md).
 
 | Date | Change | Commit |
 |---|---|---|
+| 2026-07-22 | **Published to npm** — `npm i -g ease-design` (v0.1.0, MIT, zero deps); first public release from CI with sigstore provenance. Kernel-only; Figma/recall/a11y hands ship separately later | `281fc55` |
 | 2026-07-21 | **Report renderer + preview links (Spec 019 P2)** — style-A (`ruleHeader`/`checkItem`/`kv`) adopted in `ui doctor`, `ui ds preview`, `ui designmd audit`, `design-os doctor`, `design-os evolution`; new OSC-8-safe `previewLink`/`figmaNote` convention (bare `file://` paths, never markdown links); Python mirror `report_style.py`. `--json`/exit codes unchanged | `7ea1429` |
 | 2026-07-21 | **Onboarding first-run (Spec 019 P1)** — `ui onboard` readiness checklist (adapters, git, DS, soul, learning loop + optional agents/Figma), a shared style-A report renderer, `ui init` chaining to `onboard`/`guide`, and host-approval-before-install discipline wired into the `/ui:init` wrapper + onboard journey | `61f35a7` |
 | 2026-07-21 | **Suite-level IMPROVING gate** — the living-agent proof graduates only from a preregistered suite (≥3 holdouts across ≥2 categories, mean +10, aggregate repair/recurrence reductions, every case wins); a single comparison can no longer graduate and a 0→0 metric no longer reads as 100%. Verdict stays `APPLIED` | `591016c` |

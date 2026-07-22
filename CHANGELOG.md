@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-22 - Published to npm — `ease-design@0.1.0`
+
+- The `ui` kernel is now installable with `npm install -g ease-design` (zero runtime
+  deps, MIT). First public release, published from CI with npm **provenance** (sigstore
+  attestation of the GitHub Actions build).
+- The published package ships the `ui` kernel + `knowledge/` + `schemas/` + `templates/`
+  only. The optional Figma/recall/a11y hands stay in the repo (`jangtrinh/design-os`) and
+  will be distributed separately later.
+- Release plumbing fix: `package.json` `repository.url` now points at the real repo
+  (`jangtrinh/design-os`), which npm provenance requires to match the CI build (the npm
+  package name `ease-design` and the GitHub repo name `design-os` are intentionally
+  different).
+
 ## 2026-07-22 - Distribution prep (Spec 019 P3)
 
 - distribution: version-gate + PyPI metadata + publish runbook; no publish executed.
